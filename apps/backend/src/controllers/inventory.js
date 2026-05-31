@@ -27,7 +27,7 @@ export async function registerMerma(req, res) {
 
   const db = getDb();
   const ing = await db.execute({
-    sql: `SELECT id, name, stock_qty FROM ingredients WHERE id = ? AND is_active = 1`,
+    sql: `SELECT id, name, stock_qty, cost_unit FROM ingredients WHERE id = ? AND is_active = 1`,
     args: [ingredient_id],
   });
   if (!ing.rows.length) return res.status(404).json({ error: 'INSUMO_NO_ENCONTRADO' });
@@ -46,9 +46,9 @@ export async function registerMerma(req, res) {
       args: [delta, ingredient_id],
     },
     {
-      sql: `INSERT INTO inventory_adjustments (id, ingredient_id, user_id, type, qty_delta, reason)
-            VALUES (?,?,?,?,?,?)`,
-      args: [adjId, ingredient_id, req.user.id, type, delta, String(reason).trim()],
+      sql: `INSERT INTO inventory_adjustments (id, ingredient_id, user_id, type, qty_delta, unit_cost, reason)
+            VALUES (?,?,?,?,?,?,?)`,
+      args: [adjId, ingredient_id, req.user.id, type, delta, Number(ing.rows[0].cost_unit), String(reason).trim()],
     },
     {
       sql: `INSERT INTO audit_logs (id, user_id, action, entity, entity_id, severity, metadata, ip_address)

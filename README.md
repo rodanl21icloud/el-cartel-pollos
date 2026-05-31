@@ -117,7 +117,7 @@ para autorizar `PUT`/`DELETE` de cajero/preparador (header `x-management-otp`).
 | POST | `/api/expenses` | autenticado (registrar gasto) |
 | GET  | `/api/expenses` | **solo GERENCIA** |
 | PUT/DELETE | `/api/products/:id` · `/api/ingredients/:id` | **OTP gerencia** si no es GERENCIA |
-| GET  | `/api/reports/turn-summary` · `/closures` · `/cash-flow` | **solo GERENCIA** |
+| GET  | `/api/reports/turn-summary` · `/closures` · `/cash-flow` · `/pnl` | **solo GERENCIA** |
 
 ## Flujo de venta (resumen)
 1. Login → backend emite JWT + clave de sesión; el frontend la importa en memoria (`crypto.js`).
@@ -137,6 +137,11 @@ para autorizar `PUT`/`DELETE` de cajero/preparador (header `x-management-otp`).
   cuadratura). El cajero nunca ve el teórico antes de declarar.
 - **Flujo de caja** (`/reports/cash-flow`, GERENCIA): ingresos vs egresos de **todo el dinero**
   por día, con saldo acumulado y desglose de egresos por categoría.
+- **Estado de Resultados / P&L** (`/reports/pnl`, GERENCIA): ventas − **costo de insumos (BOM,
+  costo congelado por movimiento)** = utilidad bruta; − mermas − gastos operativos = utilidad
+  operativa; los **retiros de socios** se muestran aparte (no son gasto). Incluye **food cost %**
+  y márgenes. El costo unitario se congela en `inventory_adjustments.unit_cost` al vender/mermar,
+  para un P&L histórico correcto aunque cambien los precios de los insumos.
 
 > Las marcas de tiempo (`sold_at`, `opened_at`, `spent_at`) se guardan en **ISO 8601 UTC**
 > para que los rangos de período sean comparables (no usar `datetime('now')` en columnas

@@ -114,6 +114,7 @@ CREATE TABLE IF NOT EXISTS inventory_adjustments (
   user_id         TEXT NOT NULL,
   type            TEXT NOT NULL CHECK (type IN ('MERMA','VENTA','REPOSICION','CONTEO')),
   qty_delta       REAL NOT NULL,                    -- negativo descuenta, positivo repone
+  unit_cost       REAL NOT NULL DEFAULT 0,          -- costo unitario congelado al momento (P&L histórico)
   reason          TEXT NOT NULL,                    -- justificación obligatoria
   sale_id         TEXT,                             -- traza el descuento por BOM si aplica
   created_at      TEXT NOT NULL DEFAULT (datetime('now')),

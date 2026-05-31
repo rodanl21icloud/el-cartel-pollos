@@ -8,7 +8,7 @@ import { syncSale, listProducts } from './controllers/sales.js';
 import { registerMerma, listIngredients, lowStockAlerts } from './controllers/inventory.js';
 import { updateProduct, deleteProduct, updateIngredient } from './controllers/admin.js';
 import { listCategories, createExpense, listExpenses } from './controllers/expenses.js';
-import { turnSummary, closuresHistory, cashFlow } from './controllers/reports.js';
+import { turnSummary, closuresHistory, cashFlow, pnl } from './controllers/reports.js';
 
 const app = express();
 app.use(express.json({ limit: '256kb' }));
@@ -52,6 +52,7 @@ app.put('/api/ingredients/:id', updateIngredient);
 app.get('/api/reports/turn-summary', requireRole('GERENCIA'), turnSummary);
 app.get('/api/reports/closures', requireRole('GERENCIA'), closuresHistory);
 app.get('/api/reports/cash-flow', requireRole('GERENCIA'), cashFlow);
+app.get('/api/reports/pnl', requireRole('GERENCIA'), pnl);
 
 // Handler de errores uniforme.
 app.use((err, _req, res, _next) => {

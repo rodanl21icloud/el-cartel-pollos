@@ -8,6 +8,7 @@ import Merma from './screens/Merma.jsx';
 import Manage from './screens/Manage.jsx';
 import Gastos from './screens/Gastos.jsx';
 import Flujo from './screens/Flujo.jsx';
+import Pnl from './screens/Pnl.jsx';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -48,6 +49,7 @@ export default function App() {
             ['merma', 'Mermas'],
             ['cash', 'Caja'],
             ['flujo', 'Flujo'],
+            ['pnl', 'P&L'],
             ['manage', 'Gestión'],
           ].map(([key, label]) => (
             <button key={key} onClick={() => setScreen(key)}
@@ -66,6 +68,7 @@ export default function App() {
         {screen === 'merma' && <Merma />}
         {screen === 'cash' && <CashClose />}
         {screen === 'flujo' && <Flujo role={user.role} />}
+        {screen === 'pnl' && <Pnl role={user.role} />}
         {screen === 'manage' && <Manage role={user.role} />}
       </main>
     </div>

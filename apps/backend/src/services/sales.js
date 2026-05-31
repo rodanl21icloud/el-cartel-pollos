@@ -46,7 +46,7 @@ export async function registerSale(payload, ctx) {
 
   const recipeRes = await db.execute({
     sql: `SELECT pr.product_id, pr.ingredient_id, pr.qty_per_unit,
-                 i.name AS ing_name, i.stock_qty
+                 i.name AS ing_name, i.stock_qty, i.cost_unit
           FROM product_recipes pr
           JOIN ingredients i ON i.id = pr.ingredient_id
           WHERE pr.product_id IN (${placeholders})`,
@@ -77,7 +77,8 @@ export async function registerSale(payload, ctx) {
     });
 
     for (const r of recipeRes.rows.filter((x) => x.product_id === product.id)) {
-      const prev = ingredientUse.get(r.ingredient_id) || { qty: 0, name: r.ing_name, stock: Number(r.stock_qty) };
+      const prev = ingredientUse.get(r.ingredient_id) ||
+        { qty: 0, name: r.ing_name, stock: Number(r.stock_qty), cost: Number(r.cost_unit) };
       prev.qty += Number(r.qty_per_unit) * qty;
       ingredientUse.set(r.ingredient_id, prev);
     }
@@ -120,12 +121,13 @@ export async function registerSale(payload, ctx) {
             WHERE id = ?`,
       args: [use.qty, ingId],
     });
-    // Traza del descuento como ajuste de inventario (tipo VENTA).
+    // Traza del descuento como ajuste de inventario (tipo VENTA),
+    // con el costo unitario congelado para el P&L histórico.
     stmts.push({
       sql: `INSERT INTO inventory_adjustments
-              (id, ingredient_id, user_id, type, qty_delta, reason, sale_id)
-            VALUES (?,?,?, 'VENTA', ?, ?, ?)`,
-      args: [randomUUID(), ingId, ctx.userId, -use.qty,
+              (id, ingredient_id, user_id, type, qty_delta, unit_cost, reason, sale_id)
+            VALUES (?,?,?, 'VENTA', ?, ?, ?, ?)`,
+      args: [randomUUID(), ingId, ctx.userId, -use.qty, use.cost,
              `Descuento BOM por venta ${client_uuid}`, saleId],
     });
   }

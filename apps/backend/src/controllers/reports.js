@@ -120,3 +120,81 @@ export async function cashFlow(req, res) {
 }
 
 const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+const pct = (num, den) => (den > 0 ? round2((num / den) * 100) : 0);
+
+/**
+ * GET /api/reports/pnl?from=&to=
+ * Estado de Resultados (P&L). Combina ventas, costo real de insumos (BOM,
+ * costo congelado por movimiento), mermas y gastos operativos. (GERENCIA)
+ *   Utilidad bruta     = ventas − costo insumos
+ *   Utilidad operativa = utilidad bruta − mermas − gastos operativos
+ * Los RETIROS de socios no son gasto operativo (son distribución): se muestran aparte.
+ */
+export async function pnl(req, res) {
+  const db = getDb();
+  const to = req.query.to || new Date().toISOString();
+  const from = req.query.from ||
+    new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+
+  // Ventas (ingresos) en el período.
+  const ventasRes = await db.execute({
+    sql: `SELECT COALESCE(SUM(total),0) AS monto FROM sales
+          WHERE status='CONFIRMADA' AND sold_at >= ? AND sold_at <= ?`,
+    args: [from, to],
+  });
+  const ventas = Number(ventasRes.rows[0].monto);
+
+  // Costo de insumos vendidos (COGS) y mermas, con costo congelado.
+  const cogsRes = await db.execute({
+    sql: `SELECT type, COALESCE(SUM(ABS(qty_delta) * unit_cost),0) AS costo
+          FROM inventory_adjustments
+          WHERE type IN ('VENTA','MERMA') AND created_at >= ? AND created_at <= ?
+          GROUP BY type`,
+    args: [from, to],
+  });
+  let costo_insumos = 0, mermas = 0;
+  for (const r of cogsRes.rows) {
+    if (r.type === 'VENTA') costo_insumos = round2(Number(r.costo));
+    if (r.type === 'MERMA') mermas = round2(Number(r.costo));
+  }
+
+  // Gastos por categoría, separando operativos de retiros.
+  const gastosRes = await db.execute({
+    sql: `SELECT c.name AS categoria, c.kind, COALESCE(SUM(e.amount),0) AS monto
+          FROM expenses e JOIN expense_categories c ON c.id = e.category_id
+          WHERE e.spent_at >= ? AND e.spent_at <= ?
+          GROUP BY c.id ORDER BY monto DESC`,
+    args: [from, to],
+  });
+  let gastos_operativos = 0, retiros = 0;
+  const gastos_por_categoria = [];
+  for (const r of gastosRes.rows) {
+    const monto = round2(Number(r.monto));
+    if (r.kind === 'RETIRO') retiros += monto;
+    else { gastos_operativos += monto; gastos_por_categoria.push({ categoria: r.categoria, monto }); }
+  }
+  gastos_operativos = round2(gastos_operativos);
+  retiros = round2(retiros);
+
+  const utilidad_bruta = round2(ventas - costo_insumos);
+  const utilidad_operativa = round2(utilidad_bruta - mermas - gastos_operativos);
+
+  return res.json({
+    period: { from, to },
+    ventas,
+    costo_insumos,
+    utilidad_bruta,
+    mermas,
+    gastos_operativos,
+    gastos_por_categoria,
+    utilidad_operativa,
+    retiros,
+    utilidad_despues_retiros: round2(utilidad_operativa - retiros),
+    margenes: {
+      food_cost_pct: pct(costo_insumos, ventas),     // % de ventas que se va en insumos
+      merma_pct: pct(mermas, ventas),
+      utilidad_bruta_pct: pct(utilidad_bruta, ventas),
+      utilidad_operativa_pct: pct(utilidad_operativa, ventas),
+    },
+  });
+}
