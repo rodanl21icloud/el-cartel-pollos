@@ -41,8 +41,10 @@ export default function Pos() {
     };
     const res = await recordSale(payload);
     setCart({});
-    setToast(res.synced ? `Venta registrada (${money(total)})` : 'Sin red: venta en cola offline ✓');
-    setTimeout(() => setToast(null), 2500);
+    setToast(res.synced
+      ? `✅ Pedido N° ${res.order_number} · ${money(total)}`
+      : '📴 Sin red: pedido en cola (N° al reconectar)');
+    setTimeout(() => setToast(null), 3500);
   }
 
   return (

@@ -27,11 +27,12 @@ export async function registerSale(payload, ctx) {
 
   // Idempotencia: si ya existe, no se reprocesa (clave para offline-sync).
   const exists = await db.execute({
-    sql: `SELECT id, total FROM sales WHERE client_uuid = ?`,
+    sql: `SELECT id, total, order_number FROM sales WHERE client_uuid = ?`,
     args: [client_uuid],
   });
   if (exists.rows.length) {
-    return { status: 'DUPLICATE', saleId: exists.rows[0].id, total: Number(exists.rows[0].total) };
+    return { status: 'DUPLICATE', saleId: exists.rows[0].id, total: Number(exists.rows[0].total),
+             orderNumber: exists.rows[0].order_number != null ? Number(exists.rows[0].order_number) : null };
   }
 
   // Carga de productos + recetas en lote.
@@ -93,16 +94,26 @@ export async function registerSale(payload, ctx) {
     }
   }
 
+  // Número de orden correlativo por día (zona America/Santiago), asignado
+  // por el servidor al sincronizar -> sin choques entre cajas ni offline.
+  const businessDay = chileBusinessDay();
+  const maxRes = await db.execute({
+    sql: `SELECT COALESCE(MAX(order_number), 0) AS m FROM sales WHERE business_day = ?`,
+    args: [businessDay],
+  });
+  const orderNumber = Number(maxRes.rows[0].m) + 1;
+
   // ---- Transacción atómica (batch) ----
   const stmts = [];
 
   stmts.push({
     sql: `INSERT INTO sales
             (id, client_uuid, user_id, total, payment_method, status,
-             payload_hash, synced_offline, sold_at)
-          VALUES (?,?,?,?,?, 'CONFIRMADA', ?,?,?)`,
+             payload_hash, synced_offline, business_day, order_number, dispatch_status, sold_at)
+          VALUES (?,?,?,?,?, 'CONFIRMADA', ?,?,?,?, 'PENDIENTE', ?)`,
     args: [saleId, client_uuid, ctx.userId, total, payment_method,
-           ctx.payloadHash, ctx.syncedOffline ? 1 : 0, sold_at || new Date().toISOString()],
+           ctx.payloadHash, ctx.syncedOffline ? 1 : 0, businessDay, orderNumber,
+           sold_at || new Date().toISOString()],
   });
 
   for (const it of saleItems) {
@@ -142,5 +153,10 @@ export async function registerSale(payload, ctx) {
 
   await db.batch(stmts, 'write'); // rollback automático si algo falla.
 
-  return { status: 'CREATED', saleId, total };
+  return { status: 'CREATED', saleId, total, orderNumber };
+}
+
+/** Día hábil en zona America/Santiago, formato 'YYYY-MM-DD'. */
+export function chileBusinessDay(d = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(d);
 }

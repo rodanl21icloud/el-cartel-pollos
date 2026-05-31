@@ -13,6 +13,7 @@ import { getRecipe, setRecipe } from './controllers/recipes.js';
 import { listCategories, createExpense, listExpenses } from './controllers/expenses.js';
 import { turnSummary, closuresHistory, cashFlow, pnl } from './controllers/reports.js';
 import { getPermissions, myPermissions, updatePermission } from './controllers/permissions.js';
+import { listDispatch, updateDispatchStatus } from './controllers/dispatch.js';
 
 const app = express();
 app.use(express.json({ limit: '256kb' }));
@@ -22,8 +23,10 @@ app.get('/health', (_req, res) => res.json({ ok: true }));
 // --- Público ---
 app.post('/api/auth/login', login);
 
-// --- Protegido: JWT en todo /api + guard OTP sobre PUT/DELETE ---
-app.use('/api', requireAuth, requireOtpForMutation);
+// --- Protegido: JWT en todo /api. El OTP de gerencia se aplica de forma
+// SELECTIVA solo a operaciones sensibles del catálogo/permisos (no a las
+// acciones operativas como avanzar el despacho o editar una receta). ---
+app.use('/api', requireAuth);
 
 // Permisos efectivos del usuario actual (para que la UI muestre/oculte).
 app.get('/api/permissions/me', myPermissions);
@@ -45,21 +48,25 @@ app.get('/api/expenses', requirePermission('reports.view'), listExpenses);
 // Sincronización de ventas (firma HMAC obligatoria, anti-tamper)
 app.post('/api/sales/sync', requirePermission('pos.sell'), verifyHmac, syncSale);
 
+// Tablero de despacho (número de orden + estados)
+app.get('/api/dispatch', requirePermission('dispatch.manage'), listDispatch);
+app.put('/api/dispatch/:saleId/status', requirePermission('dispatch.manage'), updateDispatchStatus);
+
 // Inventario: mermas + lecturas
 app.get('/api/inventory/ingredients', listIngredients);
 app.get('/api/inventory/alerts', lowStockAlerts);
 app.post('/api/inventory/merma', requirePermission('inventory.merma'), registerMerma);
 
-// Gestión de insumos (CRUD + reposición). PUT/DELETE -> también OTP de gerencia.
+// Gestión de insumos (CRUD + reposición). Editar/eliminar -> también OTP de gerencia.
 app.post('/api/inventory/ingredients', requirePermission('inventory.manage'), createIngredient);
-app.put('/api/inventory/ingredients/:id', requirePermission('inventory.manage'), updateIngredient);
-app.delete('/api/inventory/ingredients/:id', requirePermission('inventory.manage'), deleteIngredient);
+app.put('/api/inventory/ingredients/:id', requirePermission('inventory.manage'), requireOtpForMutation, updateIngredient);
+app.delete('/api/inventory/ingredients/:id', requirePermission('inventory.manage'), requireOtpForMutation, deleteIngredient);
 app.post('/api/inventory/ingredients/:id/restock', requirePermission('inventory.manage'), restockIngredient);
 
-// Administración de carta (PUT/DELETE -> también exige OTP de gerencia)
+// Administración de carta. Editar/eliminar precio o plato -> también OTP de gerencia.
 app.post('/api/products', requirePermission('menu.manage'), createProduct);
-app.put('/api/products/:id', requirePermission('menu.manage'), updateProduct);
-app.delete('/api/products/:id', requirePermission('menu.manage'), deleteProduct);
+app.put('/api/products/:id', requirePermission('menu.manage'), requireOtpForMutation, updateProduct);
+app.delete('/api/products/:id', requirePermission('menu.manage'), requireOtpForMutation, deleteProduct);
 
 // Recetas (BOM) por producto. Decimales soportados.
 app.get('/api/products/:id/recipe', requirePermission('recipes.manage'), getRecipe);
@@ -73,7 +80,7 @@ app.get('/api/reports/pnl', requirePermission('reports.view'), pnl);
 
 // Administración de permisos (matriz rol×módulo). PUT también exige OTP.
 app.get('/api/permissions', requirePermission('permissions.manage'), getPermissions);
-app.put('/api/permissions', requirePermission('permissions.manage'), updatePermission);
+app.put('/api/permissions', requirePermission('permissions.manage'), requireOtpForMutation, updatePermission);
 
 // Handler de errores uniforme.
 app.use((err, _req, res, _next) => {

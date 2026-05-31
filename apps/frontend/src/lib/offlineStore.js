@@ -40,7 +40,8 @@ export async function recordSale(sale) {
   try {
     const res = await postSale(envelope);
     if (!res.ok) throw new Error('HTTP_' + res.status);
-    return { synced: true };
+    const body = await res.json().catch(() => ({}));
+    return { synced: true, order_number: body.order_number, total: body.total };
   } catch {
     await tx('readwrite', (s) => s.put({ ...envelope.payload, _envelope: envelope }));
     return { synced: false, queued: true };

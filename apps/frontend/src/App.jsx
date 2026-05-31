@@ -11,10 +11,12 @@ import Pnl from './screens/Pnl.jsx';
 import Permisos from './screens/Permisos.jsx';
 import Inventario from './screens/Inventario.jsx';
 import Carta from './screens/Carta.jsx';
+import Despacho from './screens/Despacho.jsx';
 
 // Cada ítem de nav se muestra solo si el usuario tiene el permiso `perm`.
 const NAV = [
   { key: 'pos', label: 'POS', perm: 'pos.sell' },
+  { key: 'despacho', label: 'Despacho', perm: 'dispatch.manage' },
   { key: 'gastos', label: 'Gastos', perm: 'expenses.manage' },
   { key: 'merma', label: 'Mermas', perm: 'inventory.merma' },
   { key: 'inventario', label: 'Inventario', perm: 'inventory.manage' },
@@ -80,6 +82,7 @@ export default function App() {
       <main className="flex-1 p-4">
         {!screen && <p className="text-center text-zinc-500 mt-10">No tienes módulos habilitados. Contacta a gerencia.</p>}
         {screen === 'pos' && <Pos />}
+        {screen === 'despacho' && <Despacho />}
         {screen === 'gastos' && <Gastos />}
         {screen === 'merma' && <Merma />}
         {screen === 'inventario' && <Inventario />}

@@ -21,6 +21,7 @@ export async function syncSale(req, res) {
       sale_id: result.saleId,
       client_uuid: payload.client_uuid,
       total: result.total,
+      order_number: result.orderNumber, // N° de orden para despacho
     });
   } catch (err) {
     return res.status(err.status || 500).json({ error: err.message, detail: err.detail });

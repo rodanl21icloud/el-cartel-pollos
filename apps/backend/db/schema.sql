@@ -92,10 +92,17 @@ CREATE TABLE IF NOT EXISTS sales (
   status          TEXT NOT NULL DEFAULT 'CONFIRMADA' CHECK (status IN ('CONFIRMADA','ANULADA')),
   payload_hash    TEXT NOT NULL,                    -- HMAC-SHA256 del payload firmado
   synced_offline  INTEGER NOT NULL DEFAULT 0 CHECK (synced_offline IN (0,1)),
+  -- Despacho: número de orden correlativo por día (asignado por el servidor al sincronizar).
+  business_day    TEXT,                             -- 'YYYY-MM-DD' (zona America/Santiago)
+  order_number    INTEGER,                          -- correlativo dentro del business_day
+  dispatch_status TEXT NOT NULL DEFAULT 'PENDIENTE'
+                    CHECK (dispatch_status IN ('PENDIENTE','EN_PREPARACION','LISTO','ENTREGADO')),
   sold_at         TEXT NOT NULL DEFAULT (datetime('now')),  -- timestamp del dispositivo
   created_at      TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
 );
+CREATE INDEX IF NOT EXISTS idx_sales_business_day ON sales(business_day, order_number);
+CREATE INDEX IF NOT EXISTS idx_sales_dispatch ON sales(dispatch_status);
 
 CREATE INDEX IF NOT EXISTS idx_sales_sold_at ON sales(sold_at);
 CREATE INDEX IF NOT EXISTS idx_sales_payment ON sales(payment_method);

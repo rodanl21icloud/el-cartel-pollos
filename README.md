@@ -117,7 +117,13 @@ para autorizar `PUT`/`DELETE` de cajero/preparador (header `x-management-otp`).
 | POST | `/api/expenses` | autenticado (registrar gasto) |
 | GET  | `/api/expenses` | **solo GERENCIA** |
 | PUT/DELETE | `/api/products/:id` · `/api/ingredients/:id` | **OTP gerencia** si no es GERENCIA |
-| GET  | `/api/reports/turn-summary` · `/closures` · `/cash-flow` · `/pnl` | **solo GERENCIA** |
+| GET  | `/api/reports/turn-summary` · `/closures` · `/cash-flow` · `/pnl` | permiso `reports.view` |
+| POST/PUT/DELETE | `/api/inventory/ingredients[...]` | permiso `inventory.manage` (+OTP en PUT/DELETE) |
+| POST | `/api/inventory/ingredients/:id/restock` | reponer stock (+gasto opcional) |
+| POST | `/api/products` · PUT/DELETE `:id` | permiso `menu.manage` (+OTP en PUT/DELETE) |
+| GET/PUT | `/api/products/:id/recipe` | permiso `recipes.manage` (decimales) |
+| GET/PUT | `/api/dispatch[/:saleId/status]` | permiso `dispatch.manage` |
+| GET/PUT | `/api/permissions` · `/api/permissions/me` | permiso `permissions.manage` |
 
 ## Flujo de venta (resumen)
 1. Login → backend emite JWT + clave de sesión; el frontend la importa en memoria (`crypto.js`).
@@ -146,6 +152,27 @@ para autorizar `PUT`/`DELETE` de cajero/preparador (header `x-management-otp`).
 > Las marcas de tiempo (`sold_at`, `opened_at`, `spent_at`) se guardan en **ISO 8601 UTC**
 > para que los rangos de período sean comparables (no usar `datetime('now')` en columnas
 > que se filtran por rango).
+
+## Permisos por módulo
+La matriz `role_permissions` define qué puede hacer cada rol (10 módulos). Gerencia la
+edita en caliente (`/permissions`, pantalla **Permisos**); el middleware `requirePermission`
+gatea cada endpoint y la nav del frontend se arma según `permissions/me`. El **OTP de gerencia**
+ya no es global: se aplica de forma selectiva solo a operaciones sensibles (editar/eliminar
+carta, insumos y permisos), no a acciones operativas (despacho, recetas).
+
+## Carta, inventario y recetas
+- **Carta**: crear/editar/eliminar platos (SKU autogenerado, baja lógica).
+- **Inventario**: crear/editar/eliminar insumos + **reponer stock** (con gasto enlazado opcional).
+  Borrar un insumo en uso por una receta queda bloqueado.
+- **Recetas (BOM)**: constructor por producto con cantidades **enteras o decimales**
+  (ej. 0,5 pollo, 0,6 kg papas); muestra costo y margen en vivo. Al vender, descuenta del
+  inventario en decimales.
+
+## Despacho (número de orden)
+Cada venta recibe un **número de orden correlativo por día** (zona America/Santiago),
+asignado por el **servidor al sincronizar** (sin choques entre cajas ni offline; una venta
+offline recibe su número al reconectar). El **tablero de despacho** lista los pedidos del día
+y permite avanzarlos: Pendiente → En preparación → Listo → Entregado.
 
 ## PWA / Offline
 La app es una **PWA** (`vite-plugin-pwa` + Workbox). El service worker precachea el
