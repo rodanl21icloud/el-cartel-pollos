@@ -120,3 +120,16 @@ para autorizar `PUT`/`DELETE` de cajero/preparador (header `x-management-otp`).
    (venta + items + descuento BOM de insumos + ajuste de inventario + auditoría) atómico.
 4. Sin red: la venta firmada se encola en **IndexedDB** y se reintenta al volver online
    (idempotente por `client_uuid`).
+
+## PWA / Offline
+La app es una **PWA** (`vite-plugin-pwa` + Workbox). El service worker precachea el
+app shell, por lo que el POS **abre sin conexión desde cero**; el catálogo usa
+`NetworkFirst` (cae a caché si no hay red). El SW solo se activa en build de producción:
+
+```bash
+npm -w @cartel/frontend run build
+npm -w @cartel/frontend run preview   # http://localhost:4173
+```
+Para probar offline: abrir el preview, DevTools → Application → Service Workers →
+marcar **Offline**, y recargar. La app carga; las ventas quedan en cola y se
+sincronizan al reconectar.
