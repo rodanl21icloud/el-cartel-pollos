@@ -34,6 +34,20 @@ CREATE TABLE IF NOT EXISTS role_permissions (
 );
 
 -- ----------------------------------------------------------------
+-- BUSINESS_SETTINGS — datos del local para comprobantes (fila única id=1).
+-- ----------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS business_settings (
+  id            INTEGER PRIMARY KEY CHECK (id = 1),
+  name          TEXT NOT NULL DEFAULT 'El Cartel de los Pollos',
+  address       TEXT,
+  phone         TEXT,
+  rut           TEXT,
+  footer        TEXT,
+  paper_width   INTEGER NOT NULL DEFAULT 80 CHECK (paper_width IN (58, 80)),
+  updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ----------------------------------------------------------------
 -- INGREDIENTS — insumos descontables del inventario teórico.
 -- unit: 'unidad' | 'gramo' | 'mililitro' | 'empaque'
 -- ----------------------------------------------------------------

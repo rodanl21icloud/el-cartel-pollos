@@ -12,6 +12,7 @@ import Permisos from './screens/Permisos.jsx';
 import Inventario from './screens/Inventario.jsx';
 import Carta from './screens/Carta.jsx';
 import Despacho from './screens/Despacho.jsx';
+import Ajustes from './screens/Ajustes.jsx';
 
 // Cada ítem de nav se muestra solo si el usuario tiene el permiso `perm`.
 const NAV = [
@@ -24,6 +25,7 @@ const NAV = [
   { key: 'flujo', label: 'Flujo', perm: 'reports.view' },
   { key: 'pnl', label: 'P&L', perm: 'reports.view' },
   { key: 'carta', label: 'Carta', perm: 'menu.manage' },
+  { key: 'ajustes', label: 'Ajustes', perm: 'settings.manage' },
   { key: 'permisos', label: 'Permisos', perm: 'permissions.manage' },
 ];
 
@@ -90,6 +92,7 @@ export default function App() {
         {screen === 'flujo' && <Flujo role={user.role} />}
         {screen === 'pnl' && <Pnl role={user.role} />}
         {screen === 'carta' && <Carta role={user.role} />}
+        {screen === 'ajustes' && <Ajustes role={user.role} />}
         {screen === 'permisos' && <Permisos />}
       </main>
     </div>

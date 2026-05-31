@@ -124,6 +124,8 @@ para autorizar `PUT`/`DELETE` de cajero/preparador (header `x-management-otp`).
 | GET/PUT | `/api/products/:id/recipe` | permiso `recipes.manage` (decimales) |
 | GET/PUT | `/api/dispatch[/:saleId/status]` | permiso `dispatch.manage` |
 | GET/PUT | `/api/permissions` · `/api/permissions/me` | permiso `permissions.manage` |
+| GET | `/api/sales/:id/receipt` | datos del comprobante (imprimir/reenviar) |
+| GET/PUT | `/api/settings` | datos del negocio (PUT: permiso `settings.manage` +OTP) |
 
 ## Flujo de venta (resumen)
 1. Login → backend emite JWT + clave de sesión; el frontend la importa en memoria (`crypto.js`).
@@ -167,6 +169,14 @@ carta, insumos y permisos), no a acciones operativas (despacho, recetas).
 - **Recetas (BOM)**: constructor por producto con cantidades **enteras o decimales**
   (ej. 0,5 pollo, 0,6 kg papas); muestra costo y margen en vivo. Al vender, descuenta del
   inventario en decimales.
+
+## Comprobantes e impresión
+Al cobrar, el POS muestra el N° de orden y permite **imprimir ticket de cocina** (sin precios,
+ítems grandes), **imprimir boleta** para el cliente y **enviar el comprobante por WhatsApp**
+(link `wa.me` con el resumen). La impresión es vía diálogo del SO (sirve con impresora térmica
+58/80mm instalada como impresora del sistema); el ancho de papel se configura en **Ajustes**,
+junto con nombre, dirección, teléfono, RUT y mensaje de pie. Los pedidos se pueden
+**reimprimir / reenviar** desde el tablero de Despacho.
 
 ## Despacho (número de orden)
 Cada venta recibe un **número de orden correlativo por día** (zona America/Santiago),

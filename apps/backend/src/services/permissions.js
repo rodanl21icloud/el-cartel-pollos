@@ -15,6 +15,7 @@ export const PERMISSIONS = [
   { key: 'recipes.manage',     label: 'Gestionar recetas',        group: 'Catálogo' },
   { key: 'menu.manage',        label: 'Gestionar carta',          group: 'Catálogo' },
   { key: 'reports.view',       label: 'Ver reportes y P&L',       group: 'Gerencia' },
+  { key: 'settings.manage',    label: 'Editar datos del negocio', group: 'Gerencia' },
   { key: 'permissions.manage', label: 'Administrar permisos',     group: 'Gerencia' },
 ];
 const VALID = new Set(PERMISSIONS.map((p) => p.key));

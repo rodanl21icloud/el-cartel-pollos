@@ -5,7 +5,8 @@ import { requirePermission } from './middleware/permissions.js';
 import { verifyHmac } from './middleware/hmac.js';
 import { login } from './controllers/auth.js';
 import { closeCashRegister, getCurrentSession, openSession, registerMovement } from './controllers/cashRegister.js';
-import { syncSale, listProducts } from './controllers/sales.js';
+import { syncSale, listProducts, getReceipt } from './controllers/sales.js';
+import { getSettings, updateSettings } from './controllers/settings.js';
 import { registerMerma, listIngredients, lowStockAlerts,
          createIngredient, deleteIngredient, restockIngredient } from './controllers/inventory.js';
 import { createProduct, updateProduct, deleteProduct, updateIngredient } from './controllers/admin.js';
@@ -47,6 +48,13 @@ app.get('/api/expenses', requirePermission('reports.view'), listExpenses);
 
 // Sincronización de ventas (firma HMAC obligatoria, anti-tamper)
 app.post('/api/sales/sync', requirePermission('pos.sell'), verifyHmac, syncSale);
+
+// Comprobante de una venta (imprimir / reenviar)
+app.get('/api/sales/:id/receipt', getReceipt);
+
+// Datos del negocio (comprobantes)
+app.get('/api/settings', getSettings);
+app.put('/api/settings', requirePermission('settings.manage'), requireOtpForMutation, updateSettings);
 
 // Tablero de despacho (número de orden + estados)
 app.get('/api/dispatch', requirePermission('dispatch.manage'), listDispatch);

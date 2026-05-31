@@ -17,6 +17,10 @@ INSERT OR IGNORE INTO product_recipes (id, product_id, ingredient_id, qty_per_un
   ('rec-2', 'prod-combo-fam', 'ing-papas',   600),   -- 600 g de papas
   ('rec-3', 'prod-combo-fam', 'ing-empaque', 1);     -- 1 empaque
 
+-- Datos del negocio (comprobantes)
+INSERT OR IGNORE INTO business_settings (id, name, address, phone, footer, paper_width)
+VALUES (1, 'El Cartel de los Pollos', 'Reparto a domicilio', '+56 9 1234 5678', '¡Gracias por tu pedido!', 80);
+
 -- Categorías de gasto
 INSERT OR IGNORE INTO expense_categories (id, name, kind) VALUES
   ('cat-proveedores', 'Proveedores e insumos', 'OPERATIVO'),

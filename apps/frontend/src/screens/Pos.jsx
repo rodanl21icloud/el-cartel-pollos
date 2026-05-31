@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { recordSale, flushQueue } from '../lib/offlineStore.js';
+import { buildCustomerReceiptHTML, buildKitchenTicketHTML, whatsappUrl } from '../lib/receipt.js';
+import { openPrint } from '../lib/print.js';
 
 const PAYMENTS = [
   { id: 'EFECTIVO', label: '💵 Efectivo', color: 'bg-green-600' },
@@ -12,10 +14,13 @@ const money = (n) => '$' + Number(n).toLocaleString('es-CL');
 
 export default function Pos() {
   const [products, setProducts] = useState([]);
+  const [settings, setSettings] = useState({ name: 'El Cartel de los Pollos', paper_width: 80 });
   const [cart, setCart] = useState({}); // product_id -> qty
   const [toast, setToast] = useState(null);
+  const [lastSale, setLastSale] = useState(null); // comprobante recién emitido
 
   useEffect(() => { api('/products').then(setProducts).catch(() => {}); }, []);
+  useEffect(() => { api('/settings').then(setSettings).catch(() => {}); }, []);
   useEffect(() => { flushQueue(); }, []);
 
   const items = products.filter((p) => cart[p.id]);
@@ -33,18 +38,24 @@ export default function Pos() {
 
   async function checkout(method) {
     if (!items.length) return;
+    const receiptItems = items.map((p) => ({ name: p.name, qty: cart[p.id], unit_price: p.price, line_total: p.price * cart[p.id] }));
+    const soldAt = new Date().toISOString();
     const payload = {
       client_uuid: crypto.randomUUID(),
       payment_method: method,
-      sold_at: new Date().toISOString(),
+      sold_at: soldAt,
       items: items.map((p) => ({ product_id: p.id, qty: cart[p.id] })),
     };
     const res = await recordSale(payload);
     setCart({});
-    setToast(res.synced
-      ? `✅ Pedido N° ${res.order_number} · ${money(total)}`
-      : '📴 Sin red: pedido en cola (N° al reconectar)');
-    setTimeout(() => setToast(null), 3500);
+    const data = { order_number: res.order_number ?? null, items: receiptItems, total, payment_method: method, sold_at: soldAt };
+    if (res.synced) {
+      setLastSale(data); // muestra el panel de comprobante
+    } else {
+      setLastSale({ ...data, offline: true });
+      setToast('📴 Sin red: pedido en cola (N° al reconectar)');
+      setTimeout(() => setToast(null), 3500);
+    }
   }
 
   return (
@@ -99,6 +110,36 @@ export default function Pos() {
           {toast}
         </div>
       )}
+
+      {lastSale && (
+        <ReceiptPanel data={lastSale} settings={settings} onClose={() => setLastSale(null)} />
+      )}
+    </div>
+  );
+}
+
+// Panel post-venta: número de orden + acciones de comprobante.
+function ReceiptPanel({ data, settings, onClose }) {
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-30" onClick={onClose}>
+      <div className="bg-white rounded-3xl p-6 w-full max-w-sm text-center" onClick={(e) => e.stopPropagation()}>
+        <div className="text-sm text-zinc-500">Pedido registrado</div>
+        <div className="text-6xl font-black text-cartel my-1">
+          {data.offline ? '⏳' : `N° ${data.order_number}`}
+        </div>
+        {data.offline && <div className="text-amber-600 font-bold mb-1">En cola · número al reconectar</div>}
+        <div className="text-2xl font-black mb-4">{money(data.total)}</div>
+
+        <div className="grid gap-2">
+          <button onClick={() => openPrint(buildKitchenTicketHTML(data, settings))}
+            className="btn-pos bg-zinc-800 text-white">🍗 Ticket de cocina</button>
+          <button onClick={() => openPrint(buildCustomerReceiptHTML(data, settings))}
+            className="btn-pos bg-blue-600 text-white">🧾 Imprimir boleta</button>
+          <a href={whatsappUrl(data, settings)} target="_blank" rel="noreferrer"
+            className="btn-pos bg-green-600 text-white block">📲 Enviar por WhatsApp</a>
+          <button onClick={onClose} className="px-4 py-3 rounded-2xl bg-zinc-200 font-bold mt-1">Nuevo pedido</button>
+        </div>
+      </div>
     </div>
   );
 }

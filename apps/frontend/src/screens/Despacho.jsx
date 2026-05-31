@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '../lib/api.js';
+import { buildCustomerReceiptHTML, buildKitchenTicketHTML, whatsappUrl } from '../lib/receipt.js';
+import { openPrint } from '../lib/print.js';
 
 const money = (n) => '$' + Number(n).toLocaleString('es-CL');
 
@@ -13,6 +15,7 @@ const FLOW = {
 
 export default function Despacho() {
   const [data, setData] = useState(null);
+  const [settings, setSettings] = useState({ name: 'El Cartel de los Pollos', paper_width: 80 });
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
@@ -21,6 +24,7 @@ export default function Despacho() {
 
   useEffect(() => {
     load();
+    api('/settings').then(setSettings).catch(() => {});
     const t = setInterval(load, 8000); // refresco automático del tablero
     return () => clearInterval(t);
   }, [load]);
@@ -30,6 +34,15 @@ export default function Despacho() {
     if (!next) return;
     try { await api(`/dispatch/${o.sale_id}/status`, { method: 'PUT', body: { status: next } }); load(); }
     catch (e) { setError(e.message); }
+  }
+
+  async function reprint(o, kind) {
+    try {
+      const r = await api(`/sales/${o.sale_id}/receipt`);
+      if (kind === 'cocina') openPrint(buildKitchenTicketHTML(r, settings));
+      else if (kind === 'boleta') openPrint(buildCustomerReceiptHTML(r, settings));
+      else window.open(whatsappUrl(r, settings), '_blank');
+    } catch (e) { setError(e.message); }
   }
 
   if (error && !data) return <p className="text-red-600 text-center mt-10">{error}</p>;
@@ -64,6 +77,9 @@ export default function Despacho() {
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
+                <button onClick={() => reprint(o, 'cocina')} title="Reimprimir cocina" className="w-9 h-9 rounded-lg bg-zinc-100 text-lg">🍗</button>
+                <button onClick={() => reprint(o, 'boleta')} title="Imprimir boleta" className="w-9 h-9 rounded-lg bg-zinc-100 text-lg">🧾</button>
+                <button onClick={() => reprint(o, 'whatsapp')} title="WhatsApp" className="w-9 h-9 rounded-lg bg-zinc-100 text-lg">📲</button>
                 <span className={`text-xs px-2 py-1 rounded-full font-bold ${f.color}`}>{f.label}</span>
                 {f.next && (
                   <button onClick={() => advance(o)} className="px-4 py-2 rounded-xl bg-cartel text-white font-bold">{f.nextLabel}</button>
