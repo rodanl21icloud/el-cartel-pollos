@@ -1,0 +1,20 @@
+{
+  "name": "@cartel/backend",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "node --env-file=.env --watch src/index.js",
+    "start": "node src/index.js",
+    "db:push": "node --env-file=.env scripts/applySchema.js",
+    "db:seed": "node --env-file=.env scripts/applySchema.js --seed",
+    "seed:users": "node --env-file=.env scripts/seedUsers.js"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.14.0",
+    "bcryptjs": "^2.4.3",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "otplib": "^12.0.1"
+  }
+}

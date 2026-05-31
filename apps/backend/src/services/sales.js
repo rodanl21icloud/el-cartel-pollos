@@ -1,0 +1,144 @@
+// ============================================================
+// Servicio de ventas: registro transaccional + descuento BOM.
+// - Idempotente por client_uuid (reintentos offline seguros).
+// - Atómico: venta + items + descuento de insumos + auditoría
+//   ocurren en una sola transacción libSQL (batch).
+// ============================================================
+import { randomUUID } from 'node:crypto';
+import { getDb } from '../db.js';
+
+/**
+ * registerSale — persiste una venta verificada (HMAC) y descuenta el BOM.
+ * @param payload  objeto firmado: { client_uuid, items:[{product_id, qty}], payment_method, sold_at }
+ * @param ctx      { userId, payloadHash, syncedOffline, ip }
+ * @returns { status: 'CREATED'|'DUPLICATE', saleId, total }
+ */
+export async function registerSale(payload, ctx) {
+  const db = getDb();
+  const { client_uuid, items, payment_method, sold_at } = payload;
+
+  // Validación estructural mínima.
+  if (!client_uuid || !Array.isArray(items) || items.length === 0) {
+    const e = new Error('VENTA_INVALIDA'); e.status = 400; throw e;
+  }
+  if (!['EFECTIVO', 'POS', 'TRANSFERENCIA'].includes(payment_method)) {
+    const e = new Error('METODO_PAGO_INVALIDO'); e.status = 400; throw e;
+  }
+
+  // Idempotencia: si ya existe, no se reprocesa (clave para offline-sync).
+  const exists = await db.execute({
+    sql: `SELECT id, total FROM sales WHERE client_uuid = ?`,
+    args: [client_uuid],
+  });
+  if (exists.rows.length) {
+    return { status: 'DUPLICATE', saleId: exists.rows[0].id, total: Number(exists.rows[0].total) };
+  }
+
+  // Carga de productos + recetas en lote.
+  const productIds = [...new Set(items.map((i) => i.product_id))];
+  const placeholders = productIds.map(() => '?').join(',');
+
+  const prodRes = await db.execute({
+    sql: `SELECT id, price, is_active FROM products WHERE id IN (${placeholders})`,
+    args: productIds,
+  });
+  const products = new Map(prodRes.rows.map((p) => [p.id, p]));
+
+  const recipeRes = await db.execute({
+    sql: `SELECT pr.product_id, pr.ingredient_id, pr.qty_per_unit,
+                 i.name AS ing_name, i.stock_qty
+          FROM product_recipes pr
+          JOIN ingredients i ON i.id = pr.ingredient_id
+          WHERE pr.product_id IN (${placeholders})`,
+    args: productIds,
+  });
+
+  // Acumula consumo total de insumos a partir del BOM.
+  const ingredientUse = new Map(); // ingredient_id -> { qty, name, stock }
+  const saleId = randomUUID();
+  const saleItems = [];
+  let total = 0;
+
+  for (const line of items) {
+    const product = products.get(line.product_id);
+    if (!product || !product.is_active) {
+      const e = new Error('PRODUCTO_NO_DISPONIBLE'); e.status = 409; e.detail = line.product_id; throw e;
+    }
+    const qty = Number(line.qty);
+    if (!Number.isInteger(qty) || qty <= 0) {
+      const e = new Error('CANTIDAD_INVALIDA'); e.status = 400; throw e;
+    }
+    const unitPrice = Number(product.price);
+    const lineTotal = unitPrice * qty;
+    total += lineTotal;
+    saleItems.push({
+      id: randomUUID(), sale_id: saleId, product_id: product.id,
+      qty, unit_price: unitPrice, line_total: lineTotal,
+    });
+
+    for (const r of recipeRes.rows.filter((x) => x.product_id === product.id)) {
+      const prev = ingredientUse.get(r.ingredient_id) || { qty: 0, name: r.ing_name, stock: Number(r.stock_qty) };
+      prev.qty += Number(r.qty_per_unit) * qty;
+      ingredientUse.set(r.ingredient_id, prev);
+    }
+  }
+
+  // Verificación de stock teórico ANTES de comprometer la transacción.
+  for (const [ingId, use] of ingredientUse) {
+    if (use.stock < use.qty) {
+      const e = new Error('STOCK_INSUFICIENTE');
+      e.status = 409; e.detail = { ingredient: use.name, need: use.qty, have: use.stock };
+      throw e;
+    }
+  }
+
+  // ---- Transacción atómica (batch) ----
+  const stmts = [];
+
+  stmts.push({
+    sql: `INSERT INTO sales
+            (id, client_uuid, user_id, total, payment_method, status,
+             payload_hash, synced_offline, sold_at)
+          VALUES (?,?,?,?,?, 'CONFIRMADA', ?,?,?)`,
+    args: [saleId, client_uuid, ctx.userId, total, payment_method,
+           ctx.payloadHash, ctx.syncedOffline ? 1 : 0, sold_at || new Date().toISOString()],
+  });
+
+  for (const it of saleItems) {
+    stmts.push({
+      sql: `INSERT INTO sale_items (id, sale_id, product_id, qty, unit_price, line_total)
+            VALUES (?,?,?,?,?,?)`,
+      args: [it.id, it.sale_id, it.product_id, it.qty, it.unit_price, it.line_total],
+    });
+  }
+
+  for (const [ingId, use] of ingredientUse) {
+    // Descuenta stock teórico.
+    stmts.push({
+      sql: `UPDATE ingredients
+            SET stock_qty = stock_qty - ?, updated_at = datetime('now')
+            WHERE id = ?`,
+      args: [use.qty, ingId],
+    });
+    // Traza del descuento como ajuste de inventario (tipo VENTA).
+    stmts.push({
+      sql: `INSERT INTO inventory_adjustments
+              (id, ingredient_id, user_id, type, qty_delta, reason, sale_id)
+            VALUES (?,?,?, 'VENTA', ?, ?, ?)`,
+      args: [randomUUID(), ingId, ctx.userId, -use.qty,
+             `Descuento BOM por venta ${client_uuid}`, saleId],
+    });
+  }
+
+  // Auditoría dentro del mismo batch atómico.
+  stmts.push({
+    sql: `INSERT INTO audit_logs (id, user_id, action, entity, entity_id, severity, metadata, ip_address)
+          VALUES (?,?, 'SALE_SYNC', 'sales', ?, 'INFO', ?, ?)`,
+    args: [randomUUID(), ctx.userId, saleId,
+           JSON.stringify({ total, payment_method, offline: !!ctx.syncedOffline }), ctx.ip || null],
+  });
+
+  await db.batch(stmts, 'write'); // rollback automático si algo falla.
+
+  return { status: 'CREATED', saleId, total };
+}
