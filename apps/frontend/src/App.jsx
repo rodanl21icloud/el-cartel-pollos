@@ -6,6 +6,8 @@ import Pos from './screens/Pos.jsx';
 import CashClose from './screens/CashClose.jsx';
 import Merma from './screens/Merma.jsx';
 import Manage from './screens/Manage.jsx';
+import Gastos from './screens/Gastos.jsx';
+import Flujo from './screens/Flujo.jsx';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -42,8 +44,10 @@ export default function App() {
         <div className="flex items-center gap-2">
           {[
             ['pos', 'POS'],
+            ['gastos', 'Gastos'],
             ['merma', 'Mermas'],
-            ['cash', 'Cierre'],
+            ['cash', 'Caja'],
+            ['flujo', 'Flujo'],
             ['manage', 'Gestión'],
           ].map(([key, label]) => (
             <button key={key} onClick={() => setScreen(key)}
@@ -58,8 +62,10 @@ export default function App() {
 
       <main className="flex-1 p-4">
         {screen === 'pos' && <Pos />}
+        {screen === 'gastos' && <Gastos />}
         {screen === 'merma' && <Merma />}
         {screen === 'cash' && <CashClose />}
+        {screen === 'flujo' && <Flujo role={user.role} />}
         {screen === 'manage' && <Manage role={user.role} />}
       </main>
     </div>

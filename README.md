@@ -109,9 +109,15 @@ para autorizar `PUT`/`DELETE` de cajero/preparador (header `x-management-otp`).
 | POST | `/api/sales/sync` | autenticado + **HMAC** |
 | GET  | `/api/inventory/ingredients` · `/alerts` | autenticado |
 | POST | `/api/inventory/merma` | autenticado (`reason` obligatorio) |
+| GET  | `/api/cash-register/current` | estado de caja (ciego, sin teórico) |
+| POST | `/api/cash-register/open` | CAJERO / GERENCIA (fondo inicial) |
+| POST | `/api/cash-register/movement` | CAJERO / GERENCIA (depósito/ingreso) |
 | POST | `/api/cash-register/close` | CAJERO / GERENCIA (ciego) |
+| GET  | `/api/expenses/categories` | autenticado |
+| POST | `/api/expenses` | autenticado (registrar gasto) |
+| GET  | `/api/expenses` | **solo GERENCIA** |
 | PUT/DELETE | `/api/products/:id` · `/api/ingredients/:id` | **OTP gerencia** si no es GERENCIA |
-| GET  | `/api/reports/turn-summary` · `/closures` | **solo GERENCIA** |
+| GET  | `/api/reports/turn-summary` · `/closures` · `/cash-flow` | **solo GERENCIA** |
 
 ## Flujo de venta (resumen)
 1. Login → backend emite JWT + clave de sesión; el frontend la importa en memoria (`crypto.js`).
@@ -120,6 +126,21 @@ para autorizar `PUT`/`DELETE` de cajero/preparador (header `x-management-otp`).
    (venta + items + descuento BOM de insumos + ajuste de inventario + auditoría) atómico.
 4. Sin red: la venta firmada se encola en **IndexedDB** y se reintenta al volver online
    (idempotente por `client_uuid`).
+
+## Finanzas
+- **Gastos / egresos**: registrar por categoría (proveedores, sueldos, arriendo/servicios,
+  retiros de socios), método de pago, proveedor y descripción.
+- **Cuadratura de caja (ciego) con fondo**: se abre caja con un fondo inicial, se registran
+  depósitos/ingresos de efectivo durante el turno, y al cerrar el teórico se calcula como
+  `fondo + ventas_efectivo − gastos_efectivo ± movimientos`. Solo los gastos en **efectivo**
+  afectan el cajón; los pagados por POS/transferencia salen del banco (van al flujo, no a la
+  cuadratura). El cajero nunca ve el teórico antes de declarar.
+- **Flujo de caja** (`/reports/cash-flow`, GERENCIA): ingresos vs egresos de **todo el dinero**
+  por día, con saldo acumulado y desglose de egresos por categoría.
+
+> Las marcas de tiempo (`sold_at`, `opened_at`, `spent_at`) se guardan en **ISO 8601 UTC**
+> para que los rangos de período sean comparables (no usar `datetime('now')` en columnas
+> que se filtran por rango).
 
 ## PWA / Offline
 La app es una **PWA** (`vite-plugin-pwa` + Workbox). El service worker precachea el

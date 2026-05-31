@@ -132,12 +132,18 @@ CREATE INDEX IF NOT EXISTS idx_adj_ingredient ON inventory_adjustments(ingredien
 CREATE TABLE IF NOT EXISTS cash_register_closures (
   id                       TEXT PRIMARY KEY,
   user_id                  TEXT NOT NULL,
+  session_id               TEXT,                  -- sesión de caja (apertura con fondo)
   period_start             TEXT NOT NULL,
   period_end               TEXT NOT NULL,
+  opening_float            REAL NOT NULL DEFAULT 0, -- fondo inicial (vuelto)
   -- DECLARADO (lo único que envía el frontend):
   efectivo_declarado       REAL NOT NULL,
   pos_declarado            REAL NOT NULL,
   transferencias_declarado REAL NOT NULL,
+  -- COMPONENTES del teórico (para transparencia del cuadre):
+  ventas_efectivo          REAL NOT NULL DEFAULT 0,
+  gastos_efectivo          REAL NOT NULL DEFAULT 0,
+  movimientos_efectivo     REAL NOT NULL DEFAULT 0, -- DEPOSITO(-) / INGRESO(+) de caja
   -- TEÓRICO (calculado en backend, nunca expuesto antes del cierre):
   efectivo_teorico         REAL NOT NULL,
   pos_teorico              REAL NOT NULL,
@@ -149,8 +155,76 @@ CREATE TABLE IF NOT EXISTS cash_register_closures (
   diff_total               REAL NOT NULL,
   has_descuadre            INTEGER NOT NULL DEFAULT 0 CHECK (has_descuadre IN (0,1)),
   created_at               TEXT NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
+  FOREIGN KEY (user_id)    REFERENCES users(id) ON DELETE RESTRICT,
+  FOREIGN KEY (session_id) REFERENCES cash_sessions(id) ON DELETE SET NULL
 );
+
+-- ----------------------------------------------------------------
+-- CASH_SESSIONS — apertura/cierre de caja con fondo inicial.
+-- Solo una sesión OPEN a la vez (índice parcial único).
+-- ----------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS cash_sessions (
+  id              TEXT PRIMARY KEY,
+  opened_by       TEXT NOT NULL,
+  opening_float   REAL NOT NULL DEFAULT 0 CHECK (opening_float >= 0),
+  opened_at       TEXT NOT NULL DEFAULT (datetime('now')),
+  closed_at       TEXT,
+  closure_id      TEXT,                            -- cierre asociado
+  status          TEXT NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN','CLOSED')),
+  FOREIGN KEY (opened_by) REFERENCES users(id) ON DELETE RESTRICT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_one_open_session
+  ON cash_sessions(status) WHERE status = 'OPEN';
+
+-- ----------------------------------------------------------------
+-- CASH_MOVEMENTS — efectivo que entra/sale de la caja física sin ser
+-- venta ni gasto (ej. depósito al banco, ingreso de fondo extra).
+-- Afecta SOLO la cuadratura, no el flujo de caja (P&L).
+-- ----------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS cash_movements (
+  id              TEXT PRIMARY KEY,
+  session_id      TEXT NOT NULL,
+  user_id         TEXT NOT NULL,
+  type            TEXT NOT NULL CHECK (type IN ('DEPOSITO','INGRESO')), -- DEPOSITO: sale; INGRESO: entra
+  amount          REAL NOT NULL CHECK (amount > 0),
+  reason          TEXT NOT NULL,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (session_id) REFERENCES cash_sessions(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id)    REFERENCES users(id)         ON DELETE RESTRICT
+);
+
+-- ----------------------------------------------------------------
+-- EXPENSE_CATEGORIES — categorías de gasto. kind RETIRO = no operativo.
+-- ----------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS expense_categories (
+  id              TEXT PRIMARY KEY,
+  name            TEXT NOT NULL UNIQUE,
+  kind            TEXT NOT NULL DEFAULT 'OPERATIVO' CHECK (kind IN ('OPERATIVO','RETIRO')),
+  is_active       INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0,1)),
+  created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ----------------------------------------------------------------
+-- EXPENSES — egresos/gastos. Afectan el flujo de caja; si son en
+-- efectivo dentro de la sesión, afectan también la cuadratura.
+-- ----------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS expenses (
+  id              TEXT PRIMARY KEY,
+  category_id     TEXT NOT NULL,
+  user_id         TEXT NOT NULL,
+  amount          REAL NOT NULL CHECK (amount > 0),
+  payment_method  TEXT NOT NULL CHECK (payment_method IN ('EFECTIVO','POS','TRANSFERENCIA')),
+  supplier        TEXT,
+  description     TEXT NOT NULL,
+  document_ref    TEXT,                            -- nro boleta/factura opcional
+  spent_at        TEXT NOT NULL DEFAULT (datetime('now')),
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (category_id) REFERENCES expense_categories(id) ON DELETE RESTRICT,
+  FOREIGN KEY (user_id)     REFERENCES users(id)              ON DELETE RESTRICT
+);
+CREATE INDEX IF NOT EXISTS idx_expenses_spent  ON expenses(spent_at);
+CREATE INDEX IF NOT EXISTS idx_expenses_method ON expenses(payment_method);
+CREATE INDEX IF NOT EXISTS idx_expenses_cat    ON expenses(category_id);
 
 -- ----------------------------------------------------------------
 -- AUDIT_LOGS — APPEND-ONLY (lógico). Sin UPDATE ni DELETE permitidos.

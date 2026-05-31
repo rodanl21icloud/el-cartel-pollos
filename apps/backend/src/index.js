@@ -3,11 +3,12 @@ import express from 'express';
 import { requireAuth, requireRole, requireOtpForMutation } from './middleware/auth.js';
 import { verifyHmac } from './middleware/hmac.js';
 import { login } from './controllers/auth.js';
-import { closeCashRegister, getOpenPeriod } from './controllers/cashRegister.js';
+import { closeCashRegister, getCurrentSession, openSession, registerMovement } from './controllers/cashRegister.js';
 import { syncSale, listProducts } from './controllers/sales.js';
 import { registerMerma, listIngredients, lowStockAlerts } from './controllers/inventory.js';
 import { updateProduct, deleteProduct, updateIngredient } from './controllers/admin.js';
-import { turnSummary, closuresHistory } from './controllers/reports.js';
+import { listCategories, createExpense, listExpenses } from './controllers/expenses.js';
+import { turnSummary, closuresHistory, cashFlow } from './controllers/reports.js';
 
 const app = express();
 app.use(express.json({ limit: '256kb' }));
@@ -23,9 +24,16 @@ app.use('/api', requireAuth, requireOtpForMutation);
 // Catálogo POS
 app.get('/api/products', listProducts);
 
-// Cierre de Caja Ciego
-app.get('/api/cash-register/open-period', getOpenPeriod);
+// Caja: apertura con fondo, movimientos de efectivo y Cierre Ciego
+app.get('/api/cash-register/current', getCurrentSession);
+app.post('/api/cash-register/open', requireRole('CAJERO', 'GERENCIA'), openSession);
+app.post('/api/cash-register/movement', requireRole('CAJERO', 'GERENCIA'), registerMovement);
 app.post('/api/cash-register/close', requireRole('CAJERO', 'GERENCIA'), closeCashRegister);
+
+// Gastos / egresos
+app.get('/api/expenses/categories', listCategories);
+app.post('/api/expenses', createExpense);
+app.get('/api/expenses', requireRole('GERENCIA'), listExpenses);
 
 // Sincronización de ventas (firma HMAC obligatoria, anti-tamper)
 app.post('/api/sales/sync', verifyHmac, syncSale);
@@ -43,6 +51,7 @@ app.put('/api/ingredients/:id', updateIngredient);
 // Reportes (solo GERENCIA: exponen el teórico)
 app.get('/api/reports/turn-summary', requireRole('GERENCIA'), turnSummary);
 app.get('/api/reports/closures', requireRole('GERENCIA'), closuresHistory);
+app.get('/api/reports/cash-flow', requireRole('GERENCIA'), cashFlow);
 
 // Handler de errores uniforme.
 app.use((err, _req, res, _next) => {

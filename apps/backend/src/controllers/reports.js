@@ -45,9 +45,78 @@ export async function turnSummary(_req, res) {
 export async function closuresHistory(_req, res) {
   const db = getDb();
   const { rows } = await db.execute({
-    sql: `SELECT id, period_start, period_end, diff_total, has_descuadre, created_at
+    sql: `SELECT id, period_start, period_end, opening_float, diff_total, has_descuadre, created_at
           FROM cash_register_closures ORDER BY created_at DESC LIMIT 30`,
     args: [],
   });
   return res.json(rows);
 }
+
+/**
+ * GET /api/reports/cash-flow?from=&to=
+ * Flujo de caja de TODO el dinero (efectivo + POS + transferencia):
+ * ingresos (ventas) vs egresos (gastos) por día, con saldo acumulado.
+ * Incluye desglose de egresos por categoría. (GERENCIA)
+ */
+export async function cashFlow(req, res) {
+  const db = getDb();
+  const to = req.query.to || new Date().toISOString();
+  // Por defecto, últimos 30 días.
+  const from = req.query.from ||
+    new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  // Ingresos por día (ventas confirmadas).
+  const ingresosRes = await db.execute({
+    sql: `SELECT substr(sold_at,1,10) AS dia, COALESCE(SUM(total),0) AS monto
+          FROM sales WHERE status='CONFIRMADA' AND sold_at >= ? AND sold_at <= ?
+          GROUP BY dia`,
+    args: [from, to],
+  });
+  // Egresos por día (todos los gastos).
+  const egresosRes = await db.execute({
+    sql: `SELECT substr(spent_at,1,10) AS dia, COALESCE(SUM(amount),0) AS monto
+          FROM expenses WHERE spent_at >= ? AND spent_at <= ?
+          GROUP BY dia`,
+    args: [from, to],
+  });
+
+  const dias = new Map();
+  for (const r of ingresosRes.rows) dias.set(r.dia, { dia: r.dia, ingresos: Number(r.monto), egresos: 0 });
+  for (const r of egresosRes.rows) {
+    const d = dias.get(r.dia) || { dia: r.dia, ingresos: 0, egresos: 0 };
+    d.egresos = Number(r.monto);
+    dias.set(r.dia, d);
+  }
+  const ordenados = [...dias.values()].sort((a, b) => a.dia.localeCompare(b.dia));
+  let saldo = 0;
+  const flujo = ordenados.map((d) => {
+    const neto = round2(d.ingresos - d.egresos);
+    saldo = round2(saldo + neto);
+    return { ...d, neto, saldo_acumulado: saldo };
+  });
+
+  // Desglose de egresos por categoría.
+  const porCategoriaRes = await db.execute({
+    sql: `SELECT c.name AS categoria, c.kind, COALESCE(SUM(e.amount),0) AS monto
+          FROM expenses e JOIN expense_categories c ON c.id = e.category_id
+          WHERE e.spent_at >= ? AND e.spent_at <= ?
+          GROUP BY c.id ORDER BY monto DESC`,
+    args: [from, to],
+  });
+
+  const total_ingresos = round2(flujo.reduce((s, d) => s + d.ingresos, 0));
+  const total_egresos = round2(flujo.reduce((s, d) => s + d.egresos, 0));
+
+  return res.json({
+    period: { from, to },
+    total_ingresos,
+    total_egresos,
+    neto: round2(total_ingresos - total_egresos),
+    por_dia: flujo,
+    egresos_por_categoria: porCategoriaRes.rows.map((r) => ({
+      categoria: r.categoria, kind: r.kind, monto: Number(r.monto),
+    })),
+  });
+}
+
+const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
