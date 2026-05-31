@@ -6,7 +6,8 @@ import { verifyHmac } from './middleware/hmac.js';
 import { login } from './controllers/auth.js';
 import { closeCashRegister, getCurrentSession, openSession, registerMovement } from './controllers/cashRegister.js';
 import { syncSale, listProducts } from './controllers/sales.js';
-import { registerMerma, listIngredients, lowStockAlerts } from './controllers/inventory.js';
+import { registerMerma, listIngredients, lowStockAlerts,
+         createIngredient, deleteIngredient, restockIngredient } from './controllers/inventory.js';
 import { updateProduct, deleteProduct, updateIngredient } from './controllers/admin.js';
 import { listCategories, createExpense, listExpenses } from './controllers/expenses.js';
 import { turnSummary, closuresHistory, cashFlow, pnl } from './controllers/reports.js';
@@ -48,10 +49,15 @@ app.get('/api/inventory/ingredients', listIngredients);
 app.get('/api/inventory/alerts', lowStockAlerts);
 app.post('/api/inventory/merma', requirePermission('inventory.merma'), registerMerma);
 
-// Administración de catálogo (PUT/DELETE -> también exige OTP de gerencia)
+// Gestión de insumos (CRUD + reposición). PUT/DELETE -> también OTP de gerencia.
+app.post('/api/inventory/ingredients', requirePermission('inventory.manage'), createIngredient);
+app.put('/api/inventory/ingredients/:id', requirePermission('inventory.manage'), updateIngredient);
+app.delete('/api/inventory/ingredients/:id', requirePermission('inventory.manage'), deleteIngredient);
+app.post('/api/inventory/ingredients/:id/restock', requirePermission('inventory.manage'), restockIngredient);
+
+// Administración de carta (PUT/DELETE -> también exige OTP de gerencia)
 app.put('/api/products/:id', requirePermission('menu.manage'), updateProduct);
 app.delete('/api/products/:id', requirePermission('menu.manage'), deleteProduct);
-app.put('/api/ingredients/:id', requirePermission('inventory.manage'), updateIngredient);
 
 // Reportes (exponen el teórico)
 app.get('/api/reports/turn-summary', requirePermission('reports.view'), turnSummary);

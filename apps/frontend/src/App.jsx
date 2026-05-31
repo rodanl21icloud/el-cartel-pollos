@@ -10,12 +10,14 @@ import Gastos from './screens/Gastos.jsx';
 import Flujo from './screens/Flujo.jsx';
 import Pnl from './screens/Pnl.jsx';
 import Permisos from './screens/Permisos.jsx';
+import Inventario from './screens/Inventario.jsx';
 
 // Cada ítem de nav se muestra solo si el usuario tiene el permiso `perm`.
 const NAV = [
   { key: 'pos', label: 'POS', perm: 'pos.sell' },
   { key: 'gastos', label: 'Gastos', perm: 'expenses.manage' },
   { key: 'merma', label: 'Mermas', perm: 'inventory.merma' },
+  { key: 'inventario', label: 'Inventario', perm: 'inventory.manage' },
   { key: 'cash', label: 'Caja', perm: 'cash.operate' },
   { key: 'flujo', label: 'Flujo', perm: 'reports.view' },
   { key: 'pnl', label: 'P&L', perm: 'reports.view' },
@@ -80,6 +82,7 @@ export default function App() {
         {screen === 'pos' && <Pos />}
         {screen === 'gastos' && <Gastos />}
         {screen === 'merma' && <Merma />}
+        {screen === 'inventario' && <Inventario />}
         {screen === 'cash' && <CashClose />}
         {screen === 'flujo' && <Flujo role={user.role} />}
         {screen === 'pnl' && <Pnl role={user.role} />}
