@@ -22,6 +22,18 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- ----------------------------------------------------------------
+-- ROLE_PERMISSIONS — permisos configurables por módulo (matriz rol×permiso).
+-- Reemplaza los chequeos de rol fijos: gerencia puede editar quién accede
+-- a cada módulo. `permission` es una clave de módulo (ver services/permissions).
+-- ----------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS role_permissions (
+  role            TEXT NOT NULL CHECK (role IN ('CAJERO','PREPARADOR','GERENCIA')),
+  permission      TEXT NOT NULL,
+  allowed         INTEGER NOT NULL DEFAULT 0 CHECK (allowed IN (0,1)),
+  PRIMARY KEY (role, permission)
+);
+
+-- ----------------------------------------------------------------
 -- INGREDIENTS — insumos descontables del inventario teórico.
 -- unit: 'unidad' | 'gramo' | 'mililitro' | 'empaque'
 -- ----------------------------------------------------------------
