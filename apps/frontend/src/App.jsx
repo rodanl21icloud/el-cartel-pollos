@@ -5,12 +5,12 @@ import Login from './screens/Login.jsx';
 import Pos from './screens/Pos.jsx';
 import CashClose from './screens/CashClose.jsx';
 import Merma from './screens/Merma.jsx';
-import Manage from './screens/Manage.jsx';
 import Gastos from './screens/Gastos.jsx';
 import Flujo from './screens/Flujo.jsx';
 import Pnl from './screens/Pnl.jsx';
 import Permisos from './screens/Permisos.jsx';
 import Inventario from './screens/Inventario.jsx';
+import Carta from './screens/Carta.jsx';
 
 // Cada ítem de nav se muestra solo si el usuario tiene el permiso `perm`.
 const NAV = [
@@ -21,7 +21,7 @@ const NAV = [
   { key: 'cash', label: 'Caja', perm: 'cash.operate' },
   { key: 'flujo', label: 'Flujo', perm: 'reports.view' },
   { key: 'pnl', label: 'P&L', perm: 'reports.view' },
-  { key: 'manage', label: 'Gestión', perm: 'menu.manage' },
+  { key: 'carta', label: 'Carta', perm: 'menu.manage' },
   { key: 'permisos', label: 'Permisos', perm: 'permissions.manage' },
 ];
 
@@ -86,7 +86,7 @@ export default function App() {
         {screen === 'cash' && <CashClose />}
         {screen === 'flujo' && <Flujo role={user.role} />}
         {screen === 'pnl' && <Pnl role={user.role} />}
-        {screen === 'manage' && <Manage role={user.role} />}
+        {screen === 'carta' && <Carta role={user.role} />}
         {screen === 'permisos' && <Permisos />}
       </main>
     </div>

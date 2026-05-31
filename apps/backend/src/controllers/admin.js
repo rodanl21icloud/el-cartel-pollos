@@ -4,8 +4,32 @@
 // necesitan OTP de gerencia; gerencia pasa directo.
 // DELETE es lógico (is_active=0) para respetar FKs de ventas históricas.
 // ============================================================
+import { randomUUID, randomBytes } from 'node:crypto';
 import { getDb } from '../db.js';
 import { writeAudit } from '../services/audit.js';
+
+/** POST /api/products  Body: { name, price, category?, sku? } */
+export async function createProduct(req, res) {
+  const { name, price, category = 'COMBO', sku } = req.body || {};
+  if (!name || !String(name).trim()) return res.status(400).json({ error: 'NOMBRE_REQUERIDO' });
+  if (typeof price !== 'number' || !Number.isFinite(price) || price < 0) return res.status(400).json({ error: 'PRECIO_INVALIDO' });
+
+  const db = getDb();
+  const id = randomUUID();
+  const finalSku = (sku && String(sku).trim()) || `PRD-${randomBytes(3).toString('hex').toUpperCase()}`;
+  try {
+    await db.execute({
+      sql: `INSERT INTO products (id, sku, name, price, category) VALUES (?,?,?,?,?)`,
+      args: [id, finalSku, String(name).trim(), price, String(category).trim() || 'COMBO'],
+    });
+  } catch (e) {
+    if (String(e.message).includes('UNIQUE')) return res.status(409).json({ error: 'SKU_DUPLICADO' });
+    throw e;
+  }
+  await writeAudit({ userId: req.user.id, action: 'PRODUCT_CREATE', entity: 'products', entityId: id,
+    severity: 'INFO', ip: req.ip, metadata: { name, price, sku: finalSku } });
+  return res.status(201).json({ id, sku: finalSku, name: String(name).trim(), price, category, is_active: 1 });
+}
 
 /** PUT /api/products/:id  — edita precio / nombre / estado. */
 export async function updateProduct(req, res) {

@@ -8,7 +8,8 @@ import { closeCashRegister, getCurrentSession, openSession, registerMovement } f
 import { syncSale, listProducts } from './controllers/sales.js';
 import { registerMerma, listIngredients, lowStockAlerts,
          createIngredient, deleteIngredient, restockIngredient } from './controllers/inventory.js';
-import { updateProduct, deleteProduct, updateIngredient } from './controllers/admin.js';
+import { createProduct, updateProduct, deleteProduct, updateIngredient } from './controllers/admin.js';
+import { getRecipe, setRecipe } from './controllers/recipes.js';
 import { listCategories, createExpense, listExpenses } from './controllers/expenses.js';
 import { turnSummary, closuresHistory, cashFlow, pnl } from './controllers/reports.js';
 import { getPermissions, myPermissions, updatePermission } from './controllers/permissions.js';
@@ -56,8 +57,13 @@ app.delete('/api/inventory/ingredients/:id', requirePermission('inventory.manage
 app.post('/api/inventory/ingredients/:id/restock', requirePermission('inventory.manage'), restockIngredient);
 
 // Administración de carta (PUT/DELETE -> también exige OTP de gerencia)
+app.post('/api/products', requirePermission('menu.manage'), createProduct);
 app.put('/api/products/:id', requirePermission('menu.manage'), updateProduct);
 app.delete('/api/products/:id', requirePermission('menu.manage'), deleteProduct);
+
+// Recetas (BOM) por producto. Decimales soportados.
+app.get('/api/products/:id/recipe', requirePermission('recipes.manage'), getRecipe);
+app.put('/api/products/:id/recipe', requirePermission('recipes.manage'), setRecipe);
 
 // Reportes (exponen el teórico)
 app.get('/api/reports/turn-summary', requirePermission('reports.view'), turnSummary);
