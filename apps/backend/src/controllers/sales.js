@@ -60,7 +60,7 @@ export async function getReceipt(req, res) {
 export async function listProducts(req, res) {
   const { getDb } = await import('../db.js');
   const { rows } = await getDb().execute({
-    sql: `SELECT id, sku, name, price, category FROM products WHERE is_active = 1 ORDER BY name`,
+    sql: `SELECT id, sku, name, price, category, image_url FROM products WHERE is_active = 1 ORDER BY name`,
     args: [],
   });
   return res.json(rows);

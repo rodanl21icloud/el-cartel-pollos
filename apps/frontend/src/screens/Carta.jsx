@@ -56,6 +56,13 @@ export default function Carta({ role }) {
     try { await api(`/products/${p.id}`, { method: 'DELETE', otp: otpArg }); load(); flash('Producto eliminado'); }
     catch (e) { handleErr(e); }
   }
+  async function setImage(p) {
+    const url = window.prompt('Pega la URL de la foto del producto:', p.image_url || '');
+    if (url === null) return;
+    setError('');
+    try { await api(`/products/${p.id}`, { method: 'PUT', body: { image_url: url.trim() }, otp: otpArg }); load(); flash('Foto actualizada'); }
+    catch (e) { handleErr(e); }
+  }
 
   return (
     <div className="max-w-5xl mx-auto space-y-3">
@@ -103,8 +110,15 @@ export default function Carta({ role }) {
             {visible.map((p) => (
               <tr key={p.id} className="border-b last:border-0 hover:bg-zinc-50">
                 <td className="p-3">
-                  <div className="font-bold">{p.name}</div>
-                  <div className="text-xs text-zinc-400">{p.sku} · {p.category}</div>
+                  <div className="flex items-center gap-2">
+                    {p.image_url
+                      ? <img src={p.image_url} alt="" className="w-10 h-10 rounded-lg object-cover bg-zinc-100" onError={(e) => { e.target.style.display = 'none'; }} />
+                      : <div className="w-10 h-10 rounded-lg bg-zinc-100 flex items-center justify-center text-zinc-300">🍗</div>}
+                    <div>
+                      <div className="font-bold">{p.name}</div>
+                      <div className="text-xs text-zinc-400">{p.sku} · {p.category}</div>
+                    </div>
+                  </div>
                 </td>
                 <td className="p-3 text-right">
                   <PriceCell value={p.price} onSave={(v) => savePrice(p, v)} />
@@ -121,6 +135,7 @@ export default function Carta({ role }) {
                   </button>
                 </td>
                 <td className="p-3 text-right whitespace-nowrap">
+                  <button onClick={() => setImage(p)} className="text-zinc-400 hover:text-cartel text-lg mr-1" title="Foto">📷</button>
                   <button onClick={() => removeProduct(p)} className="text-zinc-400 hover:text-red-600 text-lg" title="Eliminar">🗑</button>
                 </td>
               </tr>
@@ -158,6 +173,7 @@ function NewProduct({ onSave }) {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [category, setCategory] = useState('POLLO');
+  const [imageUrl, setImageUrl] = useState('');
   return (
     <div className="bg-white rounded-2xl p-4 shadow space-y-2">
       <input placeholder="Nombre del plato" value={name} onChange={(e) => setName(e.target.value)}
@@ -170,7 +186,9 @@ function NewProduct({ onSave }) {
           {[...CAT_ORDER, 'OTROS'].map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
-      <button onClick={() => onSave({ name: name.trim(), price: Number(price || 0), category })}
+      <input placeholder="URL de foto (opcional)" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)}
+        className="w-full px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
+      <button onClick={() => onSave({ name: name.trim(), price: Number(price || 0), category, image_url: imageUrl.trim() || undefined })}
         className="w-full btn-pos bg-cartel text-white">Crear plato</button>
     </div>
   );

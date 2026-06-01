@@ -150,10 +150,15 @@ function ProductSale({ onSold }) {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {visible.map((p) => (
             <button key={p.id} onClick={() => add(p)}
-              className="btn-pos bg-white text-zinc-800 border-2 border-zinc-200 hover:border-cartel text-left !py-4">
-              <div className="text-sm font-black leading-tight">{p.name}</div>
-              <div className="text-cartel mt-1 font-bold">{money(p.price)}</div>
-              {cart[p.id] && <div className="mt-1 text-xs text-zinc-500">x{cart[p.id]} en carrito</div>}
+              className="bg-white text-zinc-800 border-2 border-zinc-200 hover:border-cartel rounded-2xl overflow-hidden text-left active:scale-95 transition relative">
+              {cart[p.id] && <span className="absolute top-1 right-1 z-10 bg-cartel text-white text-xs font-black rounded-full w-6 h-6 flex items-center justify-center">{cart[p.id]}</span>}
+              {p.image_url
+                ? <img src={p.image_url} alt="" className="w-full h-20 object-cover bg-zinc-100" onError={(e) => { e.target.style.display = 'none'; }} />
+                : <div className="w-full h-20 bg-zinc-100 flex items-center justify-center text-3xl">🍗</div>}
+              <div className="p-2">
+                <div className="text-xs font-black leading-tight line-clamp-2">{p.name}</div>
+                <div className="text-cartel mt-1 font-bold text-sm">{money(p.price)}</div>
+              </div>
             </button>
           ))}
           {!products.length && <p className="text-zinc-500 col-span-full">Cargando catálogo…</p>}

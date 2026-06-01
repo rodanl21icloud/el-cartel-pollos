@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS products (
   name            TEXT NOT NULL,
   price           REAL NOT NULL CHECK (price >= 0),
   category        TEXT NOT NULL DEFAULT 'COMBO',
+  image_url       TEXT,                             -- URL de la foto del producto
   is_active       INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0,1)),
   created_at      TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at      TEXT NOT NULL DEFAULT (datetime('now'))

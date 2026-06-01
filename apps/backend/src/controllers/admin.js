@@ -15,7 +15,7 @@ import { writeAudit } from '../services/audit.js';
 export async function listCatalog(_req, res) {
   const db = getDb();
   const { rows } = await db.execute({
-    sql: `SELECT p.id, p.sku, p.name, p.price, p.category, p.is_active,
+    sql: `SELECT p.id, p.sku, p.name, p.price, p.category, p.is_active, p.image_url,
                  COALESCE((SELECT SUM(pr.qty_per_unit * i.cost_unit)
                            FROM product_recipes pr JOIN ingredients i ON i.id = pr.ingredient_id
                            WHERE pr.product_id = p.id), 0) AS costo,
@@ -28,16 +28,16 @@ export async function listCatalog(_req, res) {
     const price = Number(r.price); const costo = Math.round(Number(r.costo) * 100) / 100;
     const ganancia = Math.round((price - costo) * 100) / 100;
     return {
-      id: r.id, sku: r.sku, name: r.name, price, category: r.category,
+      id: r.id, sku: r.sku, name: r.name, price, category: r.category, image_url: r.image_url,
       costo, ganancia, margen: price > 0 ? Math.round((ganancia / price) * 100) : 0,
       has_recipe: Number(r.recipe_lines) > 0,
     };
   }));
 }
 
-/** POST /api/products  Body: { name, price, category?, sku? } */
+/** POST /api/products  Body: { name, price, category?, sku?, image_url? } */
 export async function createProduct(req, res) {
-  const { name, price, category = 'COMBO', sku } = req.body || {};
+  const { name, price, category = 'COMBO', sku, image_url } = req.body || {};
   if (!name || !String(name).trim()) return res.status(400).json({ error: 'NOMBRE_REQUERIDO' });
   if (typeof price !== 'number' || !Number.isFinite(price) || price < 0) return res.status(400).json({ error: 'PRECIO_INVALIDO' });
 
@@ -46,8 +46,9 @@ export async function createProduct(req, res) {
   const finalSku = (sku && String(sku).trim()) || `PRD-${randomBytes(3).toString('hex').toUpperCase()}`;
   try {
     await db.execute({
-      sql: `INSERT INTO products (id, sku, name, price, category) VALUES (?,?,?,?,?)`,
-      args: [id, finalSku, String(name).trim(), price, String(category).trim() || 'COMBO'],
+      sql: `INSERT INTO products (id, sku, name, price, category, image_url) VALUES (?,?,?,?,?,?)`,
+      args: [id, finalSku, String(name).trim(), price, String(category).trim() || 'COMBO',
+             image_url ? String(image_url).trim() : null],
     });
   } catch (e) {
     if (String(e.message).includes('UNIQUE')) return res.status(409).json({ error: 'SKU_DUPLICADO' });
@@ -58,10 +59,10 @@ export async function createProduct(req, res) {
   return res.status(201).json({ id, sku: finalSku, name: String(name).trim(), price, category, is_active: 1 });
 }
 
-/** PUT /api/products/:id  — edita precio / nombre / estado. */
+/** PUT /api/products/:id  — edita precio / nombre / estado / foto. */
 export async function updateProduct(req, res) {
   const { id } = req.params;
-  const { name, price, is_active } = req.body || {};
+  const { name, price, is_active, image_url } = req.body || {};
 
   const db = getDb();
   const cur = await db.execute({ sql: `SELECT * FROM products WHERE id = ?`, args: [id] });
@@ -75,11 +76,12 @@ export async function updateProduct(req, res) {
     name: name ?? cur.rows[0].name,
     price: price ?? cur.rows[0].price,
     is_active: is_active != null ? (is_active ? 1 : 0) : cur.rows[0].is_active,
+    image_url: image_url !== undefined ? (image_url ? String(image_url).trim() : null) : cur.rows[0].image_url,
   };
 
   await db.execute({
-    sql: `UPDATE products SET name = ?, price = ?, is_active = ?, updated_at = datetime('now') WHERE id = ?`,
-    args: [next.name, next.price, next.is_active, id],
+    sql: `UPDATE products SET name = ?, price = ?, is_active = ?, image_url = ?, updated_at = datetime('now') WHERE id = ?`,
+    args: [next.name, next.price, next.is_active, next.image_url, id],
   });
 
   await writeAudit({
