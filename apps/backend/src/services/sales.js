@@ -15,7 +15,7 @@ import { getDb } from '../db.js';
  */
 export async function registerSale(payload, ctx) {
   const db = getDb();
-  const { client_uuid, items, payment_method, sold_at, free_amount, note } = payload;
+  const { client_uuid, items, payment_method, sold_at, free_amount, note, discount: rawDiscount } = payload;
   const isFree = free_amount != null;
 
   // Validación estructural mínima.
@@ -116,6 +116,11 @@ export async function registerSale(payload, ctx) {
     }
   }
 
+  // Descuento (anti-tamper: viene firmado en el payload). Acotado al subtotal.
+  const subtotal = total;
+  const discount = Math.min(Math.max(0, Number(rawDiscount) || 0), subtotal);
+  total = Math.round((subtotal - discount) * 100) / 100;
+
   // Verificación de stock teórico ANTES de comprometer la transacción.
   for (const [ingId, use] of ingredientUse) {
     if (use.stock < use.qty) {
@@ -139,10 +144,10 @@ export async function registerSale(payload, ctx) {
 
   stmts.push({
     sql: `INSERT INTO sales
-            (id, client_uuid, user_id, total, payment_method, status,
+            (id, client_uuid, user_id, total, subtotal, discount, payment_method, status,
              payload_hash, synced_offline, business_day, order_number, dispatch_status, sold_at)
-          VALUES (?,?,?,?,?, 'CONFIRMADA', ?,?,?,?, 'PENDIENTE', ?)`,
-    args: [saleId, client_uuid, ctx.userId, total, payment_method,
+          VALUES (?,?,?,?,?,?,?, 'CONFIRMADA', ?,?,?,?, 'PENDIENTE', ?)`,
+    args: [saleId, client_uuid, ctx.userId, total, subtotal, discount, payment_method,
            ctx.payloadHash, ctx.syncedOffline ? 1 : 0, businessDay, orderNumber,
            sold_at || new Date().toISOString()],
   });
@@ -184,7 +189,7 @@ export async function registerSale(payload, ctx) {
 
   await db.batch(stmts, 'write'); // rollback automático si algo falla.
 
-  return { status: 'CREATED', saleId, total, orderNumber };
+  return { status: 'CREATED', saleId, total, subtotal, discount, orderNumber };
 }
 
 /** Día hábil en zona America/Santiago, formato 'YYYY-MM-DD'. */

@@ -51,6 +51,9 @@ export function buildCustomerReceiptHTML(data, settings = {}) {
     <table>${rows}</table>
     <hr>
     <table>
+      ${Number(data.discount) > 0 ? `
+      <tr><td>Subtotal</td><td class="right">${money(data.subtotal)}</td></tr>
+      <tr><td>Descuento</td><td class="right">- ${money(data.discount)}</td></tr>` : ''}
       <tr><td class="big">TOTAL</td><td class="right big">${money(data.total)}</td></tr>
       <tr><td>Pago</td><td class="right">${metodo[data.payment_method] || data.payment_method || ''}</td></tr>
     </table>

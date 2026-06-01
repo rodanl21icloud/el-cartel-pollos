@@ -90,12 +90,13 @@ function SaleChooser({ onPick }) {
   );
 }
 
-// --- Venta de productos (catálogo + carrito) ---
-function ProductSale({ settings, onSold }) {
+// --- Venta de productos (catálogo + carrito + confirmación) ---
+function ProductSale({ onSold }) {
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState({});
   const [cat, setCat] = useState('TODO');
   const [search, setSearch] = useState('');
+  const [confirming, setConfirming] = useState(false);
   const [toast, setToast] = useState(null);
 
   useEffect(() => { api('/products').then(setProducts).catch(() => {}); }, []);
@@ -113,17 +114,24 @@ function ProductSale({ settings, onSold }) {
     setCart((c) => { const n = (c[p.id] || 0) - 1; const x = { ...c }; if (n <= 0) delete x[p.id]; else x[p.id] = n; return x; });
   }
 
-  async function checkout(method) {
+  async function createSale(method, discount) {
     if (!items.length) return;
     const receiptItems = items.map((p) => ({ name: p.name, qty: cart[p.id], unit_price: p.price, line_total: p.price * cart[p.id] }));
     const soldAt = new Date().toISOString();
+    const net = Math.max(0, total - discount);
     const payload = { client_uuid: crypto.randomUUID(), payment_method: method, sold_at: soldAt,
       items: items.map((p) => ({ product_id: p.id, qty: cart[p.id] })) };
+    if (discount > 0) payload.discount = discount;
     const res = await recordSale(payload);
-    setCart({});
-    const data = { order_number: res.order_number ?? null, items: receiptItems, total, payment_method: method, sold_at: soldAt, offline: !res.synced };
+    setCart({}); setConfirming(false);
+    const data = { order_number: res.order_number ?? null, items: receiptItems, total: net, discount, subtotal: total, payment_method: method, sold_at: soldAt, offline: !res.synced };
     onSold(data);
     if (!res.synced) { setToast('📴 Sin red: pedido en cola'); setTimeout(() => setToast(null), 3000); }
+  }
+
+  if (confirming) {
+    const lines = items.map((p) => ({ name: p.name, price: p.price, qty: cart[p.id] }));
+    return <PaymentConfirm lines={lines} subtotal={total} onBack={() => setConfirming(false)} onCreate={createSale} />;
   }
 
   return (
@@ -170,16 +178,111 @@ function ProductSale({ settings, onSold }) {
         </div>
         <div className="border-t mt-3 pt-3">
           <div className="flex justify-between text-2xl font-black mb-3"><span>Total</span><span>{money(total)}</span></div>
-          <div className="grid gap-2">
-            {PAYMENTS.map((m) => (
-              <button key={m.id} disabled={!items.length} onClick={() => checkout(m.id)}
-                className={`btn-pos text-white disabled:opacity-40 ${m.color}`}>{m.label}</button>
-            ))}
-          </div>
+          <button disabled={!items.length} onClick={() => setConfirming(true)}
+            className="btn-pos w-full bg-cartel text-white disabled:opacity-40">Cobrar →</button>
         </div>
       </div>
 
       {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-zinc-900 text-white px-6 py-3 rounded-full shadow-lg font-bold">{toast}</div>}
+    </div>
+  );
+}
+
+// --- Confirmación de la venta: productos + pago (estilo Treinta) ---
+const PAY_CARDS = [
+  { id: 'EFECTIVO', icon: '💵', label: 'Efectivo' },
+  { id: 'POS', icon: '💳', label: 'Tarjeta' },
+  { id: 'TRANSFERENCIA', icon: '🏦', label: 'Transferencia' },
+];
+
+function PaymentConfirm({ lines, subtotal, onBack, onCreate }) {
+  const [method, setMethod] = useState('EFECTIVO');
+  const [discPct, setDiscPct] = useState('');
+  const [discAmt, setDiscAmt] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const discount = Math.min(Math.max(0, Number(discAmt) || 0), subtotal);
+  const net = Math.max(0, subtotal - discount);
+
+  function changePct(v) {
+    setDiscPct(v);
+    const pct = Math.min(100, Math.max(0, Number(v) || 0));
+    setDiscAmt(String(Math.round(subtotal * pct / 100)));
+  }
+  function changeAmt(v) {
+    setDiscAmt(v);
+    const amt = Math.min(subtotal, Math.max(0, Number(v) || 0));
+    setDiscPct(subtotal > 0 ? String(Math.round(amt / subtotal * 100)) : '0');
+  }
+
+  async function create() {
+    setBusy(true);
+    try { await onCreate(method, discount); } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="grid md:grid-cols-2 gap-4 max-w-4xl mx-auto">
+      {/* Productos */}
+      <div>
+        <button onClick={onBack} className="mb-3 px-3 py-2 rounded-lg bg-zinc-200 font-bold">← Volver al pedido</button>
+        <div className="bg-white rounded-2xl p-4 shadow">
+          <h2 className="font-black text-lg mb-3">Productos</h2>
+          <ul className="divide-y">
+            {lines.map((l, i) => (
+              <li key={i} className="flex items-center justify-between py-2">
+                <div>
+                  <div className="font-bold">{l.name}</div>
+                  <div className="text-sm text-zinc-500">{l.qty} × {money(l.price)}</div>
+                </div>
+                <div className="font-bold">{money(l.price * l.qty)}</div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      {/* Pago */}
+      <div className="bg-white rounded-2xl p-5 shadow">
+        <h2 className="font-black text-lg mb-3">Pago</h2>
+
+        <label className="block font-bold text-zinc-700 mb-1">Descuento</label>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="relative w-24">
+            <input type="number" min="0" max="100" value={discPct} onChange={(e) => changePct(e.target.value)} placeholder="0"
+              className="w-full px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
+            <span className="absolute right-3 top-2 text-zinc-400">%</span>
+          </div>
+          <span className="text-zinc-400 font-bold">=</span>
+          <div className="relative flex-1">
+            <span className="absolute left-3 top-2 text-zinc-400">$</span>
+            <input type="number" min="0" value={discAmt} onChange={(e) => changeAmt(e.target.value)} placeholder="0"
+              className="w-full pl-7 pr-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
+          </div>
+        </div>
+
+        <label className="block font-bold text-zinc-700 mb-2">Método de pago</label>
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          {PAY_CARDS.map((m) => (
+            <button key={m.id} onClick={() => setMethod(m.id)}
+              className={`rounded-xl py-3 px-2 border-2 text-center relative ${method === m.id ? 'border-green-500 bg-green-50' : 'border-zinc-200'}`}>
+              {method === m.id && <span className="absolute top-1 right-1 text-green-600 text-sm">✓</span>}
+              <div className="text-2xl">{m.icon}</div>
+              <div className="text-xs font-bold mt-1">{m.label}</div>
+            </button>
+          ))}
+        </div>
+
+        <div className="border-t pt-3 text-sm space-y-1 mb-4">
+          <div className="flex justify-between"><span>Subtotal</span><span>{money(subtotal)}</span></div>
+          {discount > 0 && <div className="flex justify-between text-red-600"><span>Descuento</span><span>− {money(discount)}</span></div>}
+          <div className="flex justify-between text-xl font-black pt-1"><span>Total</span><span>{money(net)}</span></div>
+        </div>
+
+        <button onClick={create} disabled={busy}
+          className="btn-pos w-full bg-cartel text-white disabled:opacity-50 flex items-center justify-between px-6">
+          <span>{busy ? 'Creando…' : 'Crear venta'}</span><span>{money(net)} →</span>
+        </button>
+      </div>
     </div>
   );
 }

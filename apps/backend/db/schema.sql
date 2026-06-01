@@ -111,6 +111,8 @@ CREATE TABLE IF NOT EXISTS sales (
   order_number    INTEGER,                          -- correlativo dentro del business_day
   kind            TEXT NOT NULL DEFAULT 'PRODUCTOS' CHECK (kind IN ('PRODUCTOS','LIBRE')),
   note            TEXT,                             -- descripción (venta libre)
+  subtotal        REAL,                             -- suma de ítems antes de descuento
+  discount        REAL NOT NULL DEFAULT 0,          -- descuento aplicado
   dispatch_status TEXT NOT NULL DEFAULT 'PENDIENTE'
                     CHECK (dispatch_status IN ('PENDIENTE','EN_PREPARACION','LISTO','ENTREGADO')),
   sold_at         TEXT NOT NULL DEFAULT (datetime('now')),  -- timestamp del dispositivo

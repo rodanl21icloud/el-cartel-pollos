@@ -33,8 +33,8 @@ export async function getReceipt(req, res) {
   const { getDb } = await import('../db.js');
   const db = getDb();
   const sale = await db.execute({
-    sql: `SELECT s.id, s.order_number, s.business_day, s.total, s.payment_method, s.sold_at,
-                 s.dispatch_status, u.full_name AS cashier
+    sql: `SELECT s.id, s.order_number, s.business_day, s.total, s.subtotal, s.discount,
+                 s.payment_method, s.sold_at, s.dispatch_status, u.full_name AS cashier
           FROM sales s JOIN users u ON u.id = s.user_id WHERE s.id = ?`,
     args: [req.params.id],
   });
@@ -49,7 +49,8 @@ export async function getReceipt(req, res) {
   const s = sale.rows[0];
   return res.json({
     sale_id: s.id, order_number: s.order_number, business_day: s.business_day,
-    total: Number(s.total), payment_method: s.payment_method, sold_at: s.sold_at,
+    total: Number(s.total), subtotal: s.subtotal != null ? Number(s.subtotal) : null,
+    discount: Number(s.discount || 0), payment_method: s.payment_method, sold_at: s.sold_at,
     dispatch_status: s.dispatch_status, cashier: s.cashier,
     items: items.rows.map((i) => ({ name: i.name, qty: i.qty, unit_price: Number(i.unit_price), line_total: Number(i.line_total) })),
   });
