@@ -123,6 +123,84 @@ const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 const pct = (num, den) => (den > 0 ? round2((num / den) * 100) : 0);
 
 /**
+ * GET /api/reports/dashboard?from=&to=
+ * Resumen ejecutivo para decisiones: KPIs del período vs período anterior,
+ * tendencia mensual, top productos (volumen y margen), ventas por día de la
+ * semana, y alertas (stock bajo, food cost alto). (reports.view)
+ */
+export async function dashboard(req, res) {
+  const db = getDb();
+  const toD = req.query.to ? new Date(req.query.to) : new Date();
+  const fromD = req.query.from ? new Date(req.query.from) : new Date(toD.getTime() - 30 * 86400000);
+  const len = toD.getTime() - fromD.getTime();
+  const to = toD.toISOString(), from = fromD.toISOString();
+  const prevTo = from, prevFrom = new Date(fromD.getTime() - len).toISOString();
+
+  const ventas = async (a, b) => {
+    const r = (await db.execute({ sql: `SELECT COUNT(*) n, COALESCE(SUM(total),0) t FROM sales WHERE status='CONFIRMADA' AND sold_at>=? AND sold_at<=?`, args: [a, b] })).rows[0];
+    return { n: Number(r.n), total: Number(r.t) };
+  };
+  const gastos = async (a, b) => Number((await db.execute({ sql: `SELECT COALESCE(SUM(amount),0) t FROM expenses WHERE spent_at>=? AND spent_at<=?`, args: [a, b] })).rows[0].t);
+  const cogs = async (a, b) => Number((await db.execute({ sql: `SELECT COALESCE(SUM(ABS(qty_delta)*unit_cost),0) c FROM inventory_adjustments WHERE type='VENTA' AND created_at>=? AND created_at<=?`, args: [a, b] })).rows[0].c);
+
+  const cur = await ventas(from, to), prev = await ventas(prevFrom, prevTo);
+  const gCur = await gastos(from, to), gPrev = await gastos(prevFrom, prevTo);
+  const cogsCur = await cogs(from, to);
+  const ticket = cur.n ? round2(cur.total / cur.n) : 0;
+  const ticketPrev = prev.n ? round2(prev.total / prev.n) : 0;
+  const delta = (a, b) => (b > 0 ? round2(((a - b) / b) * 100) : null);
+
+  // Tendencia últimos 12 meses.
+  const desde12 = new Date(toD.getFullYear(), toD.getMonth() - 11, 1).toISOString();
+  const vMes = (await db.execute({ sql: `SELECT substr(sold_at,1,7) m, COALESCE(SUM(total),0) t, COUNT(*) n FROM sales WHERE status='CONFIRMADA' AND sold_at>=? GROUP BY m`, args: [desde12] })).rows;
+  const gMes = (await db.execute({ sql: `SELECT substr(spent_at,1,7) m, COALESCE(SUM(amount),0) t FROM expenses WHERE spent_at>=? GROUP BY m`, args: [desde12] })).rows;
+  const mesMap = new Map();
+  vMes.forEach((r) => mesMap.set(r.m, { mes: r.m, ventas: Number(r.t), n: Number(r.n), gastos: 0 }));
+  gMes.forEach((r) => { const x = mesMap.get(r.m) || { mes: r.m, ventas: 0, n: 0, gastos: 0 }; x.gastos = Number(r.t); mesMap.set(r.m, x); });
+  const tendencia = [...mesMap.values()].sort((a, b) => a.mes.localeCompare(b.mes)).map((x) => ({ ...x, utilidad: round2(x.ventas - x.gastos) }));
+
+  // Top productos por monto (período).
+  const top = (await db.execute({
+    sql: `SELECT p.name, SUM(si.qty) u, COALESCE(SUM(si.line_total),0) t
+          FROM sale_items si JOIN sales s ON s.id=si.sale_id AND s.status='CONFIRMADA' AND s.sold_at>=? AND s.sold_at<=?
+          JOIN products p ON p.id=si.product_id GROUP BY p.id ORDER BY t DESC LIMIT 8`, args: [from, to],
+  })).rows.map((r) => ({ name: r.name, unidades: Number(r.u), monto: Number(r.t) }));
+
+  // Ventas por día de la semana (zona Chile).
+  const dow = Array.from({ length: 7 }, () => ({ monto: 0, n: 0 }));
+  const fmtDow = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Santiago', weekday: 'short' });
+  const DOW = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  const rowsDow = (await db.execute({ sql: `SELECT sold_at, total FROM sales WHERE status='CONFIRMADA' AND sold_at>=? AND sold_at<=?`, args: [from, to] })).rows;
+  for (const r of rowsDow) { const d = DOW[fmtDow.format(new Date(r.sold_at))]; dow[d].monto += Number(r.total); dow[d].n += 1; }
+  const diasSemana = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map((dia, i) => ({ dia, monto: round2(dow[i].monto), n: dow[i].n }));
+
+  // Margen por producto (catálogo con receta).
+  const margenes = (await db.execute({
+    sql: `SELECT p.name, p.price,
+            COALESCE((SELECT SUM(pr.qty_per_unit*i.cost_unit) FROM product_recipes pr JOIN ingredients i ON i.id=pr.ingredient_id WHERE pr.product_id=p.id),0) costo
+          FROM products p WHERE p.is_active=1`, args: [],
+  })).rows.map((r) => { const price = Number(r.price), costo = round2(Number(r.costo)); return { name: r.name, price, costo, margen: price > 0 && costo > 0 ? pct(price - costo, price) : null }; }).filter((x) => x.margen != null);
+  const peoresMargen = [...margenes].sort((a, b) => a.margen - b.margen).slice(0, 5);
+
+  // Alertas.
+  const stockBajo = (await db.execute({ sql: `SELECT name FROM ingredients WHERE is_active=1 AND stock_qty<=min_stock_qty ORDER BY (stock_qty-min_stock_qty) LIMIT 10`, args: [] })).rows.map((r) => r.name);
+
+  return res.json({
+    period: { from, to },
+    kpis: {
+      ventas: round2(cur.total), ventas_delta: delta(cur.total, prev.total),
+      n_ventas: cur.n, n_ventas_delta: delta(cur.n, prev.n),
+      ticket, ticket_delta: delta(ticket, ticketPrev),
+      gastos: round2(gCur), gastos_delta: delta(gCur, gPrev),
+      utilidad: round2(cur.total - gCur), utilidad_delta: delta(cur.total - gCur, prev.total - gPrev),
+      food_cost: pct(cogsCur, cur.total),
+    },
+    tendencia, top_productos: top, dias_semana: diasSemana, peores_margen: peoresMargen,
+    alertas: { stock_bajo: stockBajo },
+  });
+}
+
+/**
  * GET /api/reports/stats?from=&to=
  * Estadísticas operativas: total/n° ventas, ticket promedio, ventas por hora
  * (zona America/Santiago), por día, por método y ranking de productos. (reports.view)

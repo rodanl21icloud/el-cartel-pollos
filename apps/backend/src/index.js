@@ -12,7 +12,7 @@ import { registerMerma, listIngredients, lowStockAlerts,
 import { createProduct, updateProduct, deleteProduct, updateIngredient, listCatalog } from './controllers/admin.js';
 import { getRecipe, setRecipe } from './controllers/recipes.js';
 import { listCategories, createExpense, listExpenses } from './controllers/expenses.js';
-import { turnSummary, closuresHistory, cashFlow, pnl, stats } from './controllers/reports.js';
+import { turnSummary, closuresHistory, cashFlow, pnl, stats, dashboard } from './controllers/reports.js';
 import { getPermissions, myPermissions, updatePermission } from './controllers/permissions.js';
 import { listGroups, createGroup, deleteGroup, createOption, deleteOption, setGroupProducts, getProductModifiers } from './controllers/modifiers.js';
 import { listClients, createClient } from './controllers/clients.js';
@@ -108,6 +108,7 @@ app.get('/api/reports/closures', requirePermission('reports.view'), closuresHist
 app.get('/api/reports/cash-flow', requirePermission('reports.view'), cashFlow);
 app.get('/api/reports/pnl', requirePermission('reports.view'), pnl);
 app.get('/api/reports/stats', requirePermission('reports.view'), stats);
+app.get('/api/reports/dashboard', requirePermission('reports.view'), dashboard);
 
 // Conciliación bancaria
 app.get('/api/bank/summary', requirePermission('reports.view'), bankSummary);
