@@ -134,13 +134,46 @@ CREATE TABLE IF NOT EXISTS sale_items (
   sale_id         TEXT NOT NULL,
   product_id      TEXT NOT NULL,
   qty             INTEGER NOT NULL CHECK (qty > 0),
-  unit_price      REAL NOT NULL CHECK (unit_price >= 0),  -- snapshot del precio
+  unit_price      REAL NOT NULL CHECK (unit_price >= 0),  -- snapshot del precio base
+  modifiers       TEXT,                                   -- JSON: adiciones elegidas [{name, price_delta}]
+  modifiers_total REAL NOT NULL DEFAULT 0,                -- suma de price_delta por unidad
   line_total      REAL NOT NULL CHECK (line_total >= 0),
   FOREIGN KEY (sale_id)    REFERENCES sales(id)    ON DELETE CASCADE,
   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT
 );
 
 CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id);
+
+-- ----------------------------------------------------------------
+-- MODIFICADORES / ADICIONES — grupos de opciones (presa, salsas, con/sin).
+-- ----------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS modifier_groups (
+  id              TEXT PRIMARY KEY,
+  name            TEXT NOT NULL,                    -- ej. 'Presa preferida', 'Salsas extra'
+  min_select      INTEGER NOT NULL DEFAULT 0,       -- mínimo a elegir
+  max_select      INTEGER NOT NULL DEFAULT 1,       -- máximo a elegir (0 = sin límite)
+  is_required     INTEGER NOT NULL DEFAULT 0 CHECK (is_required IN (0,1)),
+  is_active       INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0,1)),
+  created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS modifier_options (
+  id              TEXT PRIMARY KEY,
+  group_id        TEXT NOT NULL,
+  name            TEXT NOT NULL,                    -- ej. 'Pechuga', 'Salsa BBQ', 'Sin ají'
+  price_delta     REAL NOT NULL DEFAULT 0,          -- recargo (o 0)
+  is_active       INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0,1)),
+  FOREIGN KEY (group_id) REFERENCES modifier_groups(id) ON DELETE CASCADE
+);
+
+-- Relación producto <-> grupo de modificadores.
+CREATE TABLE IF NOT EXISTS product_modifier_groups (
+  product_id      TEXT NOT NULL,
+  group_id        TEXT NOT NULL,
+  PRIMARY KEY (product_id, group_id),
+  FOREIGN KEY (product_id) REFERENCES products(id)        ON DELETE CASCADE,
+  FOREIGN KEY (group_id)   REFERENCES modifier_groups(id) ON DELETE CASCADE
+);
 
 -- ----------------------------------------------------------------
 -- INVENTORY_ADJUSTMENTS — mermas obligatorias y ajustes manuales.

@@ -185,6 +185,12 @@ carta, insumos y permisos), no a acciones operativas (despacho, recetas).
   (ej. 0,5 pollo, 0,6 kg papas); muestra costo y margen en vivo. Al vender, descuenta del
   inventario en decimales.
 
+## Adiciones / Modificadores
+Grupos de opciones (ej. "Presa preferida", "Salsas extra") con mín/máx y obligatoriedad,
+opciones con recargo opcional, asignables a productos. En el POS, tocar un producto con
+modificadores abre un modal para elegir; el recargo lo aplica el **servidor** (anti-tamper)
+y los modificadores aparecen en el carrito, el comprobante y el ticket de cocina.
+
 ## Comprobantes e impresión
 Al cobrar, el POS muestra el N° de orden y permite **imprimir ticket de cocina** (sin precios,
 ítems grandes), **imprimir boleta** para el cliente y **enviar el comprobante por WhatsApp**

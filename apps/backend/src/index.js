@@ -14,6 +14,7 @@ import { getRecipe, setRecipe } from './controllers/recipes.js';
 import { listCategories, createExpense, listExpenses } from './controllers/expenses.js';
 import { turnSummary, closuresHistory, cashFlow, pnl, stats } from './controllers/reports.js';
 import { getPermissions, myPermissions, updatePermission } from './controllers/permissions.js';
+import { listGroups, createGroup, deleteGroup, createOption, deleteOption, setGroupProducts, getProductModifiers } from './controllers/modifiers.js';
 import { listDispatch, updateDispatchStatus } from './controllers/dispatch.js';
 
 const app = express();
@@ -80,6 +81,17 @@ app.delete('/api/products/:id', requirePermission('menu.manage'), requireOtpForM
 // Recetas (BOM) por producto. Decimales soportados.
 app.get('/api/products/:id/recipe', requirePermission('recipes.manage'), getRecipe);
 app.put('/api/products/:id/recipe', requirePermission('recipes.manage'), setRecipe);
+
+// Modificadores / adiciones del producto (POS los lee al agregar)
+app.get('/api/products/:id/modifiers', getProductModifiers);
+
+// Administración de modificadores
+app.get('/api/modifiers', requirePermission('menu.manage'), listGroups);
+app.post('/api/modifiers/groups', requirePermission('menu.manage'), createGroup);
+app.delete('/api/modifiers/groups/:id', requirePermission('menu.manage'), deleteGroup);
+app.put('/api/modifiers/groups/:id/products', requirePermission('menu.manage'), setGroupProducts);
+app.post('/api/modifiers/options', requirePermission('menu.manage'), createOption);
+app.delete('/api/modifiers/options/:id', requirePermission('menu.manage'), deleteOption);
 
 // Reportes (exponen el teórico)
 app.get('/api/reports/turn-summary', requirePermission('reports.view'), turnSummary);

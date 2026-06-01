@@ -41,7 +41,7 @@ export async function getReceipt(req, res) {
   if (!sale.rows.length) return res.status(404).json({ error: 'VENTA_NO_ENCONTRADA' });
 
   const items = await db.execute({
-    sql: `SELECT p.name, si.qty, si.unit_price, si.line_total
+    sql: `SELECT p.name, si.qty, si.unit_price, si.line_total, si.modifiers
           FROM sale_items si JOIN products p ON p.id = si.product_id
           WHERE si.sale_id = ? ORDER BY p.name`,
     args: [req.params.id],
@@ -52,7 +52,10 @@ export async function getReceipt(req, res) {
     total: Number(s.total), subtotal: s.subtotal != null ? Number(s.subtotal) : null,
     discount: Number(s.discount || 0), payment_method: s.payment_method, sold_at: s.sold_at,
     dispatch_status: s.dispatch_status, cashier: s.cashier,
-    items: items.rows.map((i) => ({ name: i.name, qty: i.qty, unit_price: Number(i.unit_price), line_total: Number(i.line_total) })),
+    items: items.rows.map((i) => ({
+      name: i.name, qty: i.qty, unit_price: Number(i.unit_price), line_total: Number(i.line_total),
+      modifiers: i.modifiers ? JSON.parse(i.modifiers) : [],
+    })),
   });
 }
 
@@ -60,8 +63,13 @@ export async function getReceipt(req, res) {
 export async function listProducts(req, res) {
   const { getDb } = await import('../db.js');
   const { rows } = await getDb().execute({
-    sql: `SELECT id, sku, name, price, category, image_url FROM products WHERE is_active = 1 ORDER BY name`,
+    sql: `SELECT p.id, p.sku, p.name, p.price, p.category, p.image_url,
+                 (SELECT COUNT(*) FROM product_modifier_groups pmg WHERE pmg.product_id = p.id) AS mod_groups
+          FROM products p WHERE p.is_active = 1 ORDER BY p.name`,
     args: [],
   });
-  return res.json(rows);
+  return res.json(rows.map((r) => ({
+    id: r.id, sku: r.sku, name: r.name, price: Number(r.price), category: r.category,
+    image_url: r.image_url, has_modifiers: Number(r.mod_groups) > 0,
+  })));
 }

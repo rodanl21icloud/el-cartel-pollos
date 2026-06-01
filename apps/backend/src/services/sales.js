@@ -66,6 +66,17 @@ export async function registerSale(payload, ctx) {
     return { status: 'CREATED', saleId, total: free_amount, orderNumber };
   }
 
+  // Carga de modificadores elegidos (recargo desde DB, anti-tamper).
+  const allOptionIds = [...new Set(items.flatMap((i) => Array.isArray(i.modifier_option_ids) ? i.modifier_option_ids : []))];
+  const optionMap = new Map();
+  if (allOptionIds.length) {
+    const optRes = await db.execute({
+      sql: `SELECT id, name, price_delta FROM modifier_options WHERE is_active = 1 AND id IN (${allOptionIds.map(() => '?').join(',')})`,
+      args: allOptionIds,
+    });
+    for (const o of optRes.rows) optionMap.set(o.id, { name: o.name, price_delta: Number(o.price_delta) });
+  }
+
   // Carga de productos + recetas en lote.
   const productIds = [...new Set(items.map((i) => i.product_id))];
   const placeholders = productIds.map(() => '?').join(',');
@@ -101,11 +112,17 @@ export async function registerSale(payload, ctx) {
       const e = new Error('CANTIDAD_INVALIDA'); e.status = 400; throw e;
     }
     const unitPrice = Number(product.price);
-    const lineTotal = unitPrice * qty;
+    // Modificadores elegidos: recargo y nombres desde la DB (no del cliente).
+    const chosen = (Array.isArray(line.modifier_option_ids) ? line.modifier_option_ids : [])
+      .map((oid) => optionMap.get(oid)).filter(Boolean);
+    const modsTotal = chosen.reduce((s, o) => s + o.price_delta, 0);
+    const lineTotal = (unitPrice + modsTotal) * qty;
     total += lineTotal;
     saleItems.push({
       id: randomUUID(), sale_id: saleId, product_id: product.id,
       qty, unit_price: unitPrice, line_total: lineTotal,
+      modifiers: chosen.length ? JSON.stringify(chosen.map((o) => ({ name: o.name, price_delta: o.price_delta }))) : null,
+      modifiers_total: modsTotal,
     });
 
     for (const r of recipeRes.rows.filter((x) => x.product_id === product.id)) {
@@ -154,9 +171,9 @@ export async function registerSale(payload, ctx) {
 
   for (const it of saleItems) {
     stmts.push({
-      sql: `INSERT INTO sale_items (id, sale_id, product_id, qty, unit_price, line_total)
-            VALUES (?,?,?,?,?,?)`,
-      args: [it.id, it.sale_id, it.product_id, it.qty, it.unit_price, it.line_total],
+      sql: `INSERT INTO sale_items (id, sale_id, product_id, qty, unit_price, modifiers, modifiers_total, line_total)
+            VALUES (?,?,?,?,?,?,?,?)`,
+      args: [it.id, it.sale_id, it.product_id, it.qty, it.unit_price, it.modifiers, it.modifiers_total, it.line_total],
     });
   }
 

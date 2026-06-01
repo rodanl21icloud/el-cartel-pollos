@@ -35,8 +35,11 @@ function docShell(width, inner) {
 /** Boleta/comprobante para el cliente. */
 export function buildCustomerReceiptHTML(data, settings = {}) {
   const w = settings.paper_width || 80;
+  const mods = (i) => (i.modifiers || []).map((m) =>
+    `<tr><td colspan="2" style="padding-left:10px;color:#000">+ ${esc(m.name)}${m.price_delta ? ' (' + money(m.price_delta) + ')' : ''}</td></tr>`
+  ).join('');
   const rows = (data.items || []).map((i) =>
-    `<tr><td>${i.qty} x ${esc(i.name)}</td><td class="right">${money(i.line_total)}</td></tr>`
+    `<tr><td>${i.qty} x ${esc(i.name)}</td><td class="right">${money(i.line_total)}</td></tr>${mods(i)}`
   ).join('');
   const inner = `
     <div class="c big">${esc(settings.name || 'El Cartel de los Pollos')}</div>
@@ -67,7 +70,8 @@ export function buildCustomerReceiptHTML(data, settings = {}) {
 export function buildKitchenTicketHTML(data, settings = {}) {
   const w = settings.paper_width || 80;
   const rows = (data.items || []).map((i) =>
-    `<div class="big">${i.qty} x ${esc(i.name)}</div>`
+    `<div class="big">${i.qty} x ${esc(i.name)}</div>` +
+    (i.modifiers || []).map((m) => `<div style="padding-left:12px">› ${esc(m.name)}</div>`).join('')
   ).join('');
   const inner = `
     <div class="c b">COCINA</div>
