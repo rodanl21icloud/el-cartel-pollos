@@ -23,11 +23,11 @@ function clasificar(desc, dir) {
   else if ((m = d.match(/Pago:\s*(.+)/i))) counterpart = m[1].trim();
   const t = d.toLowerCase();
   let category = 'Otros';
-  if (/agrosuper|scarsofy/.test(t)) category = 'Insumos (Agrosuper/Scarsofy)';
+  if (/proveedores 0767955618/.test(t)) category = 'Ventas con tarjeta (liquidación)';
+  else if (/agrosuper|scarsofy/.test(t)) category = 'Insumos (Agrosuper/Scarsofy)';
   else if (/rj inversiones|inversiones dad|rodrigo nunez itau|rodrigo alejandro nune/.test(t)) category = 'Sociedades / retiros';
-  else if (/proveedores 0767955618/.test(t)) category = 'Pago a proveedores';
   else if (/clean magic|ulises aire|climatizacion|mantenim/.test(t)) category = 'Mantención y servicios';
-  else if (dir === 'INGRESO') category = 'Ventas por transferencia';
+  else if (dir === 'INGRESO') category = 'Transferencias recibidas';
   else category = 'Otros traspasos';
   return { counterpart, category };
 }
@@ -58,12 +58,9 @@ for (const f of FILES) {
     if (!amount) continue;
     const fecha = `${d8.slice(0,4)}-${d8.slice(4,6)}-${d8.slice(6,8)}`;
     const desc = descRaw.trim();
-    // Dirección por la descripción (más fiable que el código A/C del banco):
-    // "Traspaso De:" = entra; "Traspaso A:" / "Pago:" = sale. Fallback al código.
-    let dir;
-    if (/Traspaso\s+De:/i.test(desc)) dir = 'INGRESO';
-    else if (/(?:App-)?Traspaso\s+A:|Pago:/i.test(desc)) dir = 'EGRESO';
-    else dir = tipo === 'A' ? 'INGRESO' : 'EGRESO';
+    // Dirección por el código del banco: A = Abono (ingreso), C = Cargo (egreso).
+    // "Pago: Proveedores 0767955618" (A) = liquidación de ventas con tarjeta (ingreso).
+    const dir = tipo === 'A' ? 'INGRESO' : 'EGRESO';
     const { counterpart, category } = clasificar(desc, dir);
     const key = `${fecha}|${amount}|${desc}|${tipo}|${dir}`;
     if (seen.has(key)) { dup++; continue; }

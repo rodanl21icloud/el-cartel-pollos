@@ -97,19 +97,19 @@ export async function reconcile(req, res) {
   })).rows;
   const sysV = (await db.execute({
     sql: `SELECT substr(sold_at,1,7) mes,
-            COALESCE(SUM(CASE WHEN payment_method='TRANSFERENCIA' THEN total END),0) sis_transf,
+            COALESCE(SUM(CASE WHEN payment_method IN ('POS','TRANSFERENCIA') THEN total END),0) sis_digital,
             COALESCE(SUM(total),0) sis_ventas
           FROM sales WHERE status='CONFIRMADA' GROUP BY mes`, args: [],
   })).rows;
   const sysG = (await db.execute({ sql: `SELECT substr(spent_at,1,7) mes, COALESCE(SUM(amount),0) sis_gastos FROM expenses GROUP BY mes`, args: [] })).rows;
 
   const map = new Map();
-  const get = (mes) => { if (!map.has(mes)) map.set(mes, { mes, banco_ing: 0, banco_egr: 0, sis_transf: 0, sis_ventas: 0, sis_gastos: 0 }); return map.get(mes); };
+  const get = (mes) => { if (!map.has(mes)) map.set(mes, { mes, banco_ing: 0, banco_egr: 0, sis_digital: 0, sis_ventas: 0, sis_gastos: 0 }); return map.get(mes); };
   bank.forEach((r) => { const x = get(r.mes); x.banco_ing = Number(r.banco_ing); x.banco_egr = Number(r.banco_egr); });
-  sysV.forEach((r) => { const x = get(r.mes); x.sis_transf = Number(r.sis_transf); x.sis_ventas = Number(r.sis_ventas); });
+  sysV.forEach((r) => { const x = get(r.mes); x.sis_digital = Number(r.sis_digital); x.sis_ventas = Number(r.sis_ventas); });
   sysG.forEach((r) => { const x = get(r.mes); x.sis_gastos = Number(r.sis_gastos); });
 
   return res.json([...map.values()].sort((a, b) => a.mes.localeCompare(b.mes)).map((x) => ({
-    ...x, dif_ingresos: round2(x.banco_ing - x.sis_transf), dif_egresos: round2(x.banco_egr - x.sis_gastos),
+    ...x, dif_ingresos: round2(x.banco_ing - x.sis_digital), dif_egresos: round2(x.banco_egr - x.sis_gastos),
   })));
 }

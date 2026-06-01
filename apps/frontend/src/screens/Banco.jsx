@@ -61,7 +61,7 @@ export default function Banco({ role }) {
               <tr className="text-left text-ink-mute border-b">
                 <th className="py-2">Mes</th>
                 <th className="text-right">Ingresos banco</th>
-                <th className="text-right">Ventas transf. POS</th>
+                <th className="text-right">Ventas tarjeta+transf. POS</th>
                 <th className="text-right">Dif.</th>
                 <th className="text-right">Egresos banco</th>
                 <th className="text-right">Gastos sistema</th>
@@ -72,7 +72,7 @@ export default function Banco({ role }) {
                 <tr key={r.mes} className="border-b last:border-0">
                   <td className="py-2 font-semibold">{r.mes}</td>
                   <td className="text-right text-emerald-600">{money(r.banco_ing)}</td>
-                  <td className="text-right">{money(r.sis_transf)}</td>
+                  <td className="text-right">{money(r.sis_digital)}</td>
                   <td className={`text-right font-bold ${Math.abs(r.dif_ingresos) < 1 ? 'text-emerald-600' : 'text-amber-600'}`}>{money(r.dif_ingresos)}</td>
                   <td className="text-right text-cartel">{money(r.banco_egr)}</td>
                   <td className="text-right">{money(r.sis_gastos)}</td>
