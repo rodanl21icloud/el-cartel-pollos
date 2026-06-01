@@ -151,12 +151,8 @@ export default function App() {
 
 function Brand({ onClose }) {
   return (
-    <div className="h-16 flex items-center gap-2 px-5 border-b border-white/10 shrink-0">
-      <span className="text-2xl">🐔</span>
-      <div className="leading-none">
-        <div className="font-black tracking-tight">El Cartel</div>
-        <div className="text-[10px] text-slate-400 tracking-wide">de los Pollos</div>
-      </div>
+    <div className="h-16 flex items-center gap-2 px-4 border-b border-white/10 shrink-0">
+      <img src="/logo.jpeg" alt="El Cartel de los Pollos" className="h-10 rounded-md bg-white px-1.5 py-0.5" />
       {onClose && <button onClick={onClose} className="ml-auto p-2 rounded-lg hover:bg-white/10 text-slate-300">✕</button>}
     </div>
   );

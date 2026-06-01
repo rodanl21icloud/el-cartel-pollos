@@ -26,9 +26,8 @@ export default function Login({ onLogin }) {
 
       <form onSubmit={submit} className="relative bg-white rounded-3xl p-8 w-full max-w-sm shadow-pop animate-[fadein_.3s_ease]">
         <div className="text-center mb-7">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-ink grid place-items-center text-4xl shadow-soft">🐔</div>
-          <h1 className="text-2xl font-black tracking-tight mt-3">El Cartel de los Pollos</h1>
-          <p className="text-ink-mute text-sm">Sistema de gestión y POS</p>
+          <img src="/logo.jpeg" alt="El Cartel de los Pollos" className="w-56 mx-auto rounded-xl" />
+          <p className="text-ink-mute text-sm mt-3">Sistema de gestión y POS</p>
         </div>
         <label className="block text-sm font-bold text-slate-600 mb-1">Usuario</label>
         <input autoFocus value={username} onChange={(e) => setUsername(e.target.value)} className="field mb-4 text-lg" />
