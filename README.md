@@ -86,6 +86,10 @@ cp apps/backend/.env.example apps/backend/.env   # editar TURSO_* y JWT_SECRET
 npm -w @cartel/backend run db:seed      # schema.sql + seed.sql
 npm -w @cartel/backend run seed:users   # imprime credenciales y OTP de gerencia
 
+# Cargar la carta real (40 productos) + insumos y recetas con food cost
+npm -w @cartel/backend run seed:carta     # 40 productos en 6 categorías
+npm -w @cartel/backend run seed:recetas   # 24 insumos + recetas (BOM) + tabla de food cost
+
 # Levantar
 npm -w @cartel/backend run dev          # API en :3000
 npm -w @cartel/frontend run dev         # POS en :5173 (proxy /api -> :3000)
