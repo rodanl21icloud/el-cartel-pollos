@@ -63,6 +63,33 @@ export async function getReceipt(req, res) {
   });
 }
 
+// POST /api/sales/:id/void — anula una venta (la excluye de reportes) y, si
+// descontó inventario por BOM, restaura el stock.
+export async function voidSale(req, res) {
+  const { getDb } = await import('../db.js');
+  const { writeAudit } = await import('../services/audit.js');
+  const db = getDb();
+  const sale = (await db.execute({ sql: `SELECT id, status, order_number, total FROM sales WHERE id = ?`, args: [req.params.id] })).rows[0];
+  if (!sale) return res.status(404).json({ error: 'VENTA_NO_ENCONTRADA' });
+  if (sale.status === 'ANULADA') return res.json({ id: sale.id, status: 'ANULADA' });
+
+  // Restaurar inventario de los descuentos BOM de esta venta y eliminarlos.
+  const adj = (await db.execute({ sql: `SELECT id, ingredient_id, qty_delta FROM inventory_adjustments WHERE sale_id = ? AND type = 'VENTA'`, args: [req.params.id] })).rows;
+  const stmts = [];
+  for (const a of adj) {
+    stmts.push({ sql: `UPDATE ingredients SET stock_qty = stock_qty - ?, updated_at = datetime('now') WHERE id = ?`, args: [a.qty_delta, a.ingredient_id] }); // qty_delta negativo → suma
+    stmts.push({ sql: `DELETE FROM inventory_adjustments WHERE id = ?`, args: [a.id] });
+  }
+  stmts.push({ sql: `UPDATE sales SET status = 'ANULADA' WHERE id = ?`, args: [req.params.id] });
+  stmts.push({
+    sql: `INSERT INTO audit_logs (id, user_id, action, entity, entity_id, severity, metadata, ip_address)
+          VALUES (?,?, 'SALE_VOID', 'sales', ?, 'ALERT', ?, ?)`,
+    args: [crypto.randomUUID(), req.user.id, req.params.id, JSON.stringify({ order_number: sale.order_number, total: Number(sale.total), reason: (req.body?.reason || '').slice(0, 200) }), req.ip || null],
+  });
+  await db.batch(stmts, 'write');
+  return res.json({ id: sale.id, status: 'ANULADA', restored: adj.length });
+}
+
 // GET /api/sales?from=&to=&method=&q=&limit= — listado de ventas (transacciones).
 export async function listSales(req, res) {
   const { getDb } = await import('../db.js');

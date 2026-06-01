@@ -216,6 +216,12 @@ function RecipeBuilder({ product, ingredients, otp, onClose, onSaved, onError })
     try { await api(`/products/${product.id}/recipe`, { method: 'PUT', body: { lines: payload }, otp }); onSaved(); }
     catch (e) { onError(e); }
   }
+  async function eliminar() {
+    if (!confirm(`¿Eliminar la receta de "${product.name}"? Dejará de descontar inventario.`)) return;
+    try { await api(`/products/${product.id}/recipe`, { method: 'PUT', body: { lines: [] }, otp }); onSaved(); }
+    catch (e) { onError(e); }
+  }
+  const tieneReceta = Object.values(lines).some((v) => Number(v) > 0);
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-20" onClick={onClose}>
@@ -246,6 +252,7 @@ function RecipeBuilder({ product, ingredients, otp, onClose, onSaved, onError })
             </div>
             <div className="flex gap-2 mt-4">
               <button onClick={save} className="flex-1 btn-pos bg-cartel text-white">Guardar receta</button>
+              {tieneReceta && <button onClick={eliminar} className="px-4 rounded-2xl bg-red-100 text-red-700 font-bold" title="Eliminar receta">🗑</button>}
               <button onClick={onClose} className="px-4 rounded-2xl bg-zinc-200 font-bold">Cerrar</button>
             </div>
           </>

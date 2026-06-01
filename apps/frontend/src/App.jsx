@@ -131,7 +131,7 @@ export default function App() {
         <main className="flex-1 overflow-auto p-4 sm:p-6">
           {!screen && <p className="text-center text-ink-mute mt-12">No tienes módulos habilitados. Contacta a gerencia.</p>}
           {screen === 'pos' && <Pos onNavigate={go} />}
-          {screen === 'ventas' && <Ventas />}
+          {screen === 'ventas' && <Ventas canVoid={!!perms['reports.view']} />}
           {screen === 'despacho' && <Despacho />}
           {screen === 'clientes' && <Clientes />}
           {screen === 'gastos' && <Gastos />}

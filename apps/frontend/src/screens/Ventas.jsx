@@ -8,7 +8,7 @@ const METODO = { EFECTIVO: '💵 Efectivo', POS: '💳 Tarjeta', TRANSFERENCIA: 
 const fecha = (iso) => { try { return new Date(iso).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' }); } catch { return ''; } };
 
 // Transacciones de venta con filtros y reimpresión de boleta.
-export default function Ventas() {
+export default function Ventas({ canVoid }) {
   const [items, setItems] = useState([]);
   const [settings, setSettings] = useState({ name: 'El Cartel de los Pollos', paper_width: 80 });
   const [from, setFrom] = useState('');
@@ -38,6 +38,13 @@ export default function Ventas() {
       else if (kind === 'boleta') openPrint(buildCustomerReceiptHTML(r, settings));
       else window.open(whatsappUrl(r, settings), '_blank');
     } catch (e) { setError(e.message); }
+  }
+
+  async function anular(v) {
+    const reason = window.prompt(`Anular venta N° ${v.order_number} (${money(v.total)}). Motivo:`);
+    if (reason === null) return;
+    try { await api(`/sales/${v.id}/void`, { method: 'POST', body: { reason } }); load(); }
+    catch (e) { setError(e.message === 'PERMISO_DENEGADO' ? 'Sin permiso para anular' : e.message); }
   }
 
   const totalVisible = items.reduce((s, v) => s + v.total, 0);
@@ -83,6 +90,7 @@ export default function Ventas() {
                   <button onClick={() => reimprimir(v.id, 'boleta')} title="Imprimir boleta" className="w-8 h-8 rounded-lg hover:bg-slate-200 text-lg">🧾</button>
                   <button onClick={() => reimprimir(v.id, 'cocina')} title="Ticket cocina" className="w-8 h-8 rounded-lg hover:bg-slate-200 text-lg">🍗</button>
                   <button onClick={() => reimprimir(v.id, 'whatsapp')} title="WhatsApp" className="w-8 h-8 rounded-lg hover:bg-slate-200 text-lg">📲</button>
+                  {canVoid && <button onClick={() => anular(v)} title="Anular venta" className="w-8 h-8 rounded-lg hover:bg-red-100 text-lg">🚫</button>}
                 </td>
               </tr>
             ))}

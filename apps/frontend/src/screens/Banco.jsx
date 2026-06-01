@@ -11,6 +11,7 @@ export default function Banco({ role }) {
   const [movs, setMovs] = useState([]);
   const [q, setQ] = useState('');
   const [dir, setDir] = useState('');
+  const [rstatus, setRstatus] = useState('');
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState('');
   const canAdd = role === 'GERENCIA';
@@ -26,10 +27,18 @@ export default function Banco({ role }) {
     const params = new URLSearchParams();
     if (q.trim()) params.set('q', q.trim());
     if (dir) params.set('dir', dir);
+    if (rstatus) params.set('reconciled', rstatus);
     try { setMovs(await api(`/bank/movements?${params}`)); } catch { /* */ }
   }
+  async function toggleRec(m) {
+    try {
+      await api(`/bank/movements/${m.id}/reconcile`, { method: 'PUT', body: { reconciled: !m.reconciled } });
+      setMovs((ms) => ms.map((x) => x.id === m.id ? { ...x, reconciled: !x.reconciled } : x));
+      api('/bank/summary').then(setSum).catch(() => {});
+    } catch (e) { setError(e.message); }
+  }
   useEffect(() => { load(); }, []);
-  useEffect(() => { const t = setTimeout(loadMovs, 300); return () => clearTimeout(t); }, [q, dir]);
+  useEffect(() => { const t = setTimeout(loadMovs, 300); return () => clearTimeout(t); }, [q, dir, rstatus]);
 
   if (error && !sum) return <p className="text-red-600 text-center mt-10">{error}</p>;
   if (!sum) return <p className="text-ink-mute text-center mt-10">Cargando conciliación…</p>;
@@ -108,29 +117,33 @@ export default function Banco({ role }) {
       {/* Movimientos */}
       <div className="card p-4">
         <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
-          <h3 className="font-black">Movimientos</h3>
+          <h3 className="font-black">Movimientos {sum.pendientes > 0 && <span className="ml-1 text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{sum.pendientes} por conciliar</span>}</h3>
           {canAdd && <button onClick={() => setAdding(!adding)} className="px-3 py-1.5 rounded-xl bg-cartel text-white font-bold text-sm">{adding ? 'Cancelar' : '+ Registrar movimiento'}</button>}
         </div>
         {adding && <AddMovement onSaved={() => { setAdding(false); load(); }} onError={setError} />}
-        <div className="flex gap-2 mb-3">
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar…" className="field flex-1" />
-          <select value={dir} onChange={(e) => setDir(e.target.value)} className="field w-40">
+        <div className="flex gap-2 mb-3 flex-wrap">
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar…" className="field flex-1 min-w-[120px]" />
+          <select value={dir} onChange={(e) => setDir(e.target.value)} className="field w-36">
             <option value="">Todos</option><option value="INGRESO">Ingresos</option><option value="EGRESO">Egresos</option>
+          </select>
+          <select value={rstatus} onChange={(e) => setRstatus(e.target.value)} className="field w-40">
+            <option value="">Todos</option><option value="0">Pendientes</option><option value="1">Conciliados</option>
           </select>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[560px]">
-            <thead><tr className="text-left text-ink-mute border-b"><th className="py-2">Fecha</th><th>Detalle</th><th>Categoría</th><th className="text-right">Monto</th></tr></thead>
+          <table className="w-full text-sm min-w-[600px]">
+            <thead><tr className="text-left text-ink-mute border-b">{canAdd && <th className="py-2 w-10">OK</th>}<th>Fecha</th><th>Detalle</th><th>Categoría</th><th className="text-right">Monto</th></tr></thead>
             <tbody>
               {movs.map((m) => (
-                <tr key={m.id} className="border-b last:border-0">
+                <tr key={m.id} className={`border-b last:border-0 ${m.reconciled ? 'bg-emerald-50/50' : ''}`}>
+                  {canAdd && <td className="py-2"><input type="checkbox" checked={m.reconciled} onChange={() => toggleRec(m)} className="w-4 h-4 accent-emerald-600" title="Marcar conciliado" /></td>}
                   <td className="py-2 whitespace-nowrap">{m.fecha}</td>
                   <td><div className="font-semibold">{m.counterpart || m.description}</div><div className="text-xs text-ink-mute">{m.description}</div></td>
                   <td className="text-xs">{m.category}</td>
                   <td className={`text-right font-bold whitespace-nowrap ${m.direction === 'INGRESO' ? 'text-emerald-600' : 'text-cartel'}`}>{m.direction === 'INGRESO' ? '+' : '−'} {money(m.amount)}</td>
                 </tr>
               ))}
-              {!movs.length && <tr><td colSpan="4" className="py-3 text-ink-mute">Sin movimientos.</td></tr>}
+              {!movs.length && <tr><td colSpan={canAdd ? 5 : 4} className="py-3 text-ink-mute">Sin movimientos.</td></tr>}
             </tbody>
           </table>
         </div>

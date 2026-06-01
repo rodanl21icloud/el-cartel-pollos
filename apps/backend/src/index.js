@@ -5,7 +5,7 @@ import { requirePermission } from './middleware/permissions.js';
 import { verifyHmac } from './middleware/hmac.js';
 import { login } from './controllers/auth.js';
 import { closeCashRegister, getCurrentSession, openSession, registerMovement } from './controllers/cashRegister.js';
-import { syncSale, listProducts, getReceipt, listSales } from './controllers/sales.js';
+import { syncSale, listProducts, getReceipt, listSales, voidSale } from './controllers/sales.js';
 import { getSettings, updateSettings } from './controllers/settings.js';
 import { registerMerma, listIngredients, lowStockAlerts,
          createIngredient, deleteIngredient, restockIngredient } from './controllers/inventory.js';
@@ -59,6 +59,7 @@ app.post('/api/sales/sync', requirePermission('pos.sell'), verifyHmac, syncSale)
 // Listado de ventas (transacciones) + comprobante (imprimir / reenviar)
 app.get('/api/sales', requirePermission('pos.sell'), listSales);
 app.get('/api/sales/:id/receipt', getReceipt);
+app.post('/api/sales/:id/void', requirePermission('reports.view'), voidSale);
 
 // Datos del negocio (comprobantes)
 app.get('/api/settings', getSettings);

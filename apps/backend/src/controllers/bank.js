@@ -27,10 +27,14 @@ export async function bankSummary(req, res) {
           FROM bank_movements WHERE ${where} GROUP BY mes ORDER BY mes`, args })).rows;
 
   const st = (await db.execute({ sql: `SELECT bank_balance, bank_balance_date FROM business_settings WHERE id=1`, args: [] })).rows[0] || {};
+  const rc = (await db.execute({ sql: `SELECT reconciled, COUNT(*) n FROM bank_movements WHERE ${where} GROUP BY reconciled`, args })).rows;
+  const pendientes = Number(rc.find((r) => !r.reconciled)?.n || 0);
+  const conciliados = Number(rc.find((r) => r.reconciled)?.n || 0);
 
   return res.json({
     saldo: st.bank_balance != null ? Number(st.bank_balance) : null,
     saldo_fecha: st.bank_balance_date || null,
+    pendientes, conciliados,
     ingresos: round2(ingresos), egresos: round2(egresos), neto: round2(ingresos - egresos),
     por_categoria: cats.map((c) => ({ category: c.category, direction: c.direction, monto: Number(c.t), n: Number(c.n) })),
     top_egresos: top.map((c) => ({ counterpart: c.counterpart, monto: Number(c.t), n: Number(c.n) })),
@@ -41,11 +45,12 @@ export async function bankSummary(req, res) {
 /** GET /api/bank/movements?from=&to=&dir=&q=&limit= */
 export async function bankMovements(req, res) {
   const db = getDb();
-  const { from, to, dir, q } = req.query;
+  const { from, to, dir, q, reconciled } = req.query;
   const cl = []; const args = [];
   if (from) { cl.push('fecha >= ?'); args.push(from); }
   if (to) { cl.push('fecha <= ?'); args.push(to); }
   if (dir) { cl.push('direction = ?'); args.push(dir); }
+  if (reconciled === '0' || reconciled === '1') { cl.push('reconciled = ?'); args.push(Number(reconciled)); }
   if (q) { cl.push('(description LIKE ? OR counterpart LIKE ? OR category LIKE ?)'); const t = `%${q}%`; args.push(t, t, t); }
   const where = cl.length ? `WHERE ${cl.join(' AND ')}` : '';
   const { rows } = await db.execute({
