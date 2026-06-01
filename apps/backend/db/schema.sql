@@ -109,6 +109,8 @@ CREATE TABLE IF NOT EXISTS sales (
   -- Despacho: número de orden correlativo por día (asignado por el servidor al sincronizar).
   business_day    TEXT,                             -- 'YYYY-MM-DD' (zona America/Santiago)
   order_number    INTEGER,                          -- correlativo dentro del business_day
+  kind            TEXT NOT NULL DEFAULT 'PRODUCTOS' CHECK (kind IN ('PRODUCTOS','LIBRE')),
+  note            TEXT,                             -- descripción (venta libre)
   dispatch_status TEXT NOT NULL DEFAULT 'PENDIENTE'
                     CHECK (dispatch_status IN ('PENDIENTE','EN_PREPARACION','LISTO','ENTREGADO')),
   sold_at         TEXT NOT NULL DEFAULT (datetime('now')),  -- timestamp del dispositivo

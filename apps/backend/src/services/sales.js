@@ -15,11 +15,16 @@ import { getDb } from '../db.js';
  */
 export async function registerSale(payload, ctx) {
   const db = getDb();
-  const { client_uuid, items, payment_method, sold_at } = payload;
+  const { client_uuid, items, payment_method, sold_at, free_amount, note } = payload;
+  const isFree = free_amount != null;
 
   // Validación estructural mínima.
-  if (!client_uuid || !Array.isArray(items) || items.length === 0) {
+  if (!client_uuid) { const e = new Error('VENTA_INVALIDA'); e.status = 400; throw e; }
+  if (!isFree && (!Array.isArray(items) || items.length === 0)) {
     const e = new Error('VENTA_INVALIDA'); e.status = 400; throw e;
+  }
+  if (isFree && (typeof free_amount !== 'number' || !(free_amount > 0))) {
+    const e = new Error('MONTO_INVALIDO'); e.status = 400; throw e;
   }
   if (!['EFECTIVO', 'POS', 'TRANSFERENCIA'].includes(payment_method)) {
     const e = new Error('METODO_PAGO_INVALIDO'); e.status = 400; throw e;
@@ -33,6 +38,32 @@ export async function registerSale(payload, ctx) {
   if (exists.rows.length) {
     return { status: 'DUPLICATE', saleId: exists.rows[0].id, total: Number(exists.rows[0].total),
              orderNumber: exists.rows[0].order_number != null ? Number(exists.rows[0].order_number) : null };
+  }
+
+  // --- Venta libre: ingreso sin productos ni BOM ---
+  if (isFree) {
+    const saleId = randomUUID();
+    const businessDay = chileBusinessDay();
+    const maxRes = await db.execute({
+      sql: `SELECT COALESCE(MAX(order_number), 0) AS m FROM sales WHERE business_day = ?`, args: [businessDay],
+    });
+    const orderNumber = Number(maxRes.rows[0].m) + 1;
+    await db.batch([
+      {
+        sql: `INSERT INTO sales (id, client_uuid, user_id, total, payment_method, status,
+                 payload_hash, synced_offline, business_day, order_number, kind, note, dispatch_status, sold_at)
+               VALUES (?,?,?,?,?, 'CONFIRMADA', ?,?,?,?, 'LIBRE', ?, 'ENTREGADO', ?)`,
+        args: [saleId, client_uuid, ctx.userId, free_amount, payment_method, ctx.payloadHash,
+               ctx.syncedOffline ? 1 : 0, businessDay, orderNumber, note ? String(note).trim() : null,
+               sold_at || new Date().toISOString()],
+      },
+      {
+        sql: `INSERT INTO audit_logs (id, user_id, action, entity, entity_id, severity, metadata, ip_address)
+              VALUES (?,?, 'SALE_FREE', 'sales', ?, 'INFO', ?, ?)`,
+        args: [randomUUID(), ctx.userId, saleId, JSON.stringify({ free_amount, payment_method, note }), ctx.ip || null],
+      },
+    ], 'write');
+    return { status: 'CREATED', saleId, total: free_amount, orderNumber };
   }
 
   // Carga de productos + recetas en lote.

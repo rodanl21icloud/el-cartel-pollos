@@ -83,7 +83,7 @@ export default function App() {
 
       <main className="flex-1 p-4">
         {!screen && <p className="text-center text-zinc-500 mt-10">No tienes módulos habilitados. Contacta a gerencia.</p>}
-        {screen === 'pos' && <Pos />}
+        {screen === 'pos' && <Pos onNavigate={setScreen} />}
         {screen === 'despacho' && <Despacho />}
         {screen === 'gastos' && <Gastos />}
         {screen === 'merma' && <Merma />}

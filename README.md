@@ -131,6 +131,13 @@ para autorizar `PUT`/`DELETE` de cajero/preparador (header `x-management-otp`).
 | GET | `/api/sales/:id/receipt` | datos del comprobante (imprimir/reenviar) |
 | GET/PUT | `/api/settings` | datos del negocio (PUT: permiso `settings.manage` +OTP) |
 
+## Flujo de venta / POS
+El POS exige **caja abierta** para vender (si está cerrada, lleva a la apertura). Con la caja
+abierta, "Nueva venta" ofrece dos modos:
+- **Venta de productos**: catálogo con pestañas por categoría + buscador, carrito y cobro.
+- **Venta libre**: ingreso por un monto (con descripción opcional), sin descontar inventario.
+Ambas firman con HMAC, reciben N° de orden y muestran el panel de comprobante.
+
 ## Flujo de venta (resumen)
 1. Login → backend emite JWT + clave de sesión; el frontend la importa en memoria (`crypto.js`).
 2. POS arma el pedido y firma el payload con **HMAC-SHA256**.
