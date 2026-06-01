@@ -8,7 +8,8 @@
     "start": "node src/index.js",
     "db:push": "node --env-file=.env scripts/applySchema.js",
     "db:seed": "node --env-file=.env scripts/applySchema.js --seed",
-    "seed:users": "node --env-file=.env scripts/seedUsers.js"
+    "seed:users": "node --env-file=.env scripts/seedUsers.js",
+    "seed:carta": "node --env-file=.env scripts/seedCarta.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.14.0",

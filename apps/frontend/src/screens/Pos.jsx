@@ -12,10 +12,15 @@ const PAYMENTS = [
 
 const money = (n) => '$' + Number(n).toLocaleString('es-CL');
 
+// Orden preferido de las pestañas de categoría.
+const CAT_ORDER = ['POLLO', 'COMBOS', 'COLACIONES', 'PAPAS', 'SNACKS', 'BEBIDAS'];
+
 export default function Pos() {
   const [products, setProducts] = useState([]);
   const [settings, setSettings] = useState({ name: 'El Cartel de los Pollos', paper_width: 80 });
   const [cart, setCart] = useState({}); // product_id -> qty
+  const [cat, setCat] = useState('TODO');
+  const [search, setSearch] = useState('');
   const [toast, setToast] = useState(null);
   const [lastSale, setLastSale] = useState(null); // comprobante recién emitido
 
@@ -25,6 +30,16 @@ export default function Pos() {
 
   const items = products.filter((p) => cart[p.id]);
   const total = items.reduce((s, p) => s + p.price * cart[p.id], 0);
+
+  // Categorías presentes, en el orden preferido.
+  const cats = CAT_ORDER.filter((c) => products.some((p) => p.category === c));
+  const otras = [...new Set(products.map((p) => p.category))].filter((c) => !CAT_ORDER.includes(c));
+  const tabs = ['TODO', ...cats, ...otras];
+
+  const q = search.trim().toLowerCase();
+  const visible = products.filter((p) =>
+    (cat === 'TODO' || p.category === cat) &&
+    (!q || p.name.toLowerCase().includes(q)));
 
   function add(p) { setCart((c) => ({ ...c, [p.id]: (c[p.id] || 0) + 1 })); }
   function sub(p) {
@@ -60,17 +75,30 @@ export default function Pos() {
 
   return (
     <div className="grid md:grid-cols-3 gap-4 max-w-6xl mx-auto">
-      {/* Catálogo: botones grandes */}
-      <div className="md:col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {products.map((p) => (
-          <button key={p.id} onClick={() => add(p)}
-            className="btn-pos bg-white text-zinc-800 border-2 border-zinc-200 hover:border-cartel text-left">
-            <div className="text-base font-black leading-tight">{p.name}</div>
-            <div className="text-cartel mt-2">{money(p.price)}</div>
-            {cart[p.id] && <div className="mt-1 text-sm text-zinc-500">x{cart[p.id]} en carrito</div>}
-          </button>
-        ))}
-        {!products.length && <p className="text-zinc-500 col-span-full">Cargando catálogo…</p>}
+      {/* Catálogo con pestañas por categoría + búsqueda */}
+      <div className="md:col-span-2">
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar producto…"
+          className="w-full mb-2 px-4 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-2">
+          {tabs.map((t) => (
+            <button key={t} onClick={() => setCat(t)}
+              className={`px-4 py-2 rounded-full font-bold whitespace-nowrap ${cat === t ? 'bg-cartel text-white' : 'bg-white text-zinc-600 border border-zinc-200'}`}>
+              {t === 'TODO' ? 'Todo' : t.charAt(0) + t.slice(1).toLowerCase()}
+            </button>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {visible.map((p) => (
+            <button key={p.id} onClick={() => add(p)}
+              className="btn-pos bg-white text-zinc-800 border-2 border-zinc-200 hover:border-cartel text-left !py-4">
+              <div className="text-sm font-black leading-tight">{p.name}</div>
+              <div className="text-cartel mt-1 font-bold">{money(p.price)}</div>
+              {cart[p.id] && <div className="mt-1 text-xs text-zinc-500">x{cart[p.id]} en carrito</div>}
+            </button>
+          ))}
+          {!products.length && <p className="text-zinc-500 col-span-full">Cargando catálogo…</p>}
+          {products.length > 0 && !visible.length && <p className="text-zinc-400 col-span-full">Sin resultados.</p>}
+        </div>
       </div>
 
       {/* Carrito + pago */}
