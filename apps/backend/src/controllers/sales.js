@@ -63,6 +63,34 @@ export async function getReceipt(req, res) {
   });
 }
 
+// GET /api/sales?from=&to=&method=&q=&limit= — listado de ventas (transacciones).
+export async function listSales(req, res) {
+  const { getDb } = await import('../db.js');
+  const db = getDb();
+  const { from, to, method, q } = req.query;
+  const cl = [`s.status = 'CONFIRMADA'`]; const args = [];
+  if (from) { cl.push('s.sold_at >= ?'); args.push(from); }
+  if (to) { cl.push('s.sold_at <= ?'); args.push(to); }
+  if (method) { cl.push('s.payment_method = ?'); args.push(method); }
+  if (q && /^\d+$/.test(q.trim())) { cl.push('s.order_number = ?'); args.push(Number(q.trim())); }
+  const where = `WHERE ${cl.join(' AND ')}`;
+  const limit = Math.min(Number(req.query.limit) || 100, 500);
+  const { rows } = await db.execute({
+    sql: `SELECT s.id, s.order_number, s.sold_at, s.business_day, s.total, s.payment_method, s.kind, s.dispatch_status,
+                 c.name AS client_name,
+                 (SELECT GROUP_CONCAT(p.name || ' x' || si.qty, ', ')
+                  FROM sale_items si JOIN products p ON p.id = si.product_id WHERE si.sale_id = s.id) AS detalle
+          FROM sales s LEFT JOIN clients c ON c.id = s.client_id
+          ${where} ORDER BY s.sold_at DESC LIMIT ${limit}`,
+    args,
+  });
+  return res.json(rows.map((r) => ({
+    id: r.id, order_number: r.order_number, sold_at: r.sold_at, business_day: r.business_day,
+    total: Number(r.total), payment_method: r.payment_method, kind: r.kind,
+    dispatch_status: r.dispatch_status, client_name: r.client_name, detalle: r.detalle || '',
+  })));
+}
+
 // Catálogo para la pantalla POS (productos activos).
 export async function listProducts(req, res) {
   const { getDb } = await import('../db.js');

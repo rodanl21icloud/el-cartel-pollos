@@ -10,6 +10,7 @@ import Flujo from './screens/Flujo.jsx';
 import Pnl from './screens/Pnl.jsx';
 import Estadisticas from './screens/Estadisticas.jsx';
 import Banco from './screens/Banco.jsx';
+import Ventas from './screens/Ventas.jsx';
 import Permisos from './screens/Permisos.jsx';
 import Inventario from './screens/Inventario.jsx';
 import Carta from './screens/Carta.jsx';
@@ -22,6 +23,7 @@ import Clientes from './screens/Clientes.jsx';
 const NAV = [
   { section: 'Operación', items: [
     { key: 'pos', label: 'Vender', icon: '🛒', perm: 'pos.sell' },
+    { key: 'ventas', label: 'Ventas', icon: '🧾', perm: 'pos.sell' },
     { key: 'despacho', label: 'Despacho', icon: '🛵', perm: 'dispatch.manage' },
     { key: 'cash', label: 'Caja', icon: '💵', perm: 'cash.operate' },
     { key: 'merma', label: 'Mermas', icon: '🗑️', perm: 'inventory.merma' },
@@ -129,6 +131,7 @@ export default function App() {
         <main className="flex-1 overflow-auto p-4 sm:p-6">
           {!screen && <p className="text-center text-ink-mute mt-12">No tienes módulos habilitados. Contacta a gerencia.</p>}
           {screen === 'pos' && <Pos onNavigate={go} />}
+          {screen === 'ventas' && <Ventas />}
           {screen === 'despacho' && <Despacho />}
           {screen === 'clientes' && <Clientes />}
           {screen === 'gastos' && <Gastos />}
