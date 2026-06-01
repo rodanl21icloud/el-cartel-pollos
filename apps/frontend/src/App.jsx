@@ -17,29 +17,41 @@ import Despacho from './screens/Despacho.jsx';
 import Ajustes from './screens/Ajustes.jsx';
 import Clientes from './screens/Clientes.jsx';
 
-// Cada ítem de nav se muestra solo si el usuario tiene el permiso `perm`.
+// Navegación agrupada por sección. Cada ítem se muestra según el permiso.
 const NAV = [
-  { key: 'pos', label: 'POS', perm: 'pos.sell' },
-  { key: 'despacho', label: 'Despacho', perm: 'dispatch.manage' },
-  { key: 'clientes', label: 'Clientes', perm: 'pos.sell' },
-  { key: 'gastos', label: 'Gastos', perm: 'expenses.manage' },
-  { key: 'merma', label: 'Mermas', perm: 'inventory.merma' },
-  { key: 'inventario', label: 'Inventario', perm: 'inventory.manage' },
-  { key: 'cash', label: 'Caja', perm: 'cash.operate' },
-  { key: 'estadisticas', label: 'Estadísticas', perm: 'reports.view' },
-  { key: 'flujo', label: 'Flujo', perm: 'reports.view' },
-  { key: 'pnl', label: 'P&L', perm: 'reports.view' },
-  { key: 'carta', label: 'Carta', perm: 'menu.manage' },
-  { key: 'modificadores', label: 'Modificadores', perm: 'menu.manage' },
-  { key: 'ajustes', label: 'Ajustes', perm: 'settings.manage' },
-  { key: 'permisos', label: 'Permisos', perm: 'permissions.manage' },
+  { section: 'Operación', items: [
+    { key: 'pos', label: 'Vender', icon: '🛒', perm: 'pos.sell' },
+    { key: 'despacho', label: 'Despacho', icon: '🛵', perm: 'dispatch.manage' },
+    { key: 'cash', label: 'Caja', icon: '💵', perm: 'cash.operate' },
+    { key: 'merma', label: 'Mermas', icon: '🗑️', perm: 'inventory.merma' },
+  ] },
+  { section: 'Catálogo', items: [
+    { key: 'carta', label: 'Carta', icon: '🍗', perm: 'menu.manage' },
+    { key: 'modificadores', label: 'Modificadores', icon: '✨', perm: 'menu.manage' },
+    { key: 'inventario', label: 'Inventario', icon: '📦', perm: 'inventory.manage' },
+  ] },
+  { section: 'Finanzas', items: [
+    { key: 'estadisticas', label: 'Estadísticas', icon: '📊', perm: 'reports.view' },
+    { key: 'gastos', label: 'Gastos', icon: '💸', perm: 'expenses.manage' },
+    { key: 'flujo', label: 'Flujo de caja', icon: '📈', perm: 'reports.view' },
+    { key: 'pnl', label: 'P&L', icon: '🧮', perm: 'reports.view' },
+  ] },
+  { section: 'Contactos', items: [
+    { key: 'clientes', label: 'Clientes', icon: '👥', perm: 'pos.sell' },
+  ] },
+  { section: 'Configuración', items: [
+    { key: 'ajustes', label: 'Negocio', icon: '⚙️', perm: 'settings.manage' },
+    { key: 'permisos', label: 'Permisos', icon: '🔐', perm: 'permissions.manage' },
+  ] },
 ];
+const ALL_ITEMS = NAV.flatMap((g) => g.items);
 
 export default function App() {
   const [user, setUser] = useState(null);
   const [perms, setPerms] = useState({});
   const [screen, setScreen] = useState(null);
   const [online, setOnline] = useState(navigator.onLine);
+  const [drawer, setDrawer] = useState(false);
 
   useEffect(() => {
     const on = () => setOnline(true), off = () => setOnline(false);
@@ -51,59 +63,147 @@ export default function App() {
   async function handleLogin(username, password) {
     const data = await api('/auth/login', { method: 'POST', body: { username, password } });
     setToken(data.token);
-    await setSessionKey(data.session.id, data.session.key); // clave HMAC solo en memoria
+    await setSessionKey(data.session.id, data.session.key);
     const me = await api('/permissions/me');
     setPerms(me.permissions);
     setUser(data.user);
-    // Primera pantalla permitida.
-    const first = NAV.find((n) => me.permissions[n.perm]);
+    const first = ALL_ITEMS.find((n) => me.permissions[n.perm]);
     setScreen(first ? first.key : null);
   }
-
   function logout() { clearToken(); setUser(null); setPerms({}); setScreen(null); }
+  function go(key) { setScreen(key); setDrawer(false); }
 
   if (!user || !getToken()) return <Login onLogin={handleLogin} />;
 
-  const visibleNav = NAV.filter((n) => perms[n.perm]);
+  const current = ALL_ITEMS.find((n) => n.key === screen);
+  const groups = NAV.map((g) => ({ ...g, items: g.items.filter((i) => perms[i.perm]) })).filter((g) => g.items.length);
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="bg-cartel text-white px-4 py-3 flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl font-black">🐔 El Cartel</span>
-          <span className={`text-xs px-2 py-1 rounded-full ${online ? 'bg-green-600' : 'bg-zinc-700'}`}>
-            {online ? 'EN LÍNEA' : 'OFFLINE'}
-          </span>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {visibleNav.map((n) => (
-            <button key={n.key} onClick={() => setScreen(n.key)}
-              className={`px-3 py-2 rounded-lg font-bold ${screen === n.key ? 'bg-white text-cartel' : 'bg-cartel-dark'}`}>
-              {n.label}
-            </button>
-          ))}
-          <span className="text-sm opacity-90 ml-2">{user.name} · {user.role}</span>
-          <button onClick={logout} className="px-3 py-2 rounded-lg bg-cartel-dark font-bold">Salir</button>
-        </div>
-      </header>
+    <div className="h-screen flex bg-slate-100 overflow-hidden">
+      {/* Sidebar — desktop / tablet */}
+      <aside className="hidden md:flex flex-col w-60 lg:w-64 shrink-0 bg-ink text-white">
+        <Brand />
+        <NavList groups={groups} screen={screen} onGo={go} />
+        <UserFooter user={user} online={online} onLogout={logout} />
+      </aside>
 
-      <main className="flex-1 p-4">
-        {!screen && <p className="text-center text-zinc-500 mt-10">No tienes módulos habilitados. Contacta a gerencia.</p>}
-        {screen === 'pos' && <Pos onNavigate={setScreen} />}
-        {screen === 'despacho' && <Despacho />}
-        {screen === 'clientes' && <Clientes />}
-        {screen === 'gastos' && <Gastos />}
-        {screen === 'merma' && <Merma />}
-        {screen === 'inventario' && <Inventario />}
-        {screen === 'cash' && <CashClose userName={user.name} />}
-        {screen === 'estadisticas' && <Estadisticas role={user.role} />}
-        {screen === 'flujo' && <Flujo role={user.role} />}
-        {screen === 'pnl' && <Pnl role={user.role} />}
-        {screen === 'carta' && <Carta role={user.role} />}
-        {screen === 'modificadores' && <Modificadores role={user.role} />}
-        {screen === 'ajustes' && <Ajustes role={user.role} />}
-        {screen === 'permisos' && <Permisos />}
-      </main>
+      {/* Drawer — móvil */}
+      {drawer && (
+        <div className="md:hidden fixed inset-0 z-40">
+          <div className="absolute inset-0 bg-ink/60 backdrop-blur-sm" onClick={() => setDrawer(false)} />
+          <aside className="absolute left-0 top-0 bottom-0 w-72 bg-ink text-white flex flex-col animate-[slidein_.2s_ease]">
+            <Brand onClose={() => setDrawer(false)} />
+            <NavList groups={groups} screen={screen} onGo={go} />
+            <UserFooter user={user} online={online} onLogout={logout} />
+          </aside>
+        </div>
+      )}
+
+      {/* Contenido */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-slate-200 px-4 sm:px-6 h-16 flex items-center gap-3">
+          <button onClick={() => setDrawer(true)} className="md:hidden p-2 -ml-2 rounded-lg hover:bg-slate-100" aria-label="Menú">
+            <Bars />
+          </button>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-xl">{current?.icon}</span>
+            <h1 className="text-lg font-extrabold tracking-tight truncate">{current?.label || 'Inicio'}</h1>
+          </div>
+          <div className="ml-auto flex items-center gap-3">
+            <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${online ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${online ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+              {online ? 'En línea' : 'Offline'}
+            </span>
+            <div className="hidden sm:flex items-center gap-2">
+              <Avatar name={user.name} />
+              <div className="leading-tight">
+                <div className="text-sm font-bold">{user.name}</div>
+                <div className="text-[11px] text-ink-mute">{user.role}</div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-auto p-4 sm:p-6">
+          {!screen && <p className="text-center text-ink-mute mt-12">No tienes módulos habilitados. Contacta a gerencia.</p>}
+          {screen === 'pos' && <Pos onNavigate={go} />}
+          {screen === 'despacho' && <Despacho />}
+          {screen === 'clientes' && <Clientes />}
+          {screen === 'gastos' && <Gastos />}
+          {screen === 'merma' && <Merma />}
+          {screen === 'inventario' && <Inventario />}
+          {screen === 'cash' && <CashClose userName={user.name} />}
+          {screen === 'estadisticas' && <Estadisticas role={user.role} />}
+          {screen === 'flujo' && <Flujo role={user.role} />}
+          {screen === 'pnl' && <Pnl role={user.role} />}
+          {screen === 'carta' && <Carta role={user.role} />}
+          {screen === 'modificadores' && <Modificadores role={user.role} />}
+          {screen === 'ajustes' && <Ajustes role={user.role} />}
+          {screen === 'permisos' && <Permisos />}
+        </main>
+      </div>
     </div>
   );
+}
+
+function Brand({ onClose }) {
+  return (
+    <div className="h-16 flex items-center gap-2 px-5 border-b border-white/10 shrink-0">
+      <span className="text-2xl">🐔</span>
+      <div className="leading-none">
+        <div className="font-black tracking-tight">El Cartel</div>
+        <div className="text-[10px] text-slate-400 tracking-wide">de los Pollos</div>
+      </div>
+      {onClose && <button onClick={onClose} className="ml-auto p-2 rounded-lg hover:bg-white/10 text-slate-300">✕</button>}
+    </div>
+  );
+}
+
+function NavList({ groups, screen, onGo }) {
+  return (
+    <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-5">
+      {groups.map((g) => (
+        <div key={g.section}>
+          <div className="px-3 mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">{g.section}</div>
+          <div className="space-y-0.5">
+            {g.items.map((i) => (
+              <button key={i.key} onClick={() => onGo(i.key)}
+                className={`nav-item w-full text-left ${screen === i.key ? 'nav-item-active' : ''}`}>
+                <span className="text-lg w-5 text-center">{i.icon}</span>
+                <span className="text-sm">{i.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </nav>
+  );
+}
+
+function UserFooter({ user, online, onLogout }) {
+  return (
+    <div className="border-t border-white/10 p-3 shrink-0">
+      <div className="flex items-center gap-2 px-2 py-1">
+        <Avatar name={user.name} dark />
+        <div className="leading-tight min-w-0 flex-1">
+          <div className="text-sm font-bold truncate">{user.name}</div>
+          <div className="text-[11px] text-slate-400">{user.role}</div>
+        </div>
+        <button onClick={onLogout} title="Cerrar sesión" className="p-2 rounded-lg hover:bg-white/10 text-slate-300">⏻</button>
+      </div>
+    </div>
+  );
+}
+
+function Avatar({ name, dark }) {
+  const initials = (name || '?').split(' ').map((s) => s[0]).slice(0, 2).join('').toUpperCase();
+  return (
+    <div className={`w-9 h-9 rounded-full grid place-items-center font-black text-sm shrink-0 ${dark ? 'bg-white/10 text-white' : 'bg-cartel text-white'}`}>
+      {initials}
+    </div>
+  );
+}
+
+function Bars() {
+  return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg>;
 }
