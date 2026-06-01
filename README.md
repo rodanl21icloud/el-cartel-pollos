@@ -175,7 +175,10 @@ ya no es global: se aplica de forma selectiva solo a operaciones sensibles (edit
 carta, insumos y permisos), no a acciones operativas (despacho, recetas).
 
 ## Carta, inventario y recetas
-- **Carta**: crear/editar/eliminar platos (SKU autogenerado, baja lógica).
+- **Carta** (tabla tipo Treinta): Producto · Precio (editable inline) · **Costo** (calculado por
+  receta) · **Ganancia + margen %** · Receta (Ver/Agregar) · Eliminar. Filtro por categoría +
+  buscador. Endpoint `/api/products/catalog` calcula costo/ganancia/margen por BOM. Crear/editar/
+  eliminar platos (SKU autogenerado, baja lógica). Las recetas **rebajan el inventario** al vender.
 - **Inventario**: crear/editar/eliminar insumos + **reponer stock** (con gasto enlazado opcional).
   Borrar un insumo en uso por una receta queda bloqueado.
 - **Recetas (BOM)**: constructor por producto con cantidades **enteras o decimales**

@@ -8,6 +8,33 @@ import { randomUUID, randomBytes } from 'node:crypto';
 import { getDb } from '../db.js';
 import { writeAudit } from '../services/audit.js';
 
+/**
+ * GET /api/products/catalog — productos con costo por receta (BOM), ganancia y
+ * margen, y si tienen receta (rebajan inventario). Para la gestión de la Carta.
+ */
+export async function listCatalog(_req, res) {
+  const db = getDb();
+  const { rows } = await db.execute({
+    sql: `SELECT p.id, p.sku, p.name, p.price, p.category, p.is_active,
+                 COALESCE((SELECT SUM(pr.qty_per_unit * i.cost_unit)
+                           FROM product_recipes pr JOIN ingredients i ON i.id = pr.ingredient_id
+                           WHERE pr.product_id = p.id), 0) AS costo,
+                 (SELECT COUNT(*) FROM product_recipes pr WHERE pr.product_id = p.id) AS recipe_lines
+          FROM products p WHERE p.is_active = 1
+          ORDER BY p.category, p.name`,
+    args: [],
+  });
+  return res.json(rows.map((r) => {
+    const price = Number(r.price); const costo = Math.round(Number(r.costo) * 100) / 100;
+    const ganancia = Math.round((price - costo) * 100) / 100;
+    return {
+      id: r.id, sku: r.sku, name: r.name, price, category: r.category,
+      costo, ganancia, margen: price > 0 ? Math.round((ganancia / price) * 100) : 0,
+      has_recipe: Number(r.recipe_lines) > 0,
+    };
+  }));
+}
+
 /** POST /api/products  Body: { name, price, category?, sku? } */
 export async function createProduct(req, res) {
   const { name, price, category = 'COMBO', sku } = req.body || {};

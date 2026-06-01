@@ -9,7 +9,7 @@ import { syncSale, listProducts, getReceipt } from './controllers/sales.js';
 import { getSettings, updateSettings } from './controllers/settings.js';
 import { registerMerma, listIngredients, lowStockAlerts,
          createIngredient, deleteIngredient, restockIngredient } from './controllers/inventory.js';
-import { createProduct, updateProduct, deleteProduct, updateIngredient } from './controllers/admin.js';
+import { createProduct, updateProduct, deleteProduct, updateIngredient, listCatalog } from './controllers/admin.js';
 import { getRecipe, setRecipe } from './controllers/recipes.js';
 import { listCategories, createExpense, listExpenses } from './controllers/expenses.js';
 import { turnSummary, closuresHistory, cashFlow, pnl } from './controllers/reports.js';
@@ -72,6 +72,7 @@ app.delete('/api/inventory/ingredients/:id', requirePermission('inventory.manage
 app.post('/api/inventory/ingredients/:id/restock', requirePermission('inventory.manage'), restockIngredient);
 
 // Administración de carta. Editar/eliminar precio o plato -> también OTP de gerencia.
+app.get('/api/products/catalog', requirePermission('menu.manage'), listCatalog);
 app.post('/api/products', requirePermission('menu.manage'), createProduct);
 app.put('/api/products/:id', requirePermission('menu.manage'), requireOtpForMutation, updateProduct);
 app.delete('/api/products/:id', requirePermission('menu.manage'), requireOtpForMutation, deleteProduct);
