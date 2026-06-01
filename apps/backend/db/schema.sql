@@ -176,6 +176,7 @@ CREATE TABLE IF NOT EXISTS cash_register_closures (
   efectivo_declarado       REAL NOT NULL,
   pos_declarado            REAL NOT NULL,
   transferencias_declarado REAL NOT NULL,
+  closing_detail           TEXT,                  -- JSON: conteo de efectivo al cierre
   -- COMPONENTES del teórico (para transparencia del cuadre):
   ventas_efectivo          REAL NOT NULL DEFAULT 0,
   gastos_efectivo          REAL NOT NULL DEFAULT 0,

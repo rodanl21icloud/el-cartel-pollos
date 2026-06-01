@@ -149,11 +149,12 @@ Ambas firman con HMAC, reciben N° de orden y muestran el panel de comprobante.
 ## Finanzas
 - **Gastos / egresos**: registrar por categoría (proveedores, sueldos, arriendo/servicios,
   retiros de socios), método de pago, proveedor y descripción.
-- **Cuadratura de caja (ciego) con fondo**: se abre caja con un fondo inicial, se registran
-  depósitos/ingresos de efectivo durante el turno, y al cerrar el teórico se calcula como
-  `fondo + ventas_efectivo − gastos_efectivo ± movimientos`. Solo los gastos en **efectivo**
-  afectan el cajón; los pagados por POS/transferencia salen del banco (van al flujo, no a la
-  cuadratura). El cajero nunca ve el teórico antes de declarar.
+- **Cuadratura de caja (ciego) con fondo**: se abre y cierra caja **contando billetes y monedas**
+  por denominación (CLP), con total automático; el conteo se guarda y debe cuadrar con lo
+  declarado. El teórico se calcula como `fondo + ventas_efectivo − gastos_efectivo ± movimientos`.
+  Solo los gastos en **efectivo** afectan el cajón. **El cajero cierra a ciegas** y solo ve la
+  confirmación; el **resumen del turno** (ventas, gastos, balance y descuadre) se revela
+  únicamente a quien tenga permiso `reports.view` (gerencia).
 - **Flujo de caja** (`/reports/cash-flow`, GERENCIA): ingresos vs egresos de **todo el dinero**
   por día, con saldo acumulado y desglose de egresos por categoría.
 - **Estado de Resultados / P&L** (`/reports/pnl`, GERENCIA): ventas − **costo de insumos (BOM,

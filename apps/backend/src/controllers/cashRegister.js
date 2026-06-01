@@ -8,6 +8,7 @@
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../db.js';
 import { writeAudit } from '../services/audit.js';
+import { hasPermission } from '../services/permissions.js';
 
 const TOLERANCE = 0.0;
 const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
@@ -104,12 +105,22 @@ export async function registerMovement(req, res) {
  * Body: { efectivo_declarado, pos_declarado, transferencias_declaradas }
  */
 export async function closeCashRegister(req, res) {
-  const { efectivo_declarado, pos_declarado, transferencias_declaradas } = req.body || {};
+  const { efectivo_declarado, pos_declarado, transferencias_declaradas, detail } = req.body || {};
 
   for (const [k, v] of Object.entries({ efectivo_declarado, pos_declarado, transferencias_declaradas })) {
     if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) {
       return res.status(400).json({ error: 'MONTO_INVALIDO', field: k });
     }
+  }
+
+  // Conteo de efectivo por denominación (opcional): debe cuadrar con lo declarado.
+  let closingDetail = null;
+  if (detail && typeof detail === 'object') {
+    const sum = Object.entries(detail).reduce((s, [den, qty]) => s + Number(den) * Number(qty || 0), 0);
+    if (Math.round(sum) !== Math.round(efectivo_declarado)) {
+      return res.status(400).json({ error: 'CONTEO_NO_CUADRA', detail: { sum, efectivo_declarado } });
+    }
+    closingDetail = JSON.stringify(detail);
   }
 
   const db = getDb();
@@ -175,14 +186,14 @@ export async function closeCashRegister(req, res) {
     {
       sql: `INSERT INTO cash_register_closures (
               id, user_id, session_id, period_start, period_end, opening_float,
-              efectivo_declarado, pos_declarado, transferencias_declarado,
+              efectivo_declarado, pos_declarado, transferencias_declarado, closing_detail,
               ventas_efectivo, gastos_efectivo, movimientos_efectivo,
               efectivo_teorico, pos_teorico, transferencias_teorico,
               diff_efectivo, diff_pos, diff_transferencias, diff_total, has_descuadre
-            ) VALUES (?,?,?,?,?,?, ?,?,?, ?,?,?, ?,?,?, ?,?,?,?,?)`,
+            ) VALUES (?,?,?,?,?,?, ?,?,?,?, ?,?,?, ?,?,?, ?,?,?,?,?)`,
       args: [
         id, req.user.id, session.id, periodStart, periodEnd, fondo,
-        efectivo_declarado, pos_declarado, transferencias_declaradas,
+        efectivo_declarado, pos_declarado, transferencias_declaradas, closingDetail,
         ventas.EFECTIVO, gastos.EFECTIVO, movimientos_efectivo,
         efectivo_teorico, pos_teorico, transferencias_teorico,
         diff_efectivo, diff_pos, diff_transferencias, diff_total, has_descuadre ? 1 : 0,
@@ -200,7 +211,16 @@ export async function closeCashRegister(req, res) {
     },
   ], 'write');
 
-  // Recién aquí se revela el teórico (post-cierre).
+  // El RESUMEN del turno (teórico, ventas, gastos, descuadre) solo se revela
+  // a quien tenga permiso `reports.view` (gerencia). El cajero cierra a ciegas
+  // y recibe únicamente la confirmación.
+  const canSummary = await hasPermission(req.user.role, 'reports.view');
+  if (!canSummary) {
+    return res.status(201).json({ closure_id: id, closed: true, blind: true });
+  }
+
+  const total_ventas = round2(ventas.EFECTIVO + ventas.POS + ventas.TRANSFERENCIA);
+  const total_gastos = round2(gastos.EFECTIVO + gastos.POS + gastos.TRANSFERENCIA);
   return res.status(201).json({
     closure_id: id,
     period: { start: periodStart, end: periodEnd },
@@ -211,6 +231,7 @@ export async function closeCashRegister(req, res) {
       ventas_efectivo: ventas.EFECTIVO, gastos_efectivo: gastos.EFECTIVO,
       movimientos_efectivo, ventas_pos: ventas.POS, ventas_transferencia: ventas.TRANSFERENCIA,
     },
+    resumen_turno: { total_ventas, total_gastos, balance: round2(total_ventas - total_gastos) },
     diferencias: { efectivo: diff_efectivo, pos: diff_pos, transferencias: diff_transferencias, total: diff_total },
     descuadre: has_descuadre,
   });
