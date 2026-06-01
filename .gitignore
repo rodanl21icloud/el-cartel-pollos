@@ -7,6 +7,7 @@ dist/
 .turso/
 # Base libSQL local de desarrollo (datos de prueba)
 *.db
+backups/
 *.db-journal
 *.db-wal
 *.db-shm

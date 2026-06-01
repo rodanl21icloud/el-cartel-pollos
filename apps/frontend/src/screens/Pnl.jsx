@@ -62,9 +62,37 @@ export default function Pnl({ role }) {
         <Line label="Resultado después de retiros" value={data.utilidad_despues_retiros} bold />
       </div>
 
+      {/* Contraste con la realidad bancaria */}
+      {data.banco && (
+        <div className="bg-white rounded-2xl p-5 shadow border-2 border-amber-300">
+          <h2 className="font-black text-lg mb-1">⚠️ Realidad bancaria del período</h2>
+          <p className="text-xs text-zinc-500 mb-3">
+            Tus egresos reales (insumos/proveedores) suelen estar en el banco, no en los gastos del sistema.
+            Esta es tu utilidad <b>real estimada</b>.
+          </p>
+          <div className="text-sm">
+            <div className="flex justify-between py-1"><span>Ventas (POS)</span><b>{money(data.ventas)}</b></div>
+            <div className="flex justify-between py-1"><span>− Egresos operativos reales (banco)</span><b className="text-red-600">− {money(data.banco.egresos_operativos)}</b></div>
+            <div className="flex justify-between border-t mt-1 pt-2 text-lg">
+              <span className="font-black">Utilidad real estimada</span>
+              <b className={data.banco.utilidad_real >= 0 ? 'text-green-600' : 'text-red-600'}>{money(data.banco.utilidad_real)} ({data.banco.utilidad_real_pct}%)</b>
+            </div>
+          </div>
+          <div className="mt-3 bg-amber-50 rounded-xl p-3 text-sm">
+            <div className="flex justify-between"><span>Gastos registrados en el sistema</span><b>{money(data.gastos_operativos)}</b></div>
+            <div className="flex justify-between"><span>Egresos reales según banco</span><b>{money(data.banco.egresos_operativos)}</b></div>
+            {data.banco.gastos_no_registrados > 0 && (
+              <div className="flex justify-between text-cartel font-bold border-t mt-1 pt-1"><span>Costo NO registrado en el sistema</span><b>{money(data.banco.gastos_no_registrados)}</b></div>
+            )}
+            {data.banco.retiros > 0 && <div className="flex justify-between text-zinc-500 mt-1"><span>Retiros de socios (banco)</span><span>{money(data.banco.retiros)}</span></div>}
+          </div>
+        </div>
+      )}
+
       <p className="text-xs text-zinc-400 px-2">
-        El costo de insumos usa el costo congelado al momento de cada venta (BOM). Los retiros de
-        socios no son gasto operativo: son distribución de utilidades, por eso van aparte.
+        El costo de insumos (BOM) usa el costo congelado al vender. La <b>utilidad real</b> usa los egresos
+        del banco, que reflejan el gasto efectivo en mercadería aunque no esté registrado en el sistema.
+        Los retiros de socios no son gasto operativo: van aparte.
       </p>
     </div>
   );

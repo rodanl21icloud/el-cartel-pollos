@@ -321,6 +321,27 @@ export async function pnl(req, res) {
   const utilidad_bruta = round2(ventas - costo_insumos);
   const utilidad_operativa = round2(utilidad_bruta - mermas - gastos_operativos);
 
+  // --- Contraste con la REALIDAD BANCARIA del período ---
+  // Los egresos del banco reflejan el costo real (insumos, proveedores, servicios)
+  // que muchas veces NO está registrado como gasto en el sistema. Los retiros de
+  // socios se separan (no son costo operativo).
+  const bFecha = (s) => s.slice(0, 10); // bank_movements.fecha es 'YYYY-MM-DD'
+  const bankRows = (await db.execute({
+    sql: `SELECT direction, category, COALESCE(SUM(amount),0) t
+          FROM bank_movements WHERE fecha >= ? AND fecha <= ?
+          GROUP BY direction, category`,
+    args: [bFecha(from), bFecha(to)],
+  })).rows;
+  let banco_ingresos = 0, banco_egresos_oper = 0, banco_retiros = 0;
+  for (const r of bankRows) {
+    const t = Number(r.t);
+    if (r.direction === 'INGRESO') banco_ingresos += t;
+    else if (/retiro|socio/i.test(r.category || '')) banco_retiros += t;
+    else banco_egresos_oper += t;
+  }
+  const tiene_banco = bankRows.length > 0;
+  const utilidad_real = round2(ventas - banco_egresos_oper);
+
   return res.json({
     period: { from, to },
     ventas,
@@ -338,5 +359,13 @@ export async function pnl(req, res) {
       utilidad_bruta_pct: pct(utilidad_bruta, ventas),
       utilidad_operativa_pct: pct(utilidad_operativa, ventas),
     },
+    banco: tiene_banco ? {
+      ingresos: round2(banco_ingresos),
+      egresos_operativos: round2(banco_egresos_oper),
+      retiros: round2(banco_retiros),
+      utilidad_real,
+      utilidad_real_pct: pct(utilidad_real, ventas),
+      gastos_no_registrados: round2(banco_egresos_oper - gastos_operativos), // banco vs sistema
+    } : null,
   });
 }

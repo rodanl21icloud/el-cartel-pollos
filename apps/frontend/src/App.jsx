@@ -60,6 +60,7 @@ export default function App() {
   const [screen, setScreen] = useState(null);
   const [online, setOnline] = useState(navigator.onLine);
   const [drawer, setDrawer] = useState(false);
+  const [booting, setBooting] = useState(true);
 
   useEffect(() => {
     const on = () => setOnline(true), off = () => setOnline(false);
@@ -68,19 +69,44 @@ export default function App() {
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
   }, []);
 
+  // Restaurar la sesión al recargar (sin re-login) si el JWT sigue vigente.
+  useEffect(() => {
+    (async () => {
+      try {
+        const token = getToken();
+        const su = JSON.parse(localStorage.getItem('user') || 'null');
+        const ss = JSON.parse(localStorage.getItem('session') || 'null');
+        if (token && su && ss) {
+          const me = await api('/permissions/me'); // valida el JWT
+          await setSessionKey(ss.id, ss.key);       // restaura clave HMAC
+          setPerms(me.permissions); setUser(su);
+          const first = ALL_ITEMS.find((n) => me.permissions[n.perm]);
+          setScreen(first ? first.key : null);
+        }
+      } catch { clearToken(); localStorage.removeItem('user'); localStorage.removeItem('session'); }
+      finally { setBooting(false); }
+    })();
+  }, []);
+
   async function handleLogin(username, password) {
     const data = await api('/auth/login', { method: 'POST', body: { username, password } });
     setToken(data.token);
     await setSessionKey(data.session.id, data.session.key);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    localStorage.setItem('session', JSON.stringify(data.session));
     const me = await api('/permissions/me');
     setPerms(me.permissions);
     setUser(data.user);
     const first = ALL_ITEMS.find((n) => me.permissions[n.perm]);
     setScreen(first ? first.key : null);
   }
-  function logout() { clearToken(); setUser(null); setPerms({}); setScreen(null); }
+  function logout() {
+    clearToken(); localStorage.removeItem('user'); localStorage.removeItem('session');
+    setUser(null); setPerms({}); setScreen(null);
+  }
   function go(key) { setScreen(key); setDrawer(false); }
 
+  if (booting) return <div className="h-screen grid place-items-center bg-ink"><img src="/logo.jpeg" alt="" className="w-48 rounded-xl animate-pulse" /></div>;
   if (!user || !getToken()) return <Login onLogin={handleLogin} />;
 
   const current = ALL_ITEMS.find((n) => n.key === screen);

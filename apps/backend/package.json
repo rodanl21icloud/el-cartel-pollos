@@ -11,7 +11,8 @@
     "seed:users": "node --env-file=.env scripts/seedUsers.js",
     "seed:carta": "node --env-file=.env scripts/seedCarta.mjs",
     "seed:recetas": "node --env-file=.env scripts/seedRecetas.mjs",
-    "seed:recetas-real": "node --env-file=.env scripts/seedRecetasReal.mjs"
+    "seed:recetas-real": "node --env-file=.env scripts/seedRecetasReal.mjs",
+    "backup": "node --env-file=.env scripts/backup.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.14.0",
