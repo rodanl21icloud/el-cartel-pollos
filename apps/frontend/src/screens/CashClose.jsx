@@ -3,8 +3,15 @@ import { api } from '../lib/api.js';
 
 const money = (n) => '$' + Number(n).toLocaleString('es-CL');
 
+// Denominaciones CLP (billetes y monedas). 🟢 billete, 🟡 moneda.
+const DENOMS = [
+  { v: 20000, t: 'billete' }, { v: 10000, t: 'billete' }, { v: 5000, t: 'billete' },
+  { v: 2000, t: 'billete' }, { v: 1000, t: 'billete' },
+  { v: 500, t: 'moneda' }, { v: 100, t: 'moneda' }, { v: 50, t: 'moneda' }, { v: 10, t: 'moneda' },
+];
+
 // Caja: apertura con fondo -> operación (depósitos) -> cierre CIEGO.
-export default function CashClose() {
+export default function CashClose({ userName }) {
   const [session, setSession] = useState(null); // { open, opening_float, movements }
   const [loading, setLoading] = useState(true);
   const [result, setResult] = useState(null);
@@ -19,30 +26,94 @@ export default function CashClose() {
 
   if (loading) return <p className="text-zinc-500 text-center mt-10">Cargando caja…</p>;
   if (result) return <CloseResult result={result} onNew={() => { setResult(null); load(); }} />;
-  if (!session?.open) return <OpenBox onOpened={load} />;
+  if (!session?.open) return <OpenBox onOpened={load} userName={userName} />;
   return <OpenSession session={session} onClosed={setResult} reload={load} error={error} setError={setError} />;
 }
 
-// --- Apertura de caja ---
-function OpenBox({ onOpened }) {
-  const [fondo, setFondo] = useState('');
+// --- Apertura de caja: conteo de billetes y monedas por denominación ---
+function OpenBox({ onOpened, userName }) {
+  const [counting, setCounting] = useState(true);
+  const [counts, setCounts] = useState({}); // denom -> cantidad
+  const [fondoManual, setFondoManual] = useState('');
   const [error, setError] = useState('');
-  async function open() {
-    setError('');
-    try {
-      await api('/cash-register/open', { method: 'POST', body: { opening_float: Number(fondo || 0) } });
-      onOpened();
-    } catch (e) { setError(e.message === 'CAJA_YA_ABIERTA' ? 'Ya hay una caja abierta' : e.message); }
+  const [busy, setBusy] = useState(false);
+
+  const total = counting
+    ? DENOMS.reduce((s, d) => s + d.v * (Number(counts[d.v]) || 0), 0)
+    : Number(fondoManual) || 0;
+
+  function setCount(v, val) {
+    const n = Math.max(0, Math.floor(Number(val) || 0));
+    setCounts((c) => ({ ...c, [v]: n }));
   }
+
+  async function open() {
+    setError(''); setBusy(true);
+    try {
+      const detail = {};
+      if (counting) DENOMS.forEach((d) => { if (counts[d.v]) detail[d.v] = Number(counts[d.v]); });
+      await api('/cash-register/open', {
+        method: 'POST',
+        body: { opening_float: total, detail: counting ? detail : undefined },
+      });
+      onOpened();
+    } catch (e) {
+      setError(e.message === 'CAJA_YA_ABIERTA' ? 'Ya hay una caja abierta'
+        : e.message === 'CONTEO_NO_CUADRA' ? 'El conteo no cuadra con el fondo' : e.message);
+    }
+    setBusy(false);
+  }
+
   return (
-    <div className="max-w-md mx-auto bg-white rounded-2xl p-6 shadow">
-      <h2 className="text-2xl font-black">Abrir caja</h2>
-      <p className="text-zinc-500 text-sm mb-5">Declara el fondo inicial (vuelto) con el que parte la caja.</p>
-      <label className="block font-bold text-zinc-700 mb-1">Fondo inicial</label>
-      <input type="number" min="0" inputMode="decimal" value={fondo} onChange={(e) => setFondo(e.target.value)} autoFocus
-        className="w-full mb-4 px-4 py-4 text-2xl rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
-      {error && <p className="text-red-600 font-semibold mb-3">{error}</p>}
-      <button onClick={open} className="w-full btn-pos bg-cartel text-white">Abrir caja</button>
+    <div className="max-w-md mx-auto bg-white rounded-2xl shadow overflow-hidden">
+      <div className="bg-cartel text-white px-5 py-4">
+        <h2 className="text-2xl font-black">Abrir caja</h2>
+        <p className="text-white/80 text-sm">Encargado: <b>{userName || 'Cajero'}</b></p>
+      </div>
+
+      <div className="p-5">
+        <label className="flex items-center justify-between mb-4">
+          <span className="font-bold text-zinc-700">Contar billetes y monedas</span>
+          <button onClick={() => setCounting(!counting)}
+            className={`w-12 h-7 rounded-full transition relative ${counting ? 'bg-green-500' : 'bg-zinc-300'}`}>
+            <span className={`absolute top-0.5 w-6 h-6 bg-white rounded-full transition-all ${counting ? 'left-[1.4rem]' : 'left-0.5'}`} />
+          </button>
+        </label>
+
+        {counting ? (
+          <div className="space-y-2 mb-4">
+            {DENOMS.map((d) => {
+              const sub = d.v * (Number(counts[d.v]) || 0);
+              return (
+                <div key={d.v} className="flex items-center gap-3">
+                  <span className="text-lg">{d.t === 'billete' ? '💵' : '🪙'}</span>
+                  <span className="w-20 font-bold text-zinc-700">{money(d.v)}</span>
+                  <input type="number" min="0" inputMode="numeric" value={counts[d.v] ?? ''} placeholder="0"
+                    onChange={(e) => setCount(d.v, e.target.value)}
+                    className="flex-1 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none text-right" />
+                  <span className="w-20 text-right text-zinc-500 text-sm tabular-nums">{money(sub)}</span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="mb-4">
+            <label className="block font-bold text-zinc-700 mb-1">Fondo inicial</label>
+            <input type="number" min="0" inputMode="decimal" value={fondoManual} onChange={(e) => setFondoManual(e.target.value)} autoFocus
+              className="w-full px-4 py-4 text-2xl rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
+          </div>
+        )}
+
+        <div className="flex items-center justify-between border-t pt-3 mb-4">
+          <span className="text-lg font-bold">Total</span>
+          <span className="text-2xl font-black text-cartel tabular-nums">{money(total)}</span>
+        </div>
+
+        {error && <p className="text-red-600 font-semibold mb-3">{error}</p>}
+        <button onClick={open} disabled={busy} className="w-full btn-pos bg-cartel text-white disabled:opacity-50">
+          {busy ? 'Abriendo…' : 'Empezar turno'}
+        </button>
+      </div>
     </div>
   );
 }

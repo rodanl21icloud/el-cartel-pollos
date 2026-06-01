@@ -40,12 +40,22 @@ export async function getCurrentSession(req, res) {
   });
 }
 
-/** POST /api/cash-register/open  Body: { opening_float } */
+/** POST /api/cash-register/open  Body: { opening_float, detail? } */
 export async function openSession(req, res) {
-  const { opening_float } = req.body || {};
+  const { opening_float, detail } = req.body || {};
   if (typeof opening_float !== 'number' || !Number.isFinite(opening_float) || opening_float < 0) {
     return res.status(400).json({ error: 'FONDO_INVALIDO' });
   }
+  // Si viene el desglose por denominación, debe cuadrar con el fondo declarado.
+  let detailJson = null;
+  if (detail && typeof detail === 'object') {
+    const sum = Object.entries(detail).reduce((s, [den, qty]) => s + Number(den) * Number(qty || 0), 0);
+    if (Math.round(sum) !== Math.round(opening_float)) {
+      return res.status(400).json({ error: 'CONTEO_NO_CUADRA', detail: { sum, opening_float } });
+    }
+    detailJson = JSON.stringify(detail);
+  }
+
   const db = getDb();
   if (await findOpenSession(db)) {
     return res.status(409).json({ error: 'CAJA_YA_ABIERTA' });
@@ -56,8 +66,8 @@ export async function openSession(req, res) {
   // (formato con espacio) porque rompe los rangos del período.
   const openedAt = new Date().toISOString();
   await db.execute({
-    sql: `INSERT INTO cash_sessions (id, opened_by, opening_float, opened_at) VALUES (?,?,?,?)`,
-    args: [id, req.user.id, opening_float, openedAt],
+    sql: `INSERT INTO cash_sessions (id, opened_by, opening_float, opening_detail, opened_at) VALUES (?,?,?,?,?)`,
+    args: [id, req.user.id, opening_float, detailJson, openedAt],
   });
   await writeAudit({
     userId: req.user.id, action: 'CASH_OPEN', entity: 'cash_sessions', entityId: id,

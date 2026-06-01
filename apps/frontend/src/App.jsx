@@ -88,7 +88,7 @@ export default function App() {
         {screen === 'gastos' && <Gastos />}
         {screen === 'merma' && <Merma />}
         {screen === 'inventario' && <Inventario />}
-        {screen === 'cash' && <CashClose />}
+        {screen === 'cash' && <CashClose userName={user.name} />}
         {screen === 'flujo' && <Flujo role={user.role} />}
         {screen === 'pnl' && <Pnl role={user.role} />}
         {screen === 'carta' && <Carta role={user.role} />}

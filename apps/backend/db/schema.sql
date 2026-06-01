@@ -201,6 +201,7 @@ CREATE TABLE IF NOT EXISTS cash_sessions (
   id              TEXT PRIMARY KEY,
   opened_by       TEXT NOT NULL,
   opening_float   REAL NOT NULL DEFAULT 0 CHECK (opening_float >= 0),
+  opening_detail  TEXT,                            -- JSON: conteo por denominación
   opened_at       TEXT NOT NULL DEFAULT (datetime('now')),
   closed_at       TEXT,
   closure_id      TEXT,                            -- cierre asociado
