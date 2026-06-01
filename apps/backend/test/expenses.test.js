@@ -1,0 +1,51 @@
+import { describe, it, expect, beforeAll } from 'vitest';
+import request from 'supertest';
+import { getApp, login } from './helpers.js';
+
+let app, token;
+const bearer = () => 'Bearer ' + token;
+beforeAll(async () => { app = await getApp(); token = (await login(app)).token; });
+
+describe('Gastos', () => {
+  it('lista las categorías sembradas', async () => {
+    const res = await request(app).get('/api/expenses/categories').set('Authorization', bearer());
+    expect(res.status).toBe(200);
+    const ids = res.body.map((c) => c.id);
+    expect(ids).toContain('cat-proveedores');
+    expect(res.body.find((c) => c.id === 'cat-retiros').kind).toBe('RETIRO');
+  });
+
+  it('registra un gasto operativo válido', async () => {
+    const res = await request(app).post('/api/expenses').set('Authorization', bearer())
+      .send({ category_id: 'cat-arriendo', amount: 250000, payment_method: 'TRANSFERENCIA', description: 'Arriendo local' });
+    expect(res.status).toBe(201);
+    expect(res.body.amount).toBe(250000);
+  });
+
+  it('rechaza método de pago inválido', async () => {
+    const res = await request(app).post('/api/expenses').set('Authorization', bearer())
+      .send({ category_id: 'cat-arriendo', amount: 1000, payment_method: 'BITCOIN', description: 'x' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('METODO_PAGO_INVALIDO');
+  });
+
+  it('rechaza categoría inexistente', async () => {
+    const res = await request(app).post('/api/expenses').set('Authorization', bearer())
+      .send({ category_id: 'cat-fantasma', amount: 1000, payment_method: 'EFECTIVO', description: 'x' });
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('CATEGORIA_NO_ENCONTRADA');
+  });
+
+  it('exige descripción', async () => {
+    const res = await request(app).post('/api/expenses').set('Authorization', bearer())
+      .send({ category_id: 'cat-arriendo', amount: 1000, payment_method: 'EFECTIVO', description: '  ' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('DESCRIPCION_OBLIGATORIA');
+  });
+
+  it('lista los gastos (gerencia)', async () => {
+    const res = await request(app).get('/api/expenses').set('Authorization', bearer());
+    expect(res.status).toBe(200);
+    expect(res.body.some((e) => e.category === 'Arriendo y servicios')).toBe(true);
+  });
+});

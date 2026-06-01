@@ -29,6 +29,13 @@ export async function applySchema() {
   for (const stmt of splitStatements(sql)) await db.execute(stmt);
 }
 
+// Datos base idempotentes: categorías de gasto, negocio e insumos demo.
+export async function seedBase() {
+  const sql = fs.readFileSync(path.join(__dirname, '..', 'db', 'seed.sql'), 'utf8');
+  const db = getDb();
+  for (const stmt of splitStatements(sql)) await db.execute(stmt);
+}
+
 export async function seedUsers() {
   const db = getDb();
   const users = [

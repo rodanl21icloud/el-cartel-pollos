@@ -15,7 +15,8 @@ process.env.TURSO_DATABASE_URL = 'file:' + DB_PATH.replace(/\\/g, '/');
 if (!globalThis.__TEST_INITED__) {
   globalThis.__TEST_INITED__ = true;
   for (const ext of ['', '-wal', '-shm']) { try { fs.rmSync(DB_PATH + ext, { force: true }); } catch { /* */ } }
-  const { applySchema, seedUsers } = await import('./helpers.js');
+  const { applySchema, seedUsers, seedBase } = await import('./helpers.js');
   await applySchema();
   await seedUsers();
+  await seedBase();
 }
