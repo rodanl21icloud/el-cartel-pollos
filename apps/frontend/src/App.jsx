@@ -8,6 +8,7 @@ import Merma from './screens/Merma.jsx';
 import Gastos from './screens/Gastos.jsx';
 import Flujo from './screens/Flujo.jsx';
 import Pnl from './screens/Pnl.jsx';
+import Estadisticas from './screens/Estadisticas.jsx';
 import Permisos from './screens/Permisos.jsx';
 import Inventario from './screens/Inventario.jsx';
 import Carta from './screens/Carta.jsx';
@@ -22,6 +23,7 @@ const NAV = [
   { key: 'merma', label: 'Mermas', perm: 'inventory.merma' },
   { key: 'inventario', label: 'Inventario', perm: 'inventory.manage' },
   { key: 'cash', label: 'Caja', perm: 'cash.operate' },
+  { key: 'estadisticas', label: 'Estadísticas', perm: 'reports.view' },
   { key: 'flujo', label: 'Flujo', perm: 'reports.view' },
   { key: 'pnl', label: 'P&L', perm: 'reports.view' },
   { key: 'carta', label: 'Carta', perm: 'menu.manage' },
@@ -89,6 +91,7 @@ export default function App() {
         {screen === 'merma' && <Merma />}
         {screen === 'inventario' && <Inventario />}
         {screen === 'cash' && <CashClose userName={user.name} />}
+        {screen === 'estadisticas' && <Estadisticas role={user.role} />}
         {screen === 'flujo' && <Flujo role={user.role} />}
         {screen === 'pnl' && <Pnl role={user.role} />}
         {screen === 'carta' && <Carta role={user.role} />}

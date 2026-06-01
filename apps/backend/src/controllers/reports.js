@@ -123,6 +123,70 @@ const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 const pct = (num, den) => (den > 0 ? round2((num / den) * 100) : 0);
 
 /**
+ * GET /api/reports/stats?from=&to=
+ * Estadísticas operativas: total/n° ventas, ticket promedio, ventas por hora
+ * (zona America/Santiago), por día, por método y ranking de productos. (reports.view)
+ */
+export async function stats(req, res) {
+  const db = getDb();
+  const to = req.query.to || new Date().toISOString();
+  const from = req.query.from || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  // Ventas (cabecera) del período para totales y bucketing horario por tz.
+  const ventasRes = await db.execute({
+    sql: `SELECT total, sold_at FROM sales
+          WHERE status='CONFIRMADA' AND sold_at >= ? AND sold_at <= ?`,
+    args: [from, to],
+  });
+  const n_ventas = ventasRes.rows.length;
+  const total_ventas = round2(ventasRes.rows.reduce((s, r) => s + Number(r.total), 0));
+  const ticket_promedio = n_ventas ? round2(total_ventas / n_ventas) : 0;
+
+  // Bucket por HORA local (America/Santiago).
+  const horas = Array.from({ length: 24 }, (_, h) => ({ hora: h, monto: 0, ventas: 0 }));
+  const fmtHour = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Santiago', hour: '2-digit', hour12: false });
+  const dias = new Map();
+  const fmtDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' });
+  for (const r of ventasRes.rows) {
+    const d = new Date(r.sold_at);
+    let h = parseInt(fmtHour.format(d), 10) % 24;
+    horas[h].monto = round2(horas[h].monto + Number(r.total));
+    horas[h].ventas += 1;
+    const dia = fmtDay.format(d);
+    const acc = dias.get(dia) || { dia, monto: 0, ventas: 0 };
+    acc.monto = round2(acc.monto + Number(r.total)); acc.ventas += 1;
+    dias.set(dia, acc);
+  }
+
+  // Ventas por método.
+  const metodoRes = await db.execute({
+    sql: `SELECT payment_method, COUNT(*) AS ventas, COALESCE(SUM(total),0) AS monto
+          FROM sales WHERE status='CONFIRMADA' AND sold_at >= ? AND sold_at <= ?
+          GROUP BY payment_method`,
+    args: [from, to],
+  });
+
+  // Ranking de productos (por unidades).
+  const rankRes = await db.execute({
+    sql: `SELECT p.name, SUM(si.qty) AS unidades, COALESCE(SUM(si.line_total),0) AS monto
+          FROM sale_items si
+          JOIN sales s ON s.id = si.sale_id AND s.status='CONFIRMADA' AND s.sold_at >= ? AND s.sold_at <= ?
+          JOIN products p ON p.id = si.product_id
+          GROUP BY p.id ORDER BY unidades DESC LIMIT 15`,
+    args: [from, to],
+  });
+
+  return res.json({
+    period: { from, to },
+    total_ventas, n_ventas, ticket_promedio,
+    por_hora: horas,
+    por_dia: [...dias.values()].sort((a, b) => a.dia.localeCompare(b.dia)),
+    por_metodo: metodoRes.rows.map((r) => ({ metodo: r.payment_method, ventas: Number(r.ventas), monto: Number(r.monto) })),
+    ranking: rankRes.rows.map((r) => ({ name: r.name, unidades: Number(r.unidades), monto: Number(r.monto) })),
+  });
+}
+
+/**
  * GET /api/reports/pnl?from=&to=
  * Estado de Resultados (P&L). Combina ventas, costo real de insumos (BOM,
  * costo congelado por movimiento), mermas y gastos operativos. (GERENCIA)
