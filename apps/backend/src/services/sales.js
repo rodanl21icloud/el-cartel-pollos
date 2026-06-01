@@ -136,7 +136,17 @@ export async function registerSale(payload, ctx) {
   // Descuento (anti-tamper: viene firmado en el payload). Acotado al subtotal.
   const subtotal = total;
   const discount = Math.min(Math.max(0, Number(rawDiscount) || 0), subtotal);
-  total = Math.round((subtotal - discount) * 100) / 100;
+  const deliveryFee = Math.max(0, Number(payload.delivery_fee) || 0);
+  total = Math.round((subtotal - discount + deliveryFee) * 100) / 100;
+
+  // Cliente / domicilio (upsert por teléfono, anti-tamper irrelevante: datos del cliente).
+  let clientId = null;
+  const cli = payload.client;
+  if (cli && (cli.phone || cli.name)) {
+    const { upsertClient } = await import('../controllers/clients.js');
+    clientId = await upsertClient(db, cli);
+  }
+  const deliveryAddress = cli && cli.address ? String(cli.address).trim() : (payload.delivery_address || null);
 
   // Verificación de stock teórico ANTES de comprometer la transacción.
   for (const [ingId, use] of ingredientUse) {
@@ -161,11 +171,11 @@ export async function registerSale(payload, ctx) {
 
   stmts.push({
     sql: `INSERT INTO sales
-            (id, client_uuid, user_id, total, subtotal, discount, payment_method, status,
-             payload_hash, synced_offline, business_day, order_number, dispatch_status, sold_at)
-          VALUES (?,?,?,?,?,?,?, 'CONFIRMADA', ?,?,?,?, 'PENDIENTE', ?)`,
-    args: [saleId, client_uuid, ctx.userId, total, subtotal, discount, payment_method,
-           ctx.payloadHash, ctx.syncedOffline ? 1 : 0, businessDay, orderNumber,
+            (id, client_uuid, user_id, total, subtotal, discount, delivery_fee, client_id, delivery_address,
+             payment_method, status, payload_hash, synced_offline, business_day, order_number, dispatch_status, sold_at)
+          VALUES (?,?,?,?,?,?,?,?,?,?, 'CONFIRMADA', ?,?,?,?, 'PENDIENTE', ?)`,
+    args: [saleId, client_uuid, ctx.userId, total, subtotal, discount, deliveryFee, clientId, deliveryAddress,
+           payment_method, ctx.payloadHash, ctx.syncedOffline ? 1 : 0, businessDay, orderNumber,
            sold_at || new Date().toISOString()],
   });
 

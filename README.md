@@ -185,6 +185,13 @@ carta, insumos y permisos), no a acciones operativas (despacho, recetas).
   (ej. 0,5 pollo, 0,6 kg papas); muestra costo y margen en vivo. Al vender, descuenta del
   inventario en decimales.
 
+## Clientes / Domicilios
+En la confirmación de venta se puede activar **entrega a domicilio**: teléfono (→ autocompleta
+nombre y dirección de clientes recurrentes), nombre, dirección y **costo de envío** (suma al
+total). El cliente se crea/actualiza solo (upsert por teléfono). El comprobante muestra cliente,
+dirección y envío, y **WhatsApp** se envía directo al teléfono del cliente. Pantalla **Clientes**
+con buscador y acceso directo a WhatsApp.
+
 ## Adiciones / Modificadores
 Grupos de opciones (ej. "Presa preferida", "Salsas extra") con mín/máx y obligatoriedad,
 opciones con recargo opcional, asignables a productos. En el POS, tocar un producto con

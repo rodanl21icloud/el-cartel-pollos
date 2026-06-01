@@ -131,20 +131,26 @@ function ProductSale({ onSold }) {
   function incLine(uid) { setLines((ls) => ls.map((l) => l.uid === uid ? { ...l, qty: l.qty + 1 } : l)); }
   function decLine(uid) { setLines((ls) => ls.flatMap((l) => l.uid === uid ? (l.qty <= 1 ? [] : [{ ...l, qty: l.qty - 1 }]) : [l])); }
 
-  async function createSale(method, discount) {
+  async function createSale(method, { discount = 0, client = null, deliveryFee = 0 } = {}) {
     if (!lines.length) return;
     const receiptItems = lines.map((l) => ({
       name: l.name, qty: l.qty, unit_price: l.basePrice, line_total: (l.basePrice + l.modsTotal) * l.qty,
       modifiers: l.modifiers.map((m) => ({ name: m.name, price_delta: m.price_delta })),
     }));
     const soldAt = new Date().toISOString();
-    const net = Math.max(0, total - discount);
+    const net = Math.max(0, total - discount) + deliveryFee;
     const payload = { client_uuid: crypto.randomUUID(), payment_method: method, sold_at: soldAt,
       items: lines.map((l) => ({ product_id: l.productId, qty: l.qty, modifier_option_ids: l.modifiers.map((m) => m.id) })) };
     if (discount > 0) payload.discount = discount;
+    if (deliveryFee > 0) payload.delivery_fee = deliveryFee;
+    if (client && (client.phone || client.name)) payload.client = client;
     const res = await recordSale(payload);
     setLines([]); setConfirming(false);
-    const data = { order_number: res.order_number ?? null, items: receiptItems, total: net, discount, subtotal: total, payment_method: method, sold_at: soldAt, offline: !res.synced };
+    const data = {
+      order_number: res.order_number ?? null, items: receiptItems, total: net, discount, delivery_fee: deliveryFee,
+      subtotal: total, payment_method: method, sold_at: soldAt, offline: !res.synced,
+      client_name: client?.name, client_phone: client?.phone, delivery_address: client?.address,
+    };
     onSold(data);
     if (!res.synced) { setToast('📴 Sin red: pedido en cola'); setTimeout(() => setToast(null), 3000); }
   }
@@ -312,10 +318,17 @@ function PaymentConfirm({ lines, subtotal, onBack, onCreate }) {
   const [method, setMethod] = useState('EFECTIVO');
   const [discPct, setDiscPct] = useState('');
   const [discAmt, setDiscAmt] = useState('');
+  const [domicilio, setDomicilio] = useState(false);
+  const [phone, setPhone] = useState('');
+  const [cname, setCname] = useState('');
+  const [address, setAddress] = useState('');
+  const [fee, setFee] = useState('');
+  const [found, setFound] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const discount = Math.min(Math.max(0, Number(discAmt) || 0), subtotal);
-  const net = Math.max(0, subtotal - discount);
+  const deliveryFee = domicilio ? Math.max(0, Number(fee) || 0) : 0;
+  const net = Math.max(0, subtotal - discount) + deliveryFee;
 
   function changePct(v) {
     setDiscPct(v);
@@ -328,9 +341,21 @@ function PaymentConfirm({ lines, subtotal, onBack, onCreate }) {
     setDiscPct(subtotal > 0 ? String(Math.round(amt / subtotal * 100)) : '0');
   }
 
+  // Buscar cliente por teléfono y autocompletar.
+  async function lookupPhone() {
+    if (!phone.trim()) return;
+    try {
+      const c = await api(`/clients?phone=${encodeURIComponent(phone.trim())}`);
+      if (c && c.id) { setCname(c.name || ''); setAddress(c.address || ''); setFound(true); }
+      else setFound(false);
+    } catch { /* */ }
+  }
+
   async function create() {
     setBusy(true);
-    try { await onCreate(method, discount); } finally { setBusy(false); }
+    const client = domicilio && (phone.trim() || cname.trim())
+      ? { phone: phone.trim(), name: cname.trim() || 'Cliente', address: address.trim() } : null;
+    try { await onCreate(method, { discount, client, deliveryFee }); } finally { setBusy(false); }
   }
 
   return (
@@ -374,6 +399,33 @@ function PaymentConfirm({ lines, subtotal, onBack, onCreate }) {
           </div>
         </div>
 
+        {/* Cliente / Entrega */}
+        <div className="flex items-center justify-between mb-2">
+          <label className="font-bold text-zinc-700">Entrega a domicilio</label>
+          <button onClick={() => setDomicilio(!domicilio)}
+            className={`w-12 h-7 rounded-full transition relative ${domicilio ? 'bg-green-500' : 'bg-zinc-300'}`}>
+            <span className={`absolute top-0.5 w-6 h-6 bg-white rounded-full transition-all ${domicilio ? 'left-[1.4rem]' : 'left-0.5'}`} />
+          </button>
+        </div>
+        {domicilio && (
+          <div className="space-y-2 mb-4 bg-zinc-50 rounded-xl p-3">
+            <div className="flex gap-2">
+              <input value={phone} onChange={(e) => { setPhone(e.target.value); setFound(false); }} onBlur={lookupPhone} placeholder="Teléfono"
+                className="flex-1 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" inputMode="tel" />
+              {found && <span className="text-green-600 text-xs self-center font-bold">✓ cliente</span>}
+            </div>
+            <input value={cname} onChange={(e) => setCname(e.target.value)} placeholder="Nombre del cliente"
+              className="w-full px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
+            <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Dirección de entrega"
+              className="w-full px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
+            <div className="relative">
+              <span className="absolute left-3 top-2 text-zinc-400">$</span>
+              <input type="number" min="0" value={fee} onChange={(e) => setFee(e.target.value)} placeholder="Costo de envío"
+                className="w-full pl-7 pr-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
+            </div>
+          </div>
+        )}
+
         <label className="block font-bold text-zinc-700 mb-2">Método de pago</label>
         <div className="grid grid-cols-3 gap-2 mb-4">
           {PAY_CARDS.map((m) => (
@@ -389,6 +441,7 @@ function PaymentConfirm({ lines, subtotal, onBack, onCreate }) {
         <div className="border-t pt-3 text-sm space-y-1 mb-4">
           <div className="flex justify-between"><span>Subtotal</span><span>{money(subtotal)}</span></div>
           {discount > 0 && <div className="flex justify-between text-red-600"><span>Descuento</span><span>− {money(discount)}</span></div>}
+          {deliveryFee > 0 && <div className="flex justify-between"><span>Envío</span><span>{money(deliveryFee)}</span></div>}
           <div className="flex justify-between text-xl font-black pt-1"><span>Total</span><span>{money(net)}</span></div>
         </div>
 

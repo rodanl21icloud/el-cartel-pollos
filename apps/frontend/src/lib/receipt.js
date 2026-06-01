@@ -50,6 +50,9 @@ export function buildCustomerReceiptHTML(data, settings = {}) {
     <div class="c">Pedido</div>
     <div class="c xl">N° ${data.order_number ?? '—'}</div>
     <div>${fecha(data.sold_at || Date.now())}</div>
+    ${data.client_name || data.delivery_address ? `<hr>
+    <div>${data.client_name ? '<b>' + esc(data.client_name) + '</b>' : ''}${data.client_phone ? ' · ' + esc(data.client_phone) : ''}</div>
+    ${data.delivery_address ? `<div>🛵 ${esc(data.delivery_address)}</div>` : ''}` : ''}
     <hr>
     <table>${rows}</table>
     <hr>
@@ -57,6 +60,7 @@ export function buildCustomerReceiptHTML(data, settings = {}) {
       ${Number(data.discount) > 0 ? `
       <tr><td>Subtotal</td><td class="right">${money(data.subtotal)}</td></tr>
       <tr><td>Descuento</td><td class="right">- ${money(data.discount)}</td></tr>` : ''}
+      ${Number(data.delivery_fee) > 0 ? `<tr><td>Envío</td><td class="right">${money(data.delivery_fee)}</td></tr>` : ''}
       <tr><td class="big">TOTAL</td><td class="right big">${money(data.total)}</td></tr>
       <tr><td>Pago</td><td class="right">${metodo[data.payment_method] || data.payment_method || ''}</td></tr>
     </table>
@@ -99,8 +103,9 @@ export function buildWhatsappText(data, settings = {}) {
   return lines.join('\n');
 }
 
-/** Abre WhatsApp con el comprobante. phone opcional (formato internacional sin +). */
+/** Abre WhatsApp con el comprobante. Usa el teléfono del cliente si existe. */
 export function whatsappUrl(data, settings = {}, phone) {
   const text = encodeURIComponent(buildWhatsappText(data, settings));
-  return phone ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`;
+  const to = (phone || data.client_phone || '').replace(/[^\d]/g, '');
+  return to ? `https://wa.me/${to}?text=${text}` : `https://wa.me/?text=${text}`;
 }

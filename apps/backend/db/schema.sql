@@ -114,6 +114,9 @@ CREATE TABLE IF NOT EXISTS sales (
   note            TEXT,                             -- descripción (venta libre)
   subtotal        REAL,                             -- suma de ítems antes de descuento
   discount        REAL NOT NULL DEFAULT 0,          -- descuento aplicado
+  client_id       TEXT,                             -- cliente (domicilio)
+  delivery_address TEXT,                            -- dirección de entrega
+  delivery_fee    REAL NOT NULL DEFAULT 0,          -- costo de envío
   dispatch_status TEXT NOT NULL DEFAULT 'PENDIENTE'
                     CHECK (dispatch_status IN ('PENDIENTE','EN_PREPARACION','LISTO','ENTREGADO')),
   sold_at         TEXT NOT NULL DEFAULT (datetime('now')),  -- timestamp del dispositivo
@@ -143,6 +146,20 @@ CREATE TABLE IF NOT EXISTS sale_items (
 );
 
 CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id);
+
+-- ----------------------------------------------------------------
+-- CLIENTS — clientes para domicilios (teléfono, dirección).
+-- ----------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS clients (
+  id              TEXT PRIMARY KEY,
+  phone           TEXT UNIQUE,                      -- identificador natural
+  name            TEXT NOT NULL,
+  address         TEXT,
+  notes           TEXT,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_clients_phone ON clients(phone);
 
 -- ----------------------------------------------------------------
 -- MODIFICADORES / ADICIONES — grupos de opciones (presa, salsas, con/sin).

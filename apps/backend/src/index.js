@@ -15,6 +15,7 @@ import { listCategories, createExpense, listExpenses } from './controllers/expen
 import { turnSummary, closuresHistory, cashFlow, pnl, stats } from './controllers/reports.js';
 import { getPermissions, myPermissions, updatePermission } from './controllers/permissions.js';
 import { listGroups, createGroup, deleteGroup, createOption, deleteOption, setGroupProducts, getProductModifiers } from './controllers/modifiers.js';
+import { listClients, createClient } from './controllers/clients.js';
 import { listDispatch, updateDispatchStatus } from './controllers/dispatch.js';
 
 const app = express();
@@ -46,6 +47,10 @@ app.post('/api/cash-register/close', requirePermission('cash.operate'), closeCas
 app.get('/api/expenses/categories', listCategories);
 app.post('/api/expenses', requirePermission('expenses.manage'), createExpense);
 app.get('/api/expenses', requirePermission('reports.view'), listExpenses);
+
+// Clientes / domicilios (lookup por teléfono para autocompletar en la venta)
+app.get('/api/clients', listClients);
+app.post('/api/clients', requirePermission('pos.sell'), createClient);
 
 // Sincronización de ventas (firma HMAC obligatoria, anti-tamper)
 app.post('/api/sales/sync', requirePermission('pos.sell'), verifyHmac, syncSale);
