@@ -18,6 +18,7 @@ import Modificadores from './screens/Modificadores.jsx';
 import Despacho from './screens/Despacho.jsx';
 import Ajustes from './screens/Ajustes.jsx';
 import Clientes from './screens/Clientes.jsx';
+import Usuarios from './screens/Usuarios.jsx';
 
 // Navegación agrupada por sección. Cada ítem se muestra según el permiso.
 const NAV = [
@@ -45,6 +46,7 @@ const NAV = [
   ] },
   { section: 'Configuración', items: [
     { key: 'ajustes', label: 'Negocio', icon: '⚙️', perm: 'settings.manage' },
+    { key: 'usuarios', label: 'Usuarios', icon: '👤', perm: 'permissions.manage' },
     { key: 'permisos', label: 'Permisos', icon: '🔐', perm: 'permissions.manage' },
   ] },
 ];
@@ -145,6 +147,7 @@ export default function App() {
           {screen === 'carta' && <Carta role={user.role} />}
           {screen === 'modificadores' && <Modificadores role={user.role} />}
           {screen === 'ajustes' && <Ajustes role={user.role} />}
+          {screen === 'usuarios' && <Usuarios />}
           {screen === 'permisos' && <Permisos />}
         </main>
       </div>

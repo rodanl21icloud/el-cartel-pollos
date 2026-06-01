@@ -17,6 +17,7 @@ import { getPermissions, myPermissions, updatePermission } from './controllers/p
 import { listGroups, createGroup, deleteGroup, createOption, deleteOption, setGroupProducts, getProductModifiers } from './controllers/modifiers.js';
 import { listClients, createClient } from './controllers/clients.js';
 import { bankSummary, bankMovements, addBankMovement, reconcileMovement, reconcile } from './controllers/bank.js';
+import { listUsers, createUser, updateUser, resetPassword } from './controllers/users.js';
 import { listDispatch, updateDispatchStatus } from './controllers/dispatch.js';
 
 const app = express();
@@ -114,6 +115,12 @@ app.get('/api/bank/movements', requirePermission('reports.view'), bankMovements)
 app.get('/api/bank/reconcile', requirePermission('reports.view'), reconcile);
 app.post('/api/bank/movements', requirePermission('expenses.manage'), addBankMovement);
 app.put('/api/bank/movements/:id/reconcile', requirePermission('expenses.manage'), reconcileMovement);
+
+// Gestión de usuarios (permiso permissions.manage)
+app.get('/api/users', requirePermission('permissions.manage'), listUsers);
+app.post('/api/users', requirePermission('permissions.manage'), createUser);
+app.put('/api/users/:id', requirePermission('permissions.manage'), updateUser);
+app.post('/api/users/:id/password', requirePermission('permissions.manage'), resetPassword);
 
 // Administración de permisos (matriz rol×módulo). PUT también exige OTP.
 app.get('/api/permissions', requirePermission('permissions.manage'), getPermissions);
