@@ -16,6 +16,7 @@ import { turnSummary, closuresHistory, cashFlow, pnl, stats } from './controller
 import { getPermissions, myPermissions, updatePermission } from './controllers/permissions.js';
 import { listGroups, createGroup, deleteGroup, createOption, deleteOption, setGroupProducts, getProductModifiers } from './controllers/modifiers.js';
 import { listClients, createClient } from './controllers/clients.js';
+import { bankSummary, bankMovements, addBankMovement, reconcileMovement, reconcile } from './controllers/bank.js';
 import { listDispatch, updateDispatchStatus } from './controllers/dispatch.js';
 
 const app = express();
@@ -104,6 +105,13 @@ app.get('/api/reports/closures', requirePermission('reports.view'), closuresHist
 app.get('/api/reports/cash-flow', requirePermission('reports.view'), cashFlow);
 app.get('/api/reports/pnl', requirePermission('reports.view'), pnl);
 app.get('/api/reports/stats', requirePermission('reports.view'), stats);
+
+// Conciliación bancaria
+app.get('/api/bank/summary', requirePermission('reports.view'), bankSummary);
+app.get('/api/bank/movements', requirePermission('reports.view'), bankMovements);
+app.get('/api/bank/reconcile', requirePermission('reports.view'), reconcile);
+app.post('/api/bank/movements', requirePermission('expenses.manage'), addBankMovement);
+app.put('/api/bank/movements/:id/reconcile', requirePermission('expenses.manage'), reconcileMovement);
 
 // Administración de permisos (matriz rol×módulo). PUT también exige OTP.
 app.get('/api/permissions', requirePermission('permissions.manage'), getPermissions);

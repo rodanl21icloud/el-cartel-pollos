@@ -43,7 +43,10 @@ CREATE TABLE IF NOT EXISTS business_settings (
   phone         TEXT,
   rut           TEXT,
   footer        TEXT,
+  instagram     TEXT,
   paper_width   INTEGER NOT NULL DEFAULT 80 CHECK (paper_width IN (58, 80)),
+  bank_balance  REAL,                               -- saldo contable bancario
+  bank_balance_date TEXT,                           -- fecha del saldo
   updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -316,6 +319,31 @@ CREATE TABLE IF NOT EXISTS expenses (
 CREATE INDEX IF NOT EXISTS idx_expenses_spent  ON expenses(spent_at);
 CREATE INDEX IF NOT EXISTS idx_expenses_method ON expenses(payment_method);
 CREATE INDEX IF NOT EXISTS idx_expenses_cat    ON expenses(category_id);
+
+-- ----------------------------------------------------------------
+-- BANK_MOVEMENTS — conciliación bancaria. Movimientos de la cuenta
+-- (importados de cartola o registrados a mano). INGRESO/EGRESO.
+-- ----------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS bank_movements (
+  id              TEXT PRIMARY KEY,
+  fecha           TEXT NOT NULL,                    -- 'YYYY-MM-DD'
+  amount          REAL NOT NULL CHECK (amount >= 0),
+  direction       TEXT NOT NULL CHECK (direction IN ('INGRESO','EGRESO')),
+  bank_type       TEXT,                             -- código del banco (A/C)
+  description     TEXT,
+  counterpart     TEXT,                             -- contraparte (cliente/proveedor)
+  category        TEXT,                             -- clasificación
+  source          TEXT,                             -- archivo o 'MANUAL'
+  reconciled      INTEGER NOT NULL DEFAULT 0 CHECK (reconciled IN (0,1)),
+  sale_id         TEXT,                             -- venta conciliada (opcional)
+  created_by      TEXT,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_bank_fecha ON bank_movements(fecha);
+-- Evita duplicar al re-importar la misma cartola.
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_bankmov
+  ON bank_movements(fecha, amount, description, bank_type, direction);
 
 -- ----------------------------------------------------------------
 -- AUDIT_LOGS — APPEND-ONLY (lógico). Sin UPDATE ni DELETE permitidos.
