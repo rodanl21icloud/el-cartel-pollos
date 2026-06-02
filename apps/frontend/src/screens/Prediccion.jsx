@@ -14,18 +14,20 @@ export default function Prediccion() {
   const [weeks, setWeeks] = useState(8);
   const [service, setService] = useState(0.65);
   const [adjust, setAdjust] = useState(true);
+  const [roast, setRoast] = useState(75);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
     setData(null); setError('');
     const f = adjust ? 1 : 0;
-    api(`/reports/forecast?weeks=${weeks}&service=${service}&rain=${f}&holidays=${f}`)
+    api(`/reports/forecast?weeks=${weeks}&service=${service}&rain=${f}&holidays=${f}&roast=${roast}`)
       .then(setData).catch((e) => setError(e.message === 'PERMISO_DENEGADO' ? 'No tienes permiso para ver la predicción.' : e.message));
-  }, [weeks, service, adjust]);
+  }, [weeks, service, adjust, roast]);
 
   if (error) return <p className="text-red-600 text-center mt-10">{error}</p>;
   const maxRec = data ? Math.max(1, ...data.per_weekday.map((w) => w.max)) : 1;
+  const maxHora = data ? Math.max(1, ...data.por_hora.map((h) => h.pollos)) : 1;
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">
@@ -56,6 +58,14 @@ export default function Prediccion() {
           className={`px-3 py-2 rounded-xl font-bold text-sm flex items-center gap-2 ${adjust ? 'bg-ink text-white' : 'bg-white text-zinc-500 shadow'}`}>
           <span>{adjust ? '✓' : '○'}</span> Ajustar por clima y feriados
         </button>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-ink-mute">Cocción:</span>
+          <div className="flex gap-1 bg-white rounded-xl p-1 shadow">
+            {[60, 75, 90].map((r) => (
+              <button key={r} onClick={() => setRoast(r)} className={`px-3 py-1.5 rounded-lg font-bold text-sm ${roast === r ? 'bg-cartel text-white' : 'text-zinc-600'}`}>{r}′</button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {!data ? <p className="text-zinc-500 text-center mt-10">Calculando predicción…</p> : data.dias_con_venta === 0 ? (
@@ -83,6 +93,48 @@ export default function Prediccion() {
             </div>
             <p className="text-xs text-ink-mute mt-3">
               <b>Recomendado</b> según tu meta ({METAS.find((m) => m.id === service)?.label}). {adjust ? 'Se ajusta al alza en feriados y días de lluvia.' : 'Activa "clima y feriados" para ajustar días especiales.'}
+            </p>
+          </div>
+
+          {/* Plan de horneado de hoy */}
+          <div className="bg-white rounded-2xl p-4 shadow">
+            <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+              <h3 className="font-black">Plan de horneado de hoy 🔥</h3>
+              <div className="flex items-center gap-2">
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${data.hora_fuente === 'historial' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {data.hora_fuente === 'historial' ? '⏱️ horario real' : '⏱️ horario estimado'}
+                </span>
+                <span className="text-xs text-ink-mute">peak ~{data.hora_peak}:00 · {data.plan_hoy.roast_min}′</span>
+              </div>
+            </div>
+            {/* Curva de demanda por hora */}
+            <div className="flex items-end gap-1 h-24 mb-3">
+              {data.por_hora.filter((h) => h.hora >= 9 && h.hora <= 23).map((h) => (
+                <div key={h.hora} className="flex-1 flex flex-col items-center justify-end">
+                  <div className="w-full bg-cartel/70 rounded-t hover:bg-cartel" style={{ height: `${(h.pollos / maxHora) * 100}%` }} title={`${h.hora}:00 · ${h.pollos} pollos/día`} />
+                  <span className="text-[8px] text-zinc-400 mt-0.5">{h.hora}</span>
+                </div>
+              ))}
+            </div>
+            {data.plan_hoy.horneadas.length ? (
+              <div className="space-y-2">
+                {data.plan_hoy.horneadas.map((b, i) => (
+                  <div key={i} className="flex items-center gap-3 bg-slate-50 rounded-xl p-3">
+                    <span className="w-7 h-7 rounded-full bg-cartel text-white grid place-items-center font-black text-sm shrink-0">{i + 1}</span>
+                    <div className="flex-1 text-sm">
+                      {b.ventana && <span className="text-[10px] font-bold bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded mr-1.5">{b.ventana}</span>}
+                      Poner a las <b className="text-base">{b.poner}</b> <span className="text-ink-mute">→ listo {b.lista}</span>
+                    </div>
+                    <span className="font-black text-lg whitespace-nowrap">{b.pollos} 🍗</span>
+                  </div>
+                ))}
+              </div>
+            ) : <p className="text-sm text-zinc-400">Hoy la demanda es baja: hornea bajo pedido.</p>}
+            <p className="text-xs text-ink-mute mt-2">
+              Total de hoy ≈ {data.plan_hoy.total} pollos. Las tandas quedan listas justo antes de cada bloque de venta (cocción {data.plan_hoy.roast_min} min).
+              {data.hora_fuente === 'estimado'
+                ? ' La curva horaria es un patrón típico (almuerzo/cena): se afinará con tus ventas reales del POS.'
+                : ' Curva basada en tus ventas reales por hora.'}
             </p>
           </div>
 

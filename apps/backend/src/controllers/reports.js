@@ -565,10 +565,69 @@ export async function forecast(req, res) {
     .map(([pid, u]) => ({ name: nameById.get(pid), unidades: u, por_dia: r1(u / diasAbiertos), pollo: frac.get(pid) }))
     .sort((a, b) => b.unidades - a.unidades).slice(0, 10);
 
+  // --- Demanda de pollo por HORA (zona Chile) y PLAN DE HORNEADO de hoy ---
+  // La forma horaria se calcula SOLO con ventas reales del POS (se excluyen las
+  // importadas, que no traen hora). Si aún no hay señal suficiente, se usa un
+  // patrón típico de almuerzo/cena (estimado) que se auto-corrige con el uso.
+  const hourRows = (await db.execute({
+    sql: `SELECT s.sold_at, si.product_id pid, si.qty q
+          FROM sale_items si JOIN sales s ON s.id=si.sale_id
+          WHERE s.status='CONFIRMADA' AND s.sold_at>=? AND s.sold_at<=?
+            AND (s.payload_hash IS NULL OR s.payload_hash NOT IN ('IMPORT','IMPORT-2025')) LIMIT 50000`,
+    args: [from, to],
+  })).rows;
+  const fmtHour = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Santiago', hour: '2-digit', hour12: false });
+  const realHour = new Array(24).fill(0);
+  for (const r of hourRows) {
+    const f = frac.get(r.pid) || 0; if (!f) continue;
+    realHour[parseInt(fmtHour.format(new Date(r.sold_at)), 10) % 24] += Number(r.q) * f;
+  }
+  const realSignal = realHour.reduce((a, b) => a + b, 0);
+
+  // Patrón por defecto (negocio de pollo en Chile): peaks de almuerzo y cena.
+  const DEFAULT_SHAPE = { 11: 4, 12: 10, 13: 16, 14: 15, 15: 9, 16: 4, 17: 3, 18: 5, 19: 9, 20: 13, 21: 10, 22: 5, 23: 2 };
+  let shapeArr = new Array(24).fill(0); let hora_fuente;
+  if (realSignal >= 15) { shapeArr = realHour.map((v) => v / realSignal); hora_fuente = 'historial'; }
+  else { for (const [h, v] of Object.entries(DEFAULT_SHAPE)) shapeArr[h] = v; const t = shapeArr.reduce((a, b) => a + b, 0); shapeArr = shapeArr.map((v) => v / t); hora_fuente = 'estimado'; }
+
+  const roast = Math.min(Math.max(Number(req.query.roast) || 75, 20), 180); // min de cocción
+  const cap = Math.max(0, Number(req.query.capacity) || 0);                  // capacidad por tanda (0 = sin límite)
+  const todayTarget = next_7_days[0].recomendado;
+  const demandByHour = shapeArr.map((s) => s * todayTarget);
+  const por_hora = demandByHour.map((d, h) => ({ hora: h, pollos: r1(d) }));
+
+  const minToHHMM = (m) => { m = Math.max(0, Math.round(m)); const hh = Math.floor(m / 60) % 24, mm = m % 60; return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`; };
+
+  // Tandas por VENTANA de servicio (almuerzo / cena): práctica real de un asado.
+  // Cada tanda queda lista cuando la ventana empieza a moverse (antes del peak),
+  // partiendo en sub-tandas si supera la capacidad del horno.
+  const WINDOWS = [{ name: 'Almuerzo', from: 10, to: 16 }, { name: 'Cena', from: 17, to: 23 }];
+  const horneadas = [];
+  if (todayTarget > 0) {
+    for (const win of WINDOWS) {
+      let dem = 0, peakH = win.from, peakD = 0;
+      for (let h = win.from; h <= win.to; h++) { dem += demandByHour[h]; if (demandByHour[h] > peakD) { peakD = demandByHour[h]; peakH = h; } }
+      let n = Math.ceil(dem);
+      if (n <= 0 || peakD <= 0) continue;
+      // Hora de inicio del servicio: primera hora que alcanza el 25% del peak.
+      let ramp = peakH;
+      for (let h = win.from; h <= win.to; h++) { if (demandByHour[h] >= 0.25 * peakD) { ramp = h; break; } }
+      let ready = ramp;
+      while (n > 0) {
+        const size = cap > 0 ? Math.min(cap, n) : n; n -= size;
+        horneadas.push({ ventana: win.name, poner: minToHHMM(ready * 60 - roast), lista: minToHHMM(ready * 60), pollos: size });
+        ready += 2; // sub-tandas escalonadas cada 2 h
+      }
+    }
+  }
+  const peakHour = demandByHour.indexOf(Math.max(...demandByHour));
+
   return res.json({
     period: { from, to }, lookback_weeks: weeks, dias_con_venta: perDay.size, service, weather_ok,
     promedio_diario: r1([...perDay.values()].reduce((s, v) => s + v, 0) / diasAbiertos),
     per_weekday, next_7_days, por_producto,
+    por_hora, hora_peak: peakHour, hora_fuente,
+    plan_hoy: { fecha: next_7_days[0].fecha, total: todayTarget, roast_min: roast, fuente: hora_fuente, horneadas },
   });
 }
 

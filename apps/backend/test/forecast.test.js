@@ -43,6 +43,19 @@ describe('Predictor de horno', () => {
     expect(res.body.por_producto.some((p) => p.pollo === 1)).toBe(true);
   });
 
+  it('incluye demanda por hora y plan de horneado de hoy', async () => {
+    const res = await request(app).get('/api/reports/forecast?weeks=8&roast=75').set('Authorization', bearer());
+    expect(res.body.por_hora).toHaveLength(24);
+    expect(res.body.plan_hoy).toBeDefined();
+    expect(res.body.plan_hoy.roast_min).toBe(75);
+    expect(Array.isArray(res.body.plan_hoy.horneadas)).toBe(true);
+    // Hubo ventas hoy ⇒ al menos una tanda con hora "poner → listo".
+    if (res.body.plan_hoy.total > 0) {
+      expect(res.body.plan_hoy.horneadas[0]).toHaveProperty('poner');
+      expect(res.body.plan_hoy.horneadas[0]).toHaveProperty('pollos');
+    }
+  });
+
   it('respeta la meta de servicio (mayor meta ⇒ recomendado no menor)', async () => {
     const baja = await request(app).get('/api/reports/forecast?weeks=8&service=0.5').set('Authorization', bearer());
     const alta = await request(app).get('/api/reports/forecast?weeks=8&service=0.9').set('Authorization', bearer());
