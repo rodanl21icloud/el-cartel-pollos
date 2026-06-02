@@ -1,6 +1,10 @@
 // Servidor Express — listo para Serverless/PaaS (export del handler).
 import express from 'express';
+import path from 'node:path';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { requireAuth, requireOtpForMutation } from './middleware/auth.js';
+import { rateLimit } from './middleware/rateLimit.js';
 import { requirePermission } from './middleware/permissions.js';
 import { verifyHmac } from './middleware/hmac.js';
 import { login } from './controllers/auth.js';
@@ -21,12 +25,25 @@ import { listUsers, createUser, updateUser, resetPassword } from './controllers/
 import { listDispatch, updateDispatchStatus } from './controllers/dispatch.js';
 
 const app = express();
+// Detrás del proxy de Render/PaaS: req.ip refleja la IP real del cliente
+// (para auditoría y rate limiting).
+app.set('trust proxy', 1);
+
+// Cabeceras de seguridad mínimas (sin CSP estricta para no romper la PWA).
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  next();
+});
+
 app.use(express.json({ limit: '256kb' }));
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 // --- Público ---
-app.post('/api/auth/login', login);
+// Anti-fuerza bruta: máx. 30 intentos de login por IP cada 5 minutos.
+app.post('/api/auth/login', rateLimit({ windowMs: 5 * 60_000, max: 30 }), login);
 
 // --- Protegido: JWT en todo /api. El OTP de gerencia se aplica de forma
 // SELECTIVA solo a operaciones sensibles del catálogo/permisos (no a las
@@ -126,6 +143,21 @@ app.post('/api/users/:id/password', requirePermission('permissions.manage'), res
 // Administración de permisos (matriz rol×módulo). PUT también exige OTP.
 app.get('/api/permissions', requirePermission('permissions.manage'), getPermissions);
 app.put('/api/permissions', requirePermission('permissions.manage'), requireOtpForMutation, updatePermission);
+
+// --- Frontend (PWA) servido desde el mismo dominio en producción ---
+// La build de Vite vive en apps/frontend/dist. Si existe, Express la sirve
+// y hace fallback a index.html para las rutas del SPA (no /api ni /health).
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const DIST = path.join(__dirname, '..', '..', 'frontend', 'dist');
+if (fs.existsSync(DIST)) {
+  app.use(express.static(DIST, { index: false, maxAge: '1h' }));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path === '/health') return next();
+    // El service worker y el manifest no deben cachearse agresivamente.
+    return res.sendFile(path.join(DIST, 'index.html'));
+  });
+  console.log('Frontend estático servido desde', DIST);
+}
 
 // Handler de errores uniforme.
 app.use((err, _req, res, _next) => {

@@ -6,5 +6,11 @@
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "scripts": {
+    "build": "npm run build --workspace @cartel/frontend",
+    "start": "npm start --workspace @cartel/backend",
+    "test": "npm test --workspace @cartel/backend",
+    "provision": "npm run provision --workspace @cartel/backend"
+  }
 }

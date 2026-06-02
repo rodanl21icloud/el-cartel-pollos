@@ -1,0 +1,33 @@
+# ============================================================
+# Render Blueprint — El Cartel de los Pollos
+# Un único Web Service Node (servidor persistente) que:
+#   - expone la API en /api
+#   - sirve la PWA (build de Vite) en el mismo dominio
+# Base de datos: Turso (libSQL) remota -> se configura por variables.
+#
+# Deploy: en Render > New > Blueprint, conecta este repo. Render lee este
+# archivo. Luego completa TURSO_DATABASE_URL y TURSO_AUTH_TOKEN (ver DEPLOY.md).
+# ============================================================
+services:
+  - type: web
+    name: cartel-pollos
+    runtime: node
+    plan: free                # cámbialo a "starter" (US$7/mes) para que no se duerma
+    region: oregon            # ohio | oregon | frankfurt | singapore
+    branch: main
+    # --include=dev: necesitamos vite (devDependency) para construir el frontend.
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production       # != 'serverless' -> el servidor hace app.listen()
+      - key: JWT_SECRET
+        generateValue: true     # Render genera un secreto fuerte y lo fija
+      - key: JWT_TTL
+        value: 12h
+      - key: TURSO_DATABASE_URL
+        sync: false             # secreto: se completa en el dashboard
+      - key: TURSO_AUTH_TOKEN
+        sync: false             # secreto: se completa en el dashboard

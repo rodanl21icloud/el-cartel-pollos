@@ -13,6 +13,8 @@
     "seed:recetas": "node --env-file=.env scripts/seedRecetas.mjs",
     "seed:recetas-real": "node --env-file=.env scripts/seedRecetasReal.mjs",
     "backup": "node --env-file=.env scripts/backup.mjs",
+    "provision": "node scripts/provision.mjs",
+    "provision:local": "node --env-file=.env.production scripts/provision.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
