@@ -373,6 +373,27 @@ export async function exportReport(req, res) {
       args: [from, to],
     })).rows;
     rows = r.map((x) => [x.name, Number(x.u), Math.round(Number(x.m))]);
+  } else if (type === 'flujo') {
+    name = 'flujo_caja';
+    header = ['Día', 'Ingresos', 'Egresos', 'Neto'];
+    const ing = (await db.execute({ sql: `SELECT substr(sold_at,1,10) d, COALESCE(SUM(total),0) t FROM sales WHERE status='CONFIRMADA' AND sold_at>=? AND sold_at<=? GROUP BY d`, args: [from, to] })).rows;
+    const egr = (await db.execute({ sql: `SELECT substr(spent_at,1,10) d, COALESCE(SUM(amount),0) t FROM expenses WHERE spent_at>=? AND spent_at<=? GROUP BY d`, args: [from, to] })).rows;
+    const map = new Map();
+    ing.forEach((r) => map.set(r.d, { d: r.d, i: Number(r.t), e: 0 }));
+    egr.forEach((r) => { const x = map.get(r.d) || { d: r.d, i: 0, e: 0 }; x.e = Number(r.t); map.set(r.d, x); });
+    rows = [...map.values()].sort((a, b) => a.d.localeCompare(b.d)).map((x) => [x.d, Math.round(x.i), Math.round(x.e), Math.round(x.i - x.e)]);
+  } else if (type === 'pnl') {
+    name = 'estado_resultados';
+    header = ['Concepto', 'Valor'];
+    const ventas = Number((await db.execute({ sql: `SELECT COALESCE(SUM(total),0) t FROM sales WHERE status='CONFIRMADA' AND sold_at>=? AND sold_at<=?`, args: [from, to] })).rows[0].t);
+    const cog = (await db.execute({ sql: `SELECT type, COALESCE(SUM(ABS(qty_delta)*unit_cost),0) c FROM inventory_adjustments WHERE type IN ('VENTA','MERMA') AND created_at>=? AND created_at<=? GROUP BY type`, args: [from, to] })).rows;
+    const costo = Number(cog.find((r) => r.type === 'VENTA')?.c || 0), mermas = Number(cog.find((r) => r.type === 'MERMA')?.c || 0);
+    const gs = (await db.execute({ sql: `SELECT c.kind, COALESCE(SUM(e.amount),0) m FROM expenses e JOIN expense_categories c ON c.id=e.category_id WHERE e.spent_at>=? AND e.spent_at<=? GROUP BY c.kind`, args: [from, to] })).rows;
+    let oper = 0, ret = 0; for (const g of gs) { if (g.kind === 'RETIRO') ret = Number(g.m); else oper += Number(g.m); }
+    const ub = ventas - costo, uo = ub - mermas - oper;
+    rows = [['Ventas', Math.round(ventas)], ['Costo de insumos (BOM)', Math.round(costo)], ['Utilidad bruta', Math.round(ub)],
+            ['Mermas', Math.round(mermas)], ['Gastos operativos', Math.round(oper)], ['Utilidad operativa', Math.round(uo)],
+            ['Retiros de socios', Math.round(ret)], ['Resultado después de retiros', Math.round(uo - ret)]];
   } else {
     name = 'movimientos';
     header = ['Fecha', 'Concepto', 'Tipo', 'Método', 'Valor'];
@@ -395,6 +416,107 @@ export async function exportReport(req, res) {
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="${name}_${from.slice(0, 10)}_a_${to.slice(0, 10)}.csv"`);
   return res.send(csv);
+}
+
+// ============================================================
+// GET /api/reports/forecast?weeks=8
+// Predictor de demanda de POLLO (para planificar el horno y bajar la merma).
+// Convierte cada producto a "pollos equivalentes" (receta del insumo pollo, con
+// respaldo por nombre) y proyecta por día de la semana con ponderación por
+// recencia (las semanas recientes pesan más). (reports.view)
+// ============================================================
+export async function forecast(req, res) {
+  const db = getDb();
+  const weeks = Math.min(Math.max(Number(req.query.weeks) || 8, 2), 26);
+  const from = new Date(Date.now() - weeks * 7 * 86400000).toISOString();
+  const to = new Date().toISOString();
+
+  // Fracción de pollo por producto: receta (insumo 'pollo') + respaldo por nombre.
+  const prods = (await db.execute({
+    sql: `SELECT p.id, p.name,
+            COALESCE((SELECT SUM(pr.qty_per_unit) FROM product_recipes pr JOIN ingredients i ON i.id=pr.ingredient_id
+                      WHERE pr.product_id=p.id AND i.name LIKE '%ollo%'),0) pollo
+          FROM products p`,
+    args: [],
+  })).rows;
+  const frac = new Map();
+  for (const p of prods) {
+    let f = Number(p.pollo);
+    if (!(f > 0)) {
+      const n = String(p.name).toUpperCase();
+      if (/MECHAD|VACUN|CERDO|RES\b/.test(n)) f = 0;                       // otras carnes
+      else if (/1\/4|CUARTO|PRESA|BROASTER/.test(n)) f = 0.25;
+      else if (/1\/2|MEDIO/.test(n)) f = 0.5;
+      else if (/POLLO|ENTERO/.test(n)) f = 1;
+    }
+    frac.set(p.id, f);
+  }
+
+  // Unidades por (día hábil, producto) en la ventana.
+  const rows = (await db.execute({
+    sql: `SELECT s.business_day bd, si.product_id pid, SUM(si.qty) q
+          FROM sale_items si JOIN sales s ON s.id=si.sale_id
+          WHERE s.status='CONFIRMADA' AND s.sold_at>=? AND s.sold_at<=? AND s.business_day IS NOT NULL
+          GROUP BY s.business_day, si.product_id`,
+    args: [from, to],
+  })).rows;
+
+  const perDay = new Map(); // business_day -> pollos equivalentes
+  const prodAgg = new Map(); // pid -> unidades (solo productos con pollo)
+  for (const r of rows) {
+    const f = frac.get(r.pid) || 0; if (!f) continue;
+    perDay.set(r.bd, (perDay.get(r.bd) || 0) + Number(r.q) * f);
+    prodAgg.set(r.pid, (prodAgg.get(r.pid) || 0) + Number(r.q));
+  }
+
+  // Agrupar por día de la semana, guardando la antigüedad en semanas.
+  const DOW = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const byDow = Array.from({ length: 7 }, () => []);
+  const now = new Date();
+  for (const [bd, pollos] of perDay) {
+    const [y, mo, d] = bd.split('-').map(Number);
+    const dt = new Date(y, mo - 1, d);
+    const ageWeeks = Math.max(0, (now - dt) / (7 * 86400000));
+    byDow[dt.getDay()].push({ pollos, ageWeeks });
+  }
+  const r1 = (x) => Math.round(x * 10) / 10;
+  const per_weekday = DOW.map((dia, dow) => {
+    const arr = byDow[dow]; const n = arr.length;
+    if (!n) return { dow, dia, n: 0, promedio: 0, reciente: 0, max: 0, recomendado: 0 };
+    const vals = arr.map((a) => a.pollos);
+    const promedio = vals.reduce((s, v) => s + v, 0) / n;
+    const max = Math.max(...vals);
+    // Ponderación por recencia: vida media de 4 semanas.
+    let ws = 0, wsum = 0;
+    for (const a of arr) { const w = Math.pow(0.5, a.ageWeeks / 4); ws += w * a.pollos; wsum += w; }
+    const reciente = wsum > 0 ? ws / wsum : promedio;
+    return { dow, dia, n, promedio: r1(promedio), reciente: r1(reciente), max: Math.round(max), recomendado: Math.round(reciente) };
+  });
+
+  // Próximos 7 días (desde hoy).
+  const next_7_days = [];
+  for (let i = 0; i < 7; i++) {
+    const dt = new Date(now.getTime() + i * 86400000);
+    const w = per_weekday[dt.getDay()];
+    next_7_days.push({
+      fecha: `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`,
+      dia: DOW[dt.getDay()], recomendado: w.recomendado, promedio: w.promedio, max: w.max,
+      etiqueta: i === 0 ? 'Hoy' : i === 1 ? 'Mañana' : null,
+    });
+  }
+
+  // Top productos de pollo (mix de presas) y su demanda media por día.
+  const diasAbiertos = perDay.size || 1;
+  const nameById = new Map(prods.map((p) => [p.id, p.name]));
+  const por_producto = [...prodAgg.entries()]
+    .map(([pid, u]) => ({ name: nameById.get(pid), unidades: u, por_dia: r1(u / diasAbiertos), pollo: frac.get(pid) }))
+    .sort((a, b) => b.unidades - a.unidades).slice(0, 10);
+
+  return res.json({
+    period: { from, to }, lookback_weeks: weeks, dias_con_venta: perDay.size,
+    promedio_diario: r1([...perDay.values()].reduce((s, v) => s + v, 0) / diasAbiertos),
+    per_weekday, next_7_days, por_producto,
+  });
 }
 
 /**

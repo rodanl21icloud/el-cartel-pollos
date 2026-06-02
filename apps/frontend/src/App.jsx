@@ -10,6 +10,7 @@ import Flujo from './screens/Flujo.jsx';
 import Pnl from './screens/Pnl.jsx';
 import Estadisticas from './screens/Estadisticas.jsx';
 import Movimientos from './screens/Movimientos.jsx';
+import Prediccion from './screens/Prediccion.jsx';
 import Resumen from './screens/Resumen.jsx';
 import Banco from './screens/Banco.jsx';
 import Ventas from './screens/Ventas.jsx';
@@ -28,6 +29,7 @@ const NAV = [
     { key: 'pos', label: 'Vender', icon: '🛒', perm: 'pos.sell' },
     { key: 'ventas', label: 'Ventas', icon: '🧾', perm: 'pos.sell' },
     { key: 'despacho', label: 'Despacho', icon: '🛵', perm: 'dispatch.manage' },
+    { key: 'prediccion', label: 'Predicción horno', icon: '🔮', perm: 'reports.view' },
     { key: 'cash', label: 'Caja', icon: '💵', perm: 'cash.operate' },
     { key: 'merma', label: 'Mermas', icon: '🗑️', perm: 'inventory.merma' },
   ] },
@@ -165,6 +167,7 @@ export default function App() {
           {screen === 'pos' && <Pos onNavigate={go} />}
           {screen === 'ventas' && <Ventas canVoid={!!perms['reports.view']} />}
           {screen === 'despacho' && <Despacho />}
+          {screen === 'prediccion' && <Prediccion />}
           {screen === 'clientes' && <Clientes />}
           {screen === 'gastos' && <Gastos />}
           {screen === 'merma' && <Merma />}

@@ -1,22 +1,50 @@
 import { useEffect, useState } from 'react';
-import { api } from '../lib/api.js';
+import { api, apiDownload } from '../lib/api.js';
+import { presetRange } from '../lib/period.js';
+import PeriodPicker from '../components/PeriodPicker.jsx';
 
 const money = (n) => '$' + Number(n).toLocaleString('es-CL');
 const pct = (n) => `${n}%`;
 
 // Estado de Resultados (P&L). Solo gerencia.
 export default function Pnl({ role }) {
+  const [period, setPeriod] = useState({ id: 'anio', ...presetRange('anio') });
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     if (role !== 'GERENCIA') return;
-    api('/reports/pnl').then(setData).catch((e) => setError(e.message));
-  }, [role]);
+    setData(null); setError('');
+    const p = new URLSearchParams({ from: period.from, to: period.to });
+    api(`/reports/pnl?${p}`).then(setData).catch((e) => setError(e.message));
+  }, [role, period]);
+
+  async function descargar() {
+    setDownloading(true);
+    try { await apiDownload(`/reports/export?type=pnl&from=${period.from}&to=${period.to}`, `estado_resultados_${period.from.slice(0, 10)}.csv`); }
+    catch (e) { setError(e.message); } finally { setDownloading(false); }
+  }
 
   if (role !== 'GERENCIA') return <p className="text-zinc-500 text-center mt-10">Solo la gerencia puede ver el P&L.</p>;
   if (error) return <p className="text-red-600 text-center mt-10">{error}</p>;
-  if (!data) return <p className="text-zinc-500 text-center mt-10">Cargando estado de resultados…</p>;
+
+  return (
+    <div className="max-w-xl mx-auto space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h2 className="font-black text-xl">P&amp;L</h2>
+        <button onClick={descargar} disabled={downloading || !data}
+          className="px-4 py-2 rounded-xl bg-ink text-white font-bold text-sm flex items-center gap-1.5 disabled:opacity-50">
+          <span>⤓</span> {downloading ? 'Generando…' : 'Descargar reporte'}
+        </button>
+      </div>
+      <PeriodPicker value={period} onChange={setPeriod} />
+      {!data ? <p className="text-zinc-500 text-center mt-10">Cargando estado de resultados…</p> : <PnlBody data={data} />}
+    </div>
+  );
+}
+
+function PnlBody({ data }) {
 
   const m = data.margenes;
   const Line = ({ label, value, pctVal, bold, neg, sub }) => (
@@ -32,7 +60,7 @@ export default function Pnl({ role }) {
   );
 
   return (
-    <div className="max-w-xl mx-auto space-y-4">
+    <div className="space-y-4">
       {/* Tarjeta destacada de utilidad */}
       <div className="grid grid-cols-3 gap-3">
         <KPI label="Food cost" value={pct(m.food_cost_pct)} hint="insumos / ventas" tone={m.food_cost_pct <= 35 ? 'good' : 'warn'} />
@@ -43,7 +71,7 @@ export default function Pnl({ role }) {
       {/* Estado de resultados */}
       <div className="bg-white rounded-2xl p-5 shadow">
         <h2 className="font-black text-xl mb-1">Estado de Resultados</h2>
-        <p className="text-xs text-zinc-400 mb-4">Últimos 12 meses · {data.period.from.slice(0, 10)} → {data.period.to.slice(0, 10)}</p>
+        <p className="text-xs text-zinc-400 mb-4">{data.period.from.slice(0, 10)} → {data.period.to.slice(0, 10)}</p>
 
         <Line label="Ventas" value={data.ventas} pctVal={100} />
         <Line label="Costo de insumos (BOM)" value={data.costo_insumos} pctVal={m.food_cost_pct} neg />

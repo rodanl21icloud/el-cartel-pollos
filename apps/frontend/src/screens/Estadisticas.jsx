@@ -51,6 +51,12 @@ export default function Estadisticas() {
             <BigCard label="Ticket promedio" value={money(data.ticket_promedio)} />
           </div>
 
+          {/* Comparativo de barras vs período anterior */}
+          <div className="bg-white rounded-2xl p-4 shadow">
+            <h3 className="font-black mb-3">Detalle de ventas</h3>
+            <CompareBars prev={cmp?.total_previo || 0} curr={data.total_ventas} />
+          </div>
+
           {/* Ventas por hora */}
           <div className="bg-white rounded-2xl p-4 shadow">
             <h3 className="font-black mb-3">Ventas por hora</h3>
@@ -114,6 +120,26 @@ export default function Estadisticas() {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+// Dos barras: período anterior (claro) vs actual (oscuro), estilo Treinta.
+function CompareBars({ prev, curr }) {
+  const max = Math.max(1, prev, curr);
+  const Bar = ({ label, value, cls }) => (
+    <div className="flex-1 flex flex-col items-center justify-end">
+      <div className="text-xs font-bold text-ink-mute mb-1">{money(value)}</div>
+      <div className={`w-full rounded-t-lg ${cls}`} style={{ height: `${Math.max(4, (value / max) * 160)}px` }} />
+      <div className="text-xs text-ink-mute mt-2 text-center">{label}</div>
+    </div>
+  );
+  return (
+    <div>
+      <div className="flex items-end gap-6 h-52 px-4">
+        <Bar label="Período anterior" value={prev} cls="bg-emerald-200" />
+        <Bar label="Período actual" value={curr} cls="bg-emerald-600" />
+      </div>
     </div>
   );
 }
