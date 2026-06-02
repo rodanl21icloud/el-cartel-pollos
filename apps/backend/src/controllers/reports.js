@@ -254,14 +254,147 @@ export async function stats(req, res) {
     args: [from, to],
   });
 
+  // Comparativo con el período anterior de igual duración (estilo Treinta).
+  const fromMs = new Date(from).getTime(), toMs = new Date(to).getTime();
+  const len = Math.max(0, toMs - fromMs);
+  const prevTo = new Date(fromMs).toISOString();
+  const prevFrom = new Date(fromMs - len).toISOString();
+  const prev = (await db.execute({
+    sql: `SELECT COUNT(*) n, COALESCE(SUM(total),0) t FROM sales
+          WHERE status='CONFIRMADA' AND sold_at >= ? AND sold_at < ?`,
+    args: [prevFrom, prevTo],
+  })).rows[0];
+  const tPrev = Number(prev.t), nPrev = Number(prev.n);
+  const delta = (a, b) => (b > 0 ? round2(((a - b) / b) * 100) : null);
+
   return res.json({
     period: { from, to },
     total_ventas, n_ventas, ticket_promedio,
+    comparativo: {
+      total_previo: round2(tPrev), n_previo: nPrev,
+      delta_total: delta(total_ventas, tPrev), delta_n: delta(n_ventas, nPrev),
+    },
     por_hora: horas,
     por_dia: [...dias.values()].sort((a, b) => a.dia.localeCompare(b.dia)),
     por_metodo: metodoRes.rows.map((r) => ({ metodo: r.payment_method, ventas: Number(r.ventas), monto: Number(r.monto) })),
     ranking: rankRes.rows.map((r) => ({ name: r.name, unidades: Number(r.unidades), monto: Number(r.monto) })),
   });
+}
+
+// ============================================================
+// GET /api/reports/movements?from=&to=&type=&q=&limit=
+// Libro de movimientos unificado (ingresos = ventas, egresos = gastos) con
+// KPIs de balance, ventas y gastos del período. (reports.view)
+// ============================================================
+export async function movements(req, res) {
+  const db = getDb();
+  const to = req.query.to || new Date().toISOString();
+  const from = req.query.from || new Date(Date.now() - 30 * 86400000).toISOString();
+  const type = req.query.type; // 'INGRESO' | 'EGRESO' | undefined
+  const q = (req.query.q || '').trim().toLowerCase();
+  const limit = Math.min(Number(req.query.limit) || 300, 1000);
+
+  // KPIs sobre TODO el período (no limitados).
+  const v = (await db.execute({ sql: `SELECT COUNT(*) n, COALESCE(SUM(total),0) t FROM sales WHERE status='CONFIRMADA' AND sold_at>=? AND sold_at<=?`, args: [from, to] })).rows[0];
+  const g = (await db.execute({ sql: `SELECT COUNT(*) n, COALESCE(SUM(amount),0) t FROM expenses WHERE spent_at>=? AND spent_at<=?`, args: [from, to] })).rows[0];
+
+  const items = [];
+  if (type !== 'EGRESO') {
+    const rows = (await db.execute({
+      sql: `SELECT s.id, s.sold_at AS fecha, s.payment_method, s.total, s.kind,
+                   (SELECT GROUP_CONCAT(p.name || ' x' || si.qty, ', ') FROM sale_items si JOIN products p ON p.id=si.product_id WHERE si.sale_id=s.id) detalle
+            FROM sales s WHERE s.status='CONFIRMADA' AND s.sold_at>=? AND s.sold_at<=?
+            ORDER BY s.sold_at DESC LIMIT ?`,
+      args: [from, to, limit],
+    })).rows;
+    for (const r of rows) {
+      const concepto = r.kind === 'LIBRE' ? 'Venta libre' : (r.detalle || 'Venta');
+      if (q && !concepto.toLowerCase().includes(q)) continue;
+      items.push({ id: r.id, fecha: r.fecha, concepto, tipo: 'INGRESO', medio_pago: r.payment_method, valor: Number(r.total) });
+    }
+  }
+  if (type !== 'INGRESO') {
+    const rows = (await db.execute({
+      sql: `SELECT e.id, e.spent_at AS fecha, e.payment_method, e.amount, e.description, c.name cat
+            FROM expenses e JOIN expense_categories c ON c.id=e.category_id
+            WHERE e.spent_at>=? AND e.spent_at<=? ORDER BY e.spent_at DESC LIMIT ?`,
+      args: [from, to, limit],
+    })).rows;
+    for (const r of rows) {
+      const concepto = r.description || r.cat;
+      if (q && !concepto.toLowerCase().includes(q)) continue;
+      items.push({ id: r.id, fecha: r.fecha, concepto, tipo: 'EGRESO', medio_pago: r.payment_method, valor: Number(r.amount), categoria: r.cat });
+    }
+  }
+  items.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+
+  return res.json({
+    period: { from, to },
+    kpis: {
+      ventas: { total: Number(v.t), n: Number(v.n) },
+      gastos: { total: Number(g.t), n: Number(g.n) },
+      balance: round2(Number(v.t) - Number(g.t)),
+    },
+    items: items.slice(0, limit),
+    truncated: items.length > limit,
+  });
+}
+
+// ============================================================
+// GET /api/reports/export?type=ventas|movimientos|productos&from=&to=
+// Descarga un reporte en CSV (separador ';' + BOM, abre directo en Excel).
+// ============================================================
+export async function exportReport(req, res) {
+  const db = getDb();
+  const to = req.query.to || new Date().toISOString();
+  const from = req.query.from || new Date(Date.now() - 30 * 86400000).toISOString();
+  const type = req.query.type || 'movimientos';
+  const esc = (s) => { s = String(s == null ? '' : s); return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const fch = (iso) => { try { return new Date(iso).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' }); } catch { return iso; } };
+
+  let header = [], rows = [], name = 'reporte';
+  if (type === 'ventas') {
+    name = 'ventas';
+    header = ['Fecha', 'N° orden', 'Detalle', 'Método', 'Total'];
+    const r = (await db.execute({
+      sql: `SELECT s.sold_at, s.order_number, s.payment_method, s.total, s.kind,
+                   (SELECT GROUP_CONCAT(p.name || ' x' || si.qty, ', ') FROM sale_items si JOIN products p ON p.id=si.product_id WHERE si.sale_id=s.id) detalle
+            FROM sales s WHERE s.status='CONFIRMADA' AND s.sold_at>=? AND s.sold_at<=? ORDER BY s.sold_at DESC LIMIT 20000`,
+      args: [from, to],
+    })).rows;
+    rows = r.map((x) => [fch(x.sold_at), x.order_number ?? '', x.kind === 'LIBRE' ? 'Venta libre' : (x.detalle || ''), x.payment_method, Math.round(Number(x.total))]);
+  } else if (type === 'productos') {
+    name = 'productos';
+    header = ['Producto', 'Unidades', 'Monto'];
+    const r = (await db.execute({
+      sql: `SELECT p.name, SUM(si.qty) u, COALESCE(SUM(si.line_total),0) m
+            FROM sale_items si JOIN sales s ON s.id=si.sale_id AND s.status='CONFIRMADA' AND s.sold_at>=? AND s.sold_at<=?
+            JOIN products p ON p.id=si.product_id GROUP BY p.id ORDER BY u DESC LIMIT 5000`,
+      args: [from, to],
+    })).rows;
+    rows = r.map((x) => [x.name, Number(x.u), Math.round(Number(x.m))]);
+  } else {
+    name = 'movimientos';
+    header = ['Fecha', 'Concepto', 'Tipo', 'Método', 'Valor'];
+    const ventas = (await db.execute({
+      sql: `SELECT s.sold_at AS fecha, s.payment_method, s.total, s.kind,
+                   (SELECT GROUP_CONCAT(p.name || ' x' || si.qty, ', ') FROM sale_items si JOIN products p ON p.id=si.product_id WHERE si.sale_id=s.id) detalle
+            FROM sales s WHERE s.status='CONFIRMADA' AND s.sold_at>=? AND s.sold_at<=? ORDER BY s.sold_at DESC LIMIT 20000`,
+      args: [from, to],
+    })).rows.map((x) => ({ fecha: x.fecha, concepto: x.kind === 'LIBRE' ? 'Venta libre' : (x.detalle || 'Venta'), tipo: 'INGRESO', met: x.payment_method, valor: Math.round(Number(x.total)) }));
+    const gastos = (await db.execute({
+      sql: `SELECT e.spent_at AS fecha, e.payment_method met, e.amount, e.description, c.name cat
+            FROM expenses e JOIN expense_categories c ON c.id=e.category_id WHERE e.spent_at>=? AND e.spent_at<=? ORDER BY e.spent_at DESC LIMIT 20000`,
+      args: [from, to],
+    })).rows.map((x) => ({ fecha: x.fecha, concepto: x.description || x.cat, tipo: 'EGRESO', met: x.met, valor: Math.round(Number(x.amount)) }));
+    rows = [...ventas, ...gastos].sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)))
+      .map((x) => [fch(x.fecha), x.concepto, x.tipo, x.met, x.valor]);
+  }
+
+  const csv = '﻿' + [header, ...rows].map((r) => r.map(esc).join(';')).join('\r\n');
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${name}_${from.slice(0, 10)}_a_${to.slice(0, 10)}.csv"`);
+  return res.send(csv);
 }
 
 /**

@@ -9,6 +9,7 @@ import Gastos from './screens/Gastos.jsx';
 import Flujo from './screens/Flujo.jsx';
 import Pnl from './screens/Pnl.jsx';
 import Estadisticas from './screens/Estadisticas.jsx';
+import Movimientos from './screens/Movimientos.jsx';
 import Resumen from './screens/Resumen.jsx';
 import Banco from './screens/Banco.jsx';
 import Ventas from './screens/Ventas.jsx';
@@ -37,6 +38,7 @@ const NAV = [
   ] },
   { section: 'Finanzas', items: [
     { key: 'resumen', label: 'Resumen', icon: '📋', perm: 'reports.view' },
+    { key: 'movimientos', label: 'Movimientos', icon: '💱', perm: 'reports.view' },
     { key: 'estadisticas', label: 'Estadísticas', icon: '📊', perm: 'reports.view' },
     { key: 'gastos', label: 'Gastos', icon: '💸', perm: 'expenses.manage' },
     { key: 'flujo', label: 'Flujo de caja', icon: '📈', perm: 'reports.view' },
@@ -169,7 +171,8 @@ export default function App() {
           {screen === 'inventario' && <Inventario />}
           {screen === 'cash' && <CashClose userName={user.name} />}
           {screen === 'resumen' && <Resumen role={user.role} />}
-          {screen === 'estadisticas' && <Estadisticas role={user.role} />}
+          {screen === 'movimientos' && <Movimientos />}
+          {screen === 'estadisticas' && <Estadisticas />}
           {screen === 'banco' && <Banco role={user.role} />}
           {screen === 'flujo' && <Flujo role={user.role} />}
           {screen === 'pnl' && <Pnl role={user.role} />}

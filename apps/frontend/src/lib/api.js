@@ -20,3 +20,15 @@ export async function api(path, { method = 'GET', body, otp } = {}) {
   if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { status: res.status, data });
   return data;
 }
+
+// Descarga autenticada (CSV/binario): añade el JWT y dispara el guardado del archivo.
+export async function apiDownload(path, filename) {
+  const token = getToken();
+  const res = await fetch(`/api${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) throw new Error('No se pudo generar el reporte');
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
