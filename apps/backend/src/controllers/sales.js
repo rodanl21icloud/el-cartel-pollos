@@ -1,7 +1,11 @@
 // Controlador de ventas. El payload ya viene verificado por HMAC (req.verifiedPayload).
 import crypto from 'node:crypto';
-import { registerSale } from '../services/sales.js';
+import { registerSale, chileBusinessDay } from '../services/sales.js';
 import { canonicalize } from '../middleware/hmac.js';
+import { writeAudit } from '../services/audit.js';
+
+// Antigüedad máxima permitida para una venta retroactiva (días).
+const BACKDATE_MAX_DIAS = 30;
 
 export async function syncSale(req, res) {
   const payload = req.verifiedPayload;
@@ -22,6 +26,59 @@ export async function syncSale(req, res) {
       client_uuid: payload.client_uuid,
       total: result.total,
       order_number: result.orderNumber, // N° de orden para despacho
+    });
+  } catch (err) {
+    return res.status(err.status || 500).json({ error: err.message, detail: err.detail });
+  }
+}
+
+// POST /api/sales/backdate — registra una venta RETROACTIVA (fecha/hora pasada).
+// Solo roles con permiso sales.backdate. No usa HMAC (acción de gerencia gated por
+// permiso), pero queda fuertemente auditada y marcada como retroactiva.
+export async function backdateSale(req, res) {
+  const b = req.body || {};
+  const reason = (b.reason || '').trim();
+  const soldAt = b.sold_at;
+
+  // Validaciones de la fecha declarada.
+  const t = soldAt ? new Date(soldAt) : null;
+  if (!t || isNaN(t.getTime())) return res.status(400).json({ error: 'FECHA_INVALIDA' });
+  const ahora = Date.now();
+  if (t.getTime() > ahora + 60_000) return res.status(400).json({ error: 'FECHA_FUTURA', detail: 'La fecha/hora no puede ser futura.' });
+  const diasAtras = (ahora - t.getTime()) / 86_400_000;
+  if (diasAtras > BACKDATE_MAX_DIAS) return res.status(400).json({ error: 'FECHA_DEMASIADO_ANTIGUA', detail: `Máximo ${BACKDATE_MAX_DIAS} días hacia atrás.` });
+  if (!reason) return res.status(400).json({ error: 'MOTIVO_OBLIGATORIO' });
+
+  // Construye el payload de venta (idéntico a una venta normal).
+  const payload = {
+    client_uuid: b.client_uuid || crypto.randomUUID(),
+    payment_method: b.payment_method,
+    sold_at: t.toISOString(),
+    items: b.items,
+    free_amount: b.free_amount,
+    note: b.note,
+    discount: b.discount,
+    client: b.client,
+  };
+  const payloadHash = crypto.createHash('sha256').update(canonicalize(payload)).digest('hex');
+
+  try {
+    const result = await registerSale(payload, {
+      userId: req.user.id,
+      payloadHash,
+      ip: req.ip,
+      backdated: true,
+      backdateReason: reason,
+      businessDay: chileBusinessDay(t), // día hábil histórico (no el de hoy)
+    });
+    await writeAudit({
+      userId: req.user.id, action: 'SALE_BACKDATE', entity: 'sales', entityId: result.saleId,
+      severity: 'ALERT', ip: req.ip,
+      metadata: { sold_at: t.toISOString(), registrado_at: new Date(ahora).toISOString(), total: result.total, payment_method: payload.payment_method, reason },
+    });
+    return res.status(201).json({
+      status: result.status, sale_id: result.saleId, total: result.total,
+      order_number: result.orderNumber, business_day: chileBusinessDay(t), backdated: true,
     });
   } catch (err) {
     return res.status(err.status || 500).json({ error: err.message, detail: err.detail });
@@ -103,7 +160,8 @@ export async function listSales(req, res) {
   const where = `WHERE ${cl.join(' AND ')}`;
   const limit = Math.min(Number(req.query.limit) || 100, 500);
   const { rows } = await db.execute({
-    sql: `SELECT s.id, s.order_number, s.sold_at, s.business_day, s.total, s.payment_method, s.kind, s.dispatch_status,
+    sql: `SELECT s.id, s.order_number, s.sold_at, s.created_at, s.business_day, s.total, s.payment_method, s.kind, s.dispatch_status,
+                 s.is_backdated, s.backdate_reason,
                  c.name AS client_name,
                  (SELECT GROUP_CONCAT(p.name || ' x' || si.qty, ', ')
                   FROM sale_items si JOIN products p ON p.id = si.product_id WHERE si.sale_id = s.id) AS detalle
@@ -112,9 +170,10 @@ export async function listSales(req, res) {
     args,
   });
   return res.json(rows.map((r) => ({
-    id: r.id, order_number: r.order_number, sold_at: r.sold_at, business_day: r.business_day,
+    id: r.id, order_number: r.order_number, sold_at: r.sold_at, created_at: r.created_at, business_day: r.business_day,
     total: Number(r.total), payment_method: r.payment_method, kind: r.kind,
     dispatch_status: r.dispatch_status, client_name: r.client_name, detalle: r.detalle || '',
+    is_backdated: !!r.is_backdated, backdate_reason: r.backdate_reason || null,
   })));
 }
 

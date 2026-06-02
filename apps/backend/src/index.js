@@ -9,7 +9,7 @@ import { requirePermission } from './middleware/permissions.js';
 import { verifyHmac } from './middleware/hmac.js';
 import { login } from './controllers/auth.js';
 import { closeCashRegister, getCurrentSession, openSession, registerMovement } from './controllers/cashRegister.js';
-import { syncSale, listProducts, getReceipt, listSales, voidSale } from './controllers/sales.js';
+import { syncSale, listProducts, getReceipt, listSales, voidSale, backdateSale } from './controllers/sales.js';
 import { getSettings, updateSettings, setAdminPin } from './controllers/settings.js';
 import { registerMerma, listIngredients, lowStockAlerts,
          createIngredient, deleteIngredient, restockIngredient, setIngredientStock } from './controllers/inventory.js';
@@ -78,6 +78,8 @@ app.post('/api/clients', requirePermission('pos.sell'), createClient);
 
 // Sincronización de ventas (firma HMAC obligatoria, anti-tamper)
 app.post('/api/sales/sync', requirePermission('pos.sell'), verifyHmac, syncSale);
+// Venta retroactiva (fecha/hora pasada) — solo gerencia/admin, fuertemente auditada
+app.post('/api/sales/backdate', requirePermission('sales.backdate'), backdateSale);
 
 // Listado de ventas (transacciones) + comprobante (imprimir / reenviar)
 app.get('/api/sales', requirePermission('pos.sell'), listSales);

@@ -10,6 +10,7 @@ import { ROLES, ROLE_KEYS } from '../config/roles.js';
 export const PERMISSIONS = [
   { key: 'pos.sell',           label: 'Vender en POS',            group: 'Operación' },
   { key: 'sales.void',         label: 'Anular ventas',            group: 'Operación' },
+  { key: 'sales.backdate',     label: 'Registrar ventas retroactivas', group: 'Operación' },
   { key: 'cash.operate',       label: 'Abrir/cerrar caja',        group: 'Operación' },
   { key: 'dispatch.manage',    label: 'Tablero de despacho',      group: 'Operación' },
   { key: 'forecast.view',      label: 'Ver predicción de horno',  group: 'Operación' },

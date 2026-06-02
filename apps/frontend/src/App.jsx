@@ -17,6 +17,7 @@ import Prediccion from './screens/Prediccion.jsx';
 import Resumen from './screens/Resumen.jsx';
 import Banco from './screens/Banco.jsx';
 import Ventas from './screens/Ventas.jsx';
+import VentaRetroactiva from './screens/VentaRetroactiva.jsx';
 import Permisos from './screens/Permisos.jsx';
 import Inventario from './screens/Inventario.jsx';
 import Carta from './screens/Carta.jsx';
@@ -164,6 +165,7 @@ export default function App() {
           {current && !perms[current.perm] ? <Forbidden module={current.label.toLowerCase()} /> : <>
           {screen === 'pos' && <Pos onNavigate={go} />}
           {screen === 'ventas' && <Ventas canVoid={!!perms['sales.void']} />}
+          {screen === 'retroactiva' && <VentaRetroactiva user={user} />}
           {screen === 'despacho' && <Despacho />}
           {screen === 'prediccion' && <Prediccion />}
           {screen === 'clientes' && <Clientes />}

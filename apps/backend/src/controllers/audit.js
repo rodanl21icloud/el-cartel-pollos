@@ -6,7 +6,7 @@ import { getDb } from '../db.js';
 
 // Acciones consideradas "sensibles" para el filtro rápido de la UI.
 const SENSITIVE = [
-  'LOGIN_FAIL', 'SALE_VOID', 'STOCK_AJUSTE', 'STOCK_PIN_REJECT', 'HMAC_REJECT',
+  'LOGIN_FAIL', 'SALE_VOID', 'SALE_BACKDATE', 'STOCK_AJUSTE', 'STOCK_PIN_REJECT', 'HMAC_REJECT',
   'OTP_REJECT', 'OTP_MISSING', 'PERMISSION_UPDATE', 'ADMIN_PIN_SET', 'CASH_CLOSE',
   'USER_CREATE', 'USER_UPDATE', 'USER_PASSWORD_RESET', 'INV_MERMA',
 ];

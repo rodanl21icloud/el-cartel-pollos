@@ -9,6 +9,7 @@ export const NAV = [
     section: 'Operación', kind: 'OPERACION', items: [
       { key: 'pos', label: 'Vender', icon: '🛒', perm: 'pos.sell' },
       { key: 'ventas', label: 'Ventas', icon: '🧾', perm: 'pos.sell' },
+      { key: 'retroactiva', label: 'Venta retroactiva', icon: '🕓', perm: 'sales.backdate' },
       { key: 'cash', label: 'Caja', icon: '💵', perm: 'cash.operate' },
       { key: 'despacho', label: 'Despacho', icon: '🛵', perm: 'dispatch.manage' },
       { key: 'prediccion', label: 'Predicción horno', icon: '🔮', perm: 'forecast.view' },

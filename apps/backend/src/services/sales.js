@@ -43,7 +43,7 @@ export async function registerSale(payload, ctx) {
   // --- Venta libre: ingreso sin productos ni BOM ---
   if (isFree) {
     const saleId = randomUUID();
-    const businessDay = chileBusinessDay();
+    const businessDay = ctx.businessDay || chileBusinessDay();
     const maxRes = await db.execute({
       sql: `SELECT COALESCE(MAX(order_number), 0) AS m FROM sales WHERE business_day = ?`, args: [businessDay],
     });
@@ -51,11 +51,12 @@ export async function registerSale(payload, ctx) {
     await db.batch([
       {
         sql: `INSERT INTO sales (id, client_uuid, user_id, total, payment_method, status,
-                 payload_hash, synced_offline, business_day, order_number, kind, note, dispatch_status, sold_at)
-               VALUES (?,?,?,?,?, 'CONFIRMADA', ?,?,?,?, 'LIBRE', ?, 'ENTREGADO', ?)`,
+                 payload_hash, synced_offline, business_day, order_number, kind, note, dispatch_status, sold_at,
+                 is_backdated, backdate_reason)
+               VALUES (?,?,?,?,?, 'CONFIRMADA', ?,?,?,?, 'LIBRE', ?, 'ENTREGADO', ?, ?, ?)`,
         args: [saleId, client_uuid, ctx.userId, free_amount, payment_method, ctx.payloadHash,
                ctx.syncedOffline ? 1 : 0, businessDay, orderNumber, note ? String(note).trim() : null,
-               sold_at || new Date().toISOString()],
+               sold_at || new Date().toISOString(), ctx.backdated ? 1 : 0, ctx.backdateReason || null],
       },
       {
         sql: `INSERT INTO audit_logs (id, user_id, action, entity, entity_id, severity, metadata, ip_address)
@@ -159,12 +160,15 @@ export async function registerSale(payload, ctx) {
 
   // Número de orden correlativo por día (zona America/Santiago), asignado
   // por el servidor al sincronizar -> sin choques entre cajas ni offline.
-  const businessDay = chileBusinessDay();
+  const businessDay = ctx.businessDay || chileBusinessDay();
   const maxRes = await db.execute({
     sql: `SELECT COALESCE(MAX(order_number), 0) AS m FROM sales WHERE business_day = ?`,
     args: [businessDay],
   });
   const orderNumber = Number(maxRes.rows[0].m) + 1;
+
+  // Las ventas retroactivas entran como ENTREGADO (ya ocurrieron); no van al tablero.
+  const dispatchStatus = ctx.backdated ? 'ENTREGADO' : 'PENDIENTE';
 
   // ---- Transacción atómica (batch) ----
   const stmts = [];
@@ -172,11 +176,12 @@ export async function registerSale(payload, ctx) {
   stmts.push({
     sql: `INSERT INTO sales
             (id, client_uuid, user_id, total, subtotal, discount, delivery_fee, client_id, delivery_address,
-             payment_method, status, payload_hash, synced_offline, business_day, order_number, dispatch_status, sold_at)
-          VALUES (?,?,?,?,?,?,?,?,?,?, 'CONFIRMADA', ?,?,?,?, 'PENDIENTE', ?)`,
+             payment_method, status, payload_hash, synced_offline, business_day, order_number, dispatch_status, sold_at,
+             is_backdated, backdate_reason)
+          VALUES (?,?,?,?,?,?,?,?,?,?, 'CONFIRMADA', ?,?,?,?, ?, ?, ?, ?)`,
     args: [saleId, client_uuid, ctx.userId, total, subtotal, discount, deliveryFee, clientId, deliveryAddress,
-           payment_method, ctx.payloadHash, ctx.syncedOffline ? 1 : 0, businessDay, orderNumber,
-           sold_at || new Date().toISOString()],
+           payment_method, ctx.payloadHash, ctx.syncedOffline ? 1 : 0, businessDay, orderNumber, dispatchStatus,
+           sold_at || new Date().toISOString(), ctx.backdated ? 1 : 0, ctx.backdateReason || null],
   });
 
   for (const it of saleItems) {

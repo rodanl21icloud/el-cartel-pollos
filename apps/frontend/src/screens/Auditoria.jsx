@@ -8,7 +8,7 @@ const SEV = { INFO: 'bg-slate-100 text-slate-600', WARN: 'bg-amber-100 text-ambe
 // Etiquetas legibles para las acciones más comunes.
 const ACTION_LABEL = {
   LOGIN_OK: 'Inicio de sesión', LOGIN_FAIL: 'Login fallido', SALE_SYNC: 'Venta', SALE_FREE: 'Venta libre',
-  SALE_VOID: 'Anulación de venta', CASH_OPEN: 'Apertura de caja', CASH_CLOSE: 'Cierre de caja',
+  SALE_VOID: 'Anulación de venta', SALE_BACKDATE: 'Venta retroactiva', CASH_OPEN: 'Apertura de caja', CASH_CLOSE: 'Cierre de caja',
   STOCK_AJUSTE: 'Ajuste de stock', STOCK_PIN_REJECT: 'PIN de stock rechazado', INV_MERMA: 'Merma',
   INV_REPOSICION: 'Reposición', PERMISSION_UPDATE: 'Cambio de permiso', ADMIN_PIN_SET: 'PIN admin configurado',
   USER_CREATE: 'Usuario creado', USER_UPDATE: 'Usuario editado', USER_PASSWORD_RESET: 'Clave reseteada',
@@ -90,6 +90,7 @@ function Detail({ e }) {
   // Render legible para los casos más útiles.
   if (e.action === 'STOCK_AJUSTE') return <span>{m.ingredient}: <b>{m.stock_anterior} → {m.stock_nuevo}</b>{m.unidad ? ' ' + m.unidad : ''} · {m.motivo}{m.observacion ? ` (${m.observacion})` : ''}{m.tipo ? <span className="text-zinc-400"> · {m.tipo === 'AJUSTE' ? 'suma/resta' : 'reemplazo'}</span> : ''}</span>;
   if (e.action === 'SALE_VOID') return <span>Orden #{m.order_number} · ${Number(m.total || 0).toLocaleString('es-CL')} {m.reason ? `· ${m.reason}` : ''}</span>;
+  if (e.action === 'SALE_BACKDATE') return <span>${Number(m.total || 0).toLocaleString('es-CL')} · venta {m.sold_at ? new Date(m.sold_at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' }) : ''} · {m.reason}</span>;
   if (e.action === 'PERMISSION_UPDATE') return <span>{m.role} · {m.permission} → {m.allowed ? 'sí' : 'no'}</span>;
   if (e.action === 'CASH_CLOSE') return <span>Descuadre: ${Number(m.diff_total || 0).toLocaleString('es-CL')}{m.has_descuadre ? ' ⚠️' : ''}</span>;
   const keys = Object.keys(m).slice(0, 3);

@@ -127,6 +127,8 @@ CREATE TABLE IF NOT EXISTS sales (
   client_id       TEXT,                             -- cliente (domicilio)
   delivery_address TEXT,                            -- dirección de entrega
   delivery_fee    REAL NOT NULL DEFAULT 0,          -- costo de envío
+  is_backdated    INTEGER NOT NULL DEFAULT 0 CHECK (is_backdated IN (0,1)), -- venta retroactiva (fecha pasada)
+  backdate_reason TEXT,                             -- justificación del registro retroactivo
   dispatch_status TEXT NOT NULL DEFAULT 'PENDIENTE'
                     CHECK (dispatch_status IN ('PENDIENTE','EN_PREPARACION','LISTO','ENTREGADO')),
   sold_at         TEXT NOT NULL DEFAULT (datetime('now')),  -- timestamp del dispositivo

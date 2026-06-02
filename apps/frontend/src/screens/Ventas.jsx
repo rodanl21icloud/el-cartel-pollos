@@ -83,7 +83,14 @@ export default function Ventas({ canVoid }) {
               <tr key={v.id} className="border-b last:border-0 hover:bg-slate-50">
                 <td className="p-3 font-black text-cartel tabular-nums">{v.order_number ?? '—'}</td>
                 <td className="whitespace-nowrap text-ink-mute">{fecha(v.sold_at)}</td>
-                <td className="max-w-xs"><div className="truncate">{v.kind === 'LIBRE' ? 'Venta libre' : (v.detalle || '—')}</div>{v.client_name && <div className="text-xs text-ink-mute">{v.client_name}</div>}</td>
+                <td className="max-w-xs">
+                  <div className="truncate flex items-center gap-1.5">
+                    {v.kind === 'LIBRE' ? 'Venta libre' : (v.detalle || '—')}
+                    {v.is_backdated && <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full whitespace-nowrap" title={v.backdate_reason || 'Venta registrada con fecha pasada'}>🕓 Retroactiva</span>}
+                  </div>
+                  {v.client_name && <div className="text-xs text-ink-mute">{v.client_name}</div>}
+                  {v.is_backdated && v.created_at && <div className="text-[10px] text-ink-mute">ingresada {fecha(v.created_at.includes('T') ? v.created_at : v.created_at.replace(' ', 'T') + 'Z')}</div>}
+                </td>
                 <td className="text-right font-bold tabular-nums whitespace-nowrap">{money(v.total)}</td>
                 <td className="whitespace-nowrap text-xs">{METODO[v.payment_method] || v.payment_method}</td>
                 <td className="text-right whitespace-nowrap">
