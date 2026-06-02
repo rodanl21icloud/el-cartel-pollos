@@ -66,15 +66,20 @@ export async function registerMerma(req, res) {
   });
 }
 
+// Unidades que solo admiten enteros (no fracciones).
+const ENTERAS = new Set(['unidad', 'empaque']);
+
 /**
  * POST /api/inventory/ingredients/:id/set-stock
- * Ajuste manual AUDITADO de existencias (ingreso de proveedor o corrección).
- * Body: { new_qty, reason, pin } — exige el PIN de administrador.
- * Registra stock anterior/nuevo, motivo y timestamp en la auditoría inmutable.
+ * Ajuste manual AUDITADO de existencias (corrección, conteo, compra no registrada…).
+ * Body: { new_qty, reason, pin, note?, mode? } — exige el PIN de administrador.
+ *   - new_qty: cantidad FINAL del insumo (el cliente la calcula si es suma/resta).
+ *   - mode: 'REEMPLAZO' (fijar valor) | 'AJUSTE' (suma/resta) — solo para la traza.
+ * Registra stock anterior/nuevo, tipo, motivo, observación, usuario y timestamp.
  */
 export async function setIngredientStock(req, res) {
   const { id } = req.params;
-  const { new_qty, reason, pin } = req.body || {};
+  const { new_qty, reason, pin, note, mode } = req.body || {};
 
   if (typeof new_qty !== 'number' || !Number.isFinite(new_qty) || new_qty < 0) {
     return res.status(400).json({ error: 'CANTIDAD_INVALIDA' });
@@ -92,32 +97,41 @@ export async function setIngredientStock(req, res) {
     return res.status(403).json({ error: 'PIN_INVALIDO' });
   }
 
-  const ing = (await db.execute({ sql: `SELECT id, name, stock_qty, cost_unit FROM ingredients WHERE id = ? AND is_active = 1`, args: [id] })).rows[0];
+  const ing = (await db.execute({ sql: `SELECT id, name, unit, stock_qty, cost_unit FROM ingredients WHERE id = ? AND is_active = 1`, args: [id] })).rows[0];
   if (!ing) return res.status(404).json({ error: 'INSUMO_NO_ENCONTRADO' });
+
+  // Validación de decimales según la unidad (unidad/empaque = enteros).
+  if (ENTERAS.has(ing.unit) && !Number.isInteger(new_qty)) {
+    return res.status(400).json({ error: 'DECIMAL_NO_PERMITIDO', detail: `La unidad "${ing.unit}" no admite decimales.` });
+  }
 
   const stockAnterior = Number(ing.stock_qty);
   const stockNuevo = new_qty;
   const delta = Math.round((stockNuevo - stockAnterior) * 1000) / 1000;
   const adjId = randomUUID();
   const motivo = String(reason).trim();
+  const obs = note ? String(note).trim() : null;
+  const tipo = mode === 'AJUSTE' ? 'AJUSTE' : 'REEMPLAZO';
+  // La observación se anexa al motivo en el ajuste de inventario (traza completa).
+  const reasonFull = obs ? `${motivo} — ${obs}` : motivo;
 
   await db.batch([
     { sql: `UPDATE ingredients SET stock_qty = ?, updated_at = datetime('now') WHERE id = ?`, args: [stockNuevo, id] },
     {
       sql: `INSERT INTO inventory_adjustments (id, ingredient_id, user_id, type, qty_delta, unit_cost, reason)
             VALUES (?,?,?, 'CONTEO', ?, ?, ?)`,
-      args: [adjId, id, req.user.id, delta, Number(ing.cost_unit), motivo],
+      args: [adjId, id, req.user.id, delta, Number(ing.cost_unit), reasonFull],
     },
     {
       sql: `INSERT INTO audit_logs (id, user_id, action, entity, entity_id, severity, metadata, ip_address)
             VALUES (?,?, 'STOCK_AJUSTE', 'ingredients', ?, 'WARN', ?, ?)`,
       args: [randomUUID(), req.user.id, id,
-             JSON.stringify({ ingredient: ing.name, stock_anterior: stockAnterior, stock_nuevo: stockNuevo, delta, motivo }), req.ip || null],
+             JSON.stringify({ ingredient: ing.name, unidad: ing.unit, tipo, stock_anterior: stockAnterior, stock_nuevo: stockNuevo, delta, motivo, observacion: obs }), req.ip || null],
     },
   ], 'write');
 
   return res.status(201).json({
-    adjustment_id: adjId, ingredient: ing.name,
+    adjustment_id: adjId, ingredient: ing.name, tipo,
     stock_anterior: stockAnterior, stock_nuevo: stockNuevo, delta,
   });
 }

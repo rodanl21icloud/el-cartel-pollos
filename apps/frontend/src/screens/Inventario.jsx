@@ -73,50 +73,96 @@ export default function Inventario() {
   );
 }
 
-// Ajuste manual de stock AUDITADO: nueva cantidad + motivo + PIN de administrador.
-const REASONS = ['Ingreso de proveedor', 'Corrección de inventario', 'Conteo físico', 'Merma no registrada'];
+// Ajuste manual de inventario AUDITADO (HU-INV-03): reemplazar o sumar/restar,
+// con motivo, observación, vista de impacto, validación por unidad y PIN.
+const REASONS = ['Conteo físico', 'Merma', 'Corrección manual', 'Compra no registrada', 'Error de carga', 'Producción/consumo extraordinario'];
+const ENTERAS = new Set(['unidad', 'empaque']);
+const r3 = (n) => Math.round((n + Number.EPSILON) * 1000) / 1000;
+
 function StockEditModal({ ingredient, hasPin, onClose, onDone }) {
-  const [qty, setQty] = useState(String(ingredient.stock_qty));
+  const actual = Number(ingredient.stock_qty);
+  const soloEnteros = ENTERAS.has(ingredient.unit);
+  const [mode, setMode] = useState('REEMPLAZO');      // REEMPLAZO | AJUSTE
+  const [valor, setValor] = useState('');             // valor ingresado (final o diferencia)
   const [reason, setReason] = useState(REASONS[0]);
   const [custom, setCustom] = useState('');
+  const [note, setNote] = useState('');
   const [pin, setPin] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
-  const nuevo = Number(qty);
-  const delta = Number.isFinite(nuevo) ? Math.round((nuevo - ingredient.stock_qty) * 1000) / 1000 : 0;
+
+  const num = valor === '' ? NaN : Number(valor);
+  // Cantidad final según el modo.
+  const nuevo = !Number.isFinite(num) ? actual : (mode === 'REEMPLAZO' ? num : r3(actual + num));
+  const delta = r3(nuevo - actual);
+  const valido = Number.isFinite(num) && nuevo >= 0 && (!soloEnteros || Number.isInteger(nuevo));
 
   async function save() {
     setErr('');
     const motivo = (reason === 'Otro' ? custom : reason).trim();
-    if (!Number.isFinite(nuevo) || nuevo < 0) return setErr('Cantidad inválida');
+    if (!Number.isFinite(num)) return setErr('Ingresa un número válido');
+    if (nuevo < 0) return setErr('El stock resultante no puede ser negativo');
+    if (soloEnteros && !Number.isInteger(nuevo)) return setErr(`La unidad "${ingredient.unit}" no admite decimales`);
     if (!motivo) return setErr('Indica el motivo');
     if (!/^\d{4,8}$/.test(pin)) return setErr('PIN de 4 a 8 dígitos');
     setBusy(true);
     try {
-      const r = await api(`/inventory/ingredients/${ingredient.id}/set-stock`, { method: 'POST', body: { new_qty: nuevo, reason: motivo, pin } });
+      const r = await api(`/inventory/ingredients/${ingredient.id}/set-stock`, {
+        method: 'POST', body: { new_qty: nuevo, reason: motivo, note: note.trim() || undefined, mode, pin },
+      });
       onDone(r);
     } catch (e) {
       setErr(e.message === 'PIN_INVALIDO' ? 'PIN incorrecto'
         : e.message === 'PIN_NO_CONFIGURADO' ? 'No hay PIN configurado. Pídele a gerencia que lo defina en Configuración.'
+        : e.message === 'DECIMAL_NO_PERMITIDO' ? `La unidad "${ingredient.unit}" no admite decimales`
         : e.message === 'DEMASIADOS_INTENTOS' ? 'Demasiados intentos. Espera unos minutos.'
         : e.message);
     } finally { setBusy(false); }
   }
+  const Tab = ({ id, children }) => (
+    <button onClick={() => { setMode(id); setValor(''); }}
+      className={`flex-1 py-2 rounded-lg font-bold text-sm ${mode === id ? 'bg-cartel text-white' : 'bg-zinc-100 text-zinc-600'}`}>{children}</button>
+  );
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-30" onClick={onClose}>
-      <div className="bg-white rounded-2xl p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
-        <h3 className="font-black text-lg mb-1">Ajustar stock</h3>
-        <p className="text-sm text-zinc-500 mb-3">{ingredient.name} · actual <b>{ingredient.stock_qty} {ingredient.unit}</b></p>
+      <div className="bg-white rounded-2xl p-5 w-full max-w-sm max-h-[92vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+        <h3 className="font-black text-lg mb-1">Ajustar inventario</h3>
+        <p className="text-sm text-zinc-500 mb-1">Corrige el stock del insumo y registra el motivo del cambio.</p>
+        <p className="text-sm mb-3">{ingredient.name} · actual <b>{actual} {ingredient.unit}</b></p>
         {!hasPin && <p className="text-xs bg-amber-50 text-amber-700 rounded-lg p-2 mb-3">⚠️ No hay PIN de administrador configurado. Gerencia debe definirlo en <b>Configuración</b> antes de poder ajustar.</p>}
         {err && <p className="text-red-600 font-semibold text-sm mb-2">{err}</p>}
 
-        <label className="block text-xs font-bold text-zinc-500 mb-1">Nueva cantidad ({ingredient.unit})</label>
-        <input type="number" min="0" step="any" value={qty} onChange={(e) => setQty(e.target.value)} autoFocus
-          className="w-full mb-1 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none text-lg font-bold" />
-        {delta !== 0 && <p className={`text-xs mb-2 font-bold ${delta > 0 ? 'text-green-600' : 'text-red-600'}`}>{delta > 0 ? '▲ +' : '▼ '}{delta} {ingredient.unit}</p>}
+        {/* Tipo de ajuste */}
+        <div className="flex gap-2 mb-3">
+          <Tab id="REEMPLAZO">Reemplazar</Tab>
+          <Tab id="AJUSTE">Sumar / Restar</Tab>
+        </div>
 
-        <label className="block text-xs font-bold text-zinc-500 mb-1 mt-2">Motivo</label>
+        <label className="block text-xs font-bold text-zinc-500 mb-1">
+          {mode === 'REEMPLAZO' ? `Nueva cantidad (${ingredient.unit})` : `Diferencia ± (${ingredient.unit})`}
+        </label>
+        <input type="number" step={soloEnteros ? '1' : 'any'} value={valor} onChange={(e) => setValor(e.target.value)} autoFocus
+          placeholder={mode === 'REEMPLAZO' ? String(actual) : 'ej: 5000 o -20'}
+          className="w-full mb-1 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none text-lg font-bold" />
+        {soloEnteros && <p className="text-[11px] text-zinc-400 mb-1">Esta unidad solo admite números enteros.</p>}
+
+        {/* Vista de impacto: antes → después */}
+        {Number.isFinite(num) && (
+          <div className={`rounded-xl p-3 mb-3 text-sm ${delta < 0 ? 'bg-red-50' : delta > 0 ? 'bg-emerald-50' : 'bg-zinc-50'}`}>
+            <div className="flex items-center justify-between">
+              <span className="text-zinc-500">Stock</span>
+              <span className="font-bold tabular-nums">{actual} <span className="text-zinc-400">→</span> {valido ? nuevo : '—'} {ingredient.unit}</span>
+            </div>
+            <div className={`text-right font-black ${delta < 0 ? 'text-red-600' : delta > 0 ? 'text-emerald-600' : 'text-zinc-400'}`}>
+              {delta > 0 ? '▲ +' : delta < 0 ? '▼ ' : ''}{delta} {ingredient.unit}
+            </div>
+            {delta < 0 && <div className="text-[11px] text-red-600 mt-1">⚠️ Estás disminuyendo el stock.</div>}
+            {valido && nuevo <= Number(ingredient.min_stock_qty) && <div className="text-[11px] text-amber-600 mt-1">⚠️ Quedará en o bajo el stock mínimo ({ingredient.min_stock_qty}).</div>}
+          </div>
+        )}
+
+        <label className="block text-xs font-bold text-zinc-500 mb-1">Motivo</label>
         <select value={reason} onChange={(e) => setReason(e.target.value)} className="w-full mb-2 px-3 py-2 rounded-xl border-2 border-zinc-200 outline-none">
           {REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
           <option value="Otro">Otro…</option>
@@ -124,15 +170,19 @@ function StockEditModal({ ingredient, hasPin, onClose, onDone }) {
         {reason === 'Otro' && <input value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="Describe el motivo"
           className="w-full mb-2 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />}
 
+        <label className="block text-xs font-bold text-zinc-500 mb-1 mt-1">Observación (opcional)</label>
+        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Detalle adicional…" maxLength={200}
+          className="w-full mb-2 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
+
         <label className="block text-xs font-bold text-zinc-500 mb-1 mt-1">PIN de administrador</label>
         <input type="password" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
           placeholder="••••" maxLength={8} className="w-full mb-3 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none tracking-widest" />
 
         <div className="flex gap-2">
-          <button onClick={save} disabled={busy || !hasPin} className="flex-1 btn-pos bg-cartel text-white disabled:opacity-50">{busy ? 'Guardando…' : 'Confirmar ajuste'}</button>
+          <button onClick={save} disabled={busy || !hasPin || !valido} className="flex-1 btn-pos bg-cartel text-white disabled:opacity-50">{busy ? 'Guardando…' : 'Confirmar ajuste'}</button>
           <button onClick={onClose} className="px-4 rounded-2xl bg-zinc-200 font-bold">Cancelar</button>
         </div>
-        <p className="text-[11px] text-zinc-400 mt-3">Cada ajuste queda registrado en auditoría (stock anterior, nuevo, motivo, usuario y hora).</p>
+        <p className="text-[11px] text-zinc-400 mt-3">Queda en auditoría: tipo, stock anterior y nuevo, motivo, observación, usuario y hora. No borra el historial del insumo.</p>
       </div>
     </div>
   );

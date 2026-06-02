@@ -88,7 +88,7 @@ function Detail({ e }) {
   const m = e.metadata;
   if (!m || typeof m !== 'object') return <span className="text-ink-mute">{e.entity}</span>;
   // Render legible para los casos más útiles.
-  if (e.action === 'STOCK_AJUSTE') return <span>{m.ingredient}: <b>{m.stock_anterior} → {m.stock_nuevo}</b> · {m.motivo}</span>;
+  if (e.action === 'STOCK_AJUSTE') return <span>{m.ingredient}: <b>{m.stock_anterior} → {m.stock_nuevo}</b>{m.unidad ? ' ' + m.unidad : ''} · {m.motivo}{m.observacion ? ` (${m.observacion})` : ''}{m.tipo ? <span className="text-zinc-400"> · {m.tipo === 'AJUSTE' ? 'suma/resta' : 'reemplazo'}</span> : ''}</span>;
   if (e.action === 'SALE_VOID') return <span>Orden #{m.order_number} · ${Number(m.total || 0).toLocaleString('es-CL')} {m.reason ? `· ${m.reason}` : ''}</span>;
   if (e.action === 'PERMISSION_UPDATE') return <span>{m.role} · {m.permission} → {m.allowed ? 'sí' : 'no'}</span>;
   if (e.action === 'CASH_CLOSE') return <span>Descuadre: ${Number(m.diff_total || 0).toLocaleString('es-CL')}{m.has_descuadre ? ' ⚠️' : ''}</span>;

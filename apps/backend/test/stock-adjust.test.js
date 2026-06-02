@@ -47,17 +47,41 @@ describe('Ajuste de stock auditado con PIN de administrador', () => {
     expect(malaQty.status).toBe(400);
   });
 
-  it('ajusta el stock con PIN correcto y deja traza en auditoría', async () => {
+  it('ajusta el stock con PIN correcto (reemplazo) y deja traza en auditoría', async () => {
     const res = await request(app).post(`/api/inventory/ingredients/${ingId}/set-stock`).set('Authorization', bearer())
-      .send({ new_qty: 80, reason: 'Ingreso de proveedor', pin: PIN });
+      .send({ new_qty: 80, reason: 'Conteo físico', note: 'recuento del lunes', mode: 'REEMPLAZO', pin: PIN });
     expect(res.status).toBe(201);
     expect(res.body.stock_anterior).toBe(50);
     expect(res.body.stock_nuevo).toBe(80);
     expect(res.body.delta).toBe(30);
+    expect(res.body.tipo).toBe('REEMPLAZO');
 
     // Stock efectivamente actualizado.
     const list = await request(app).get('/api/inventory/ingredients').set('Authorization', bearer());
     expect(Number(list.body.find((i) => i.id === ingId).stock_qty)).toBe(80);
+
+    // Auditoría con tipo + observación.
+    const audit = await request(app).get('/api/audit?action=STOCK_AJUSTE&limit=5').set('Authorization', bearer());
+    const ev = audit.body.find((e) => e.metadata?.stock_nuevo === 80);
+    expect(ev.metadata.tipo).toBe('REEMPLAZO');
+    expect(ev.metadata.observacion).toBe('recuento del lunes');
+  });
+
+  it('acepta ajuste por suma/resta (mode AJUSTE) computado en el cliente', async () => {
+    // Stock está en 80; el cliente envía el valor final (80 - 30 = 50).
+    const res = await request(app).post(`/api/inventory/ingredients/${ingId}/set-stock`).set('Authorization', bearer())
+      .send({ new_qty: 50, reason: 'Merma', mode: 'AJUSTE', pin: PIN });
+    expect(res.status).toBe(201);
+    expect(res.body.tipo).toBe('AJUSTE');
+    expect(res.body.delta).toBe(-30);
+  });
+
+  it('rechaza decimales en unidades enteras', async () => {
+    // ingId es 'unidad' → no admite decimales.
+    const res = await request(app).post(`/api/inventory/ingredients/${ingId}/set-stock`).set('Authorization', bearer())
+      .send({ new_qty: 12.5, reason: 'Corrección manual', pin: PIN });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('DECIMAL_NO_PERMITIDO');
   });
 
   it('el cajero no puede ajustar stock (inventory.manage)', async () => {
