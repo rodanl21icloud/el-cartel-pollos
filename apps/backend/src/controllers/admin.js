@@ -8,6 +8,16 @@ import { randomUUID, randomBytes } from 'node:crypto';
 import { getDb } from '../db.js';
 import { writeAudit } from '../services/audit.js';
 
+// KAN-28: nombre de producto inválido (debe ser descriptivo, no un código).
+// Espejo de apps/frontend/src/lib/productName.js (validarNombreProducto).
+function nombreInvalido(raw) {
+  const n = String(raw ?? '').trim();
+  if (n.length < 3) return true;                 // vacío, solo espacios o < 3
+  if (!/^[a-záéíóúñü]/i.test(n)) return true;     // no empieza con letra (., -, número, símbolo)
+  if (/[A-Z]{2,}-?\d+/.test(n)) return true;      // patrón de código (UPBEB125, IMP-001)
+  return false;
+}
+
 /**
  * GET /api/products/catalog — productos con costo por receta (BOM), ganancia y
  * margen, y si tienen receta (rebajan inventario). Para la gestión de la Carta.
@@ -39,7 +49,7 @@ export async function listCatalog(_req, res) {
 /** POST /api/products  Body: { name, price, category?, sku?, image_url? } */
 export async function createProduct(req, res) {
   const { name, price, category = 'COMBO', sku, image_url } = req.body || {};
-  if (!name || !String(name).trim()) return res.status(400).json({ error: 'NOMBRE_REQUERIDO' });
+  if (nombreInvalido(name)) return res.status(400).json({ error: 'NOMBRE_INVALIDO' });
   if (typeof price !== 'number' || !Number.isFinite(price) || price < 0) return res.status(400).json({ error: 'PRECIO_INVALIDO' });
 
   const db = getDb();
@@ -71,6 +81,10 @@ export async function updateProduct(req, res) {
 
   if (price != null && (typeof price !== 'number' || price < 0)) {
     return res.status(400).json({ error: 'PRECIO_INVALIDO' });
+  }
+  // Solo se valida el nombre cuando se está cambiando (no bloquea editar foto/precio/visibilidad de productos existentes).
+  if (name !== undefined && nombreInvalido(name)) {
+    return res.status(400).json({ error: 'NOMBRE_INVALIDO' });
   }
 
   const next = {

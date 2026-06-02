@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { api } from '../lib/api.js';
+import { validarNombreProducto, esNombreCodigo } from '../lib/productName.js';
 
 const money = (n) => '$' + Number(n).toLocaleString('es-CL');
 const CAT_ORDER = ['POLLO', 'COMBOS', 'COLACIONES', 'PAPAS', 'SNACKS', 'BEBIDAS'];
@@ -16,6 +17,7 @@ export default function Carta({ role }) {
   const [otp, setOtp] = useState('');
   const [creating, setCreating] = useState(false);
   const [recipeFor, setRecipeFor] = useState(null);
+  const [renameFor, setRenameFor] = useState(null);
   const [share, setShare] = useState(false);
   const [error, setError] = useState('');
   const [toast, setToast] = useState(null);
@@ -32,7 +34,9 @@ export default function Carta({ role }) {
   function flash(m) { setToast(m); setTimeout(() => setToast(null), 2600); }
   function handleErr(e) {
     setError(e.message === 'OTP_GERENCIA_REQUERIDO' ? 'Ingresa el OTP de gerencia arriba'
-      : e.message === 'OTP_INVALIDO' ? 'OTP incorrecto' : e.message);
+      : e.message === 'OTP_INVALIDO' ? 'OTP incorrecto'
+      : e.message === 'NOMBRE_INVALIDO' ? 'El nombre debe ser descriptivo (no códigos como UPBEB125).'
+      : e.message);
   }
 
   const cats = CAT_ORDER.filter((c) => items.some((p) => p.category === c));
@@ -127,7 +131,15 @@ export default function Carta({ role }) {
                       ? <img src={p.image_url} alt="" className="w-10 h-10 rounded-lg object-cover bg-zinc-100" onError={(e) => { e.target.style.display = 'none'; }} />
                       : <div className="w-10 h-10 rounded-lg bg-zinc-100 flex items-center justify-center text-zinc-300">🍗</div>}
                     <div>
-                      <div className="font-bold flex items-center gap-1.5">{p.name}
+                      <div className="font-bold flex items-center gap-1.5 flex-wrap">{p.name}
+                        {/* KAN-28 (C): badge naranja si el nombre es de código. Desaparece al renombrar (load() refresca). */}
+                        {esNombreCodigo(p.name) && (
+                          <button onClick={() => setRenameFor(p)}
+                            title="Este producto aparece con código en la grilla de venta. Edita el nombre para que sea descriptivo."
+                            className="text-[10px] font-bold bg-orange-100 text-orange-700 hover:bg-orange-200 px-1.5 py-0.5 rounded-full">
+                            ⚠️ Nombre de código
+                          </button>
+                        )}
                         {p.in_catalog === false && <span className="text-[10px] font-bold bg-zinc-200 text-zinc-500 px-1.5 py-0.5 rounded">oculto</span>}
                       </div>
                       <div className="text-xs text-zinc-400">{p.sku} · {p.category}</div>
@@ -149,6 +161,7 @@ export default function Carta({ role }) {
                   </button>
                 </td>
                 <td className="p-3 text-right whitespace-nowrap">
+                  <button onClick={() => setRenameFor(p)} className="text-zinc-400 hover:text-cartel text-lg mr-1" title="Renombrar">✏️</button>
                   <button onClick={() => toggleCatalog(p)} className="text-lg mr-1" title={p.in_catalog === false ? 'Mostrar en catálogo' : 'Ocultar del catálogo'}>
                     {p.in_catalog === false ? '🙈' : '👁️'}
                   </button>
@@ -169,6 +182,11 @@ export default function Carta({ role }) {
       {recipeFor && (
         <RecipeBuilder product={recipeFor} ingredients={ingredients} otp={otpArg}
           onClose={() => setRecipeFor(null)} onSaved={() => { setRecipeFor(null); flash('Receta guardada'); load(); }} onError={handleErr} />
+      )}
+      {renameFor && (
+        <RenameModal product={renameFor} otp={otpArg}
+          onClose={() => setRenameFor(null)}
+          onSaved={() => { setRenameFor(null); flash('Nombre actualizado'); load(); }} onError={handleErr} />
       )}
       {share && <CatalogShareModal otp={otpArg} count={items.filter((p) => p.in_catalog !== false).length}
         onClose={() => setShare(false)} onError={handleErr} flash={flash} />}
@@ -294,13 +312,23 @@ function Toggle({ label, on, onClick, disabled }) {
 
 function NewProduct({ onSave }) {
   const [name, setName] = useState('');
+  const [touched, setTouched] = useState(false);
   const [price, setPrice] = useState('');
   const [category, setCategory] = useState('POLLO');
   const [imageUrl, setImageUrl] = useState('');
+  const nameErr = validarNombreProducto(name);          // '' si es válido
+
+  function submit() {
+    setTouched(true);
+    if (nameErr) return;                                 // bloquea el submit si el nombre es inválido
+    onSave({ name: name.trim(), price: Number(price || 0), category, image_url: imageUrl.trim() || undefined });
+  }
   return (
     <div className="bg-white rounded-2xl p-4 shadow space-y-2">
-      <input placeholder="Nombre del plato" value={name} onChange={(e) => setName(e.target.value)}
-        className="w-full px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
+      <input placeholder="Nombre del plato (descriptivo)" value={name}
+        onChange={(e) => setName(e.target.value)} onBlur={() => setTouched(true)}
+        className={`w-full px-3 py-2 rounded-xl border-2 outline-none ${touched && nameErr ? 'border-red-400 focus:border-red-500' : 'border-zinc-200 focus:border-cartel'}`} />
+      {touched && nameErr && <p className="text-red-600 text-xs font-semibold">{nameErr}</p>}
       <div className="grid grid-cols-2 gap-2">
         <input type="number" min="0" placeholder="Precio" value={price} onChange={(e) => setPrice(e.target.value)}
           className="px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
@@ -311,8 +339,45 @@ function NewProduct({ onSave }) {
       </div>
       <input placeholder="URL de foto (opcional)" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)}
         className="w-full px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
-      <button onClick={() => onSave({ name: name.trim(), price: Number(price || 0), category, image_url: imageUrl.trim() || undefined })}
-        className="w-full btn-pos bg-cartel text-white">Crear plato</button>
+      <button onClick={submit} disabled={!!nameErr}
+        className="w-full btn-pos bg-cartel text-white disabled:opacity-50 disabled:cursor-not-allowed">Crear plato</button>
+    </div>
+  );
+}
+
+// Edición del NOMBRE de un producto, con la misma validación bloqueante.
+// Permite corregir nombres de código como ".UPBEB125".
+function RenameModal({ product, otp, onClose, onSaved, onError }) {
+  const [name, setName] = useState(product.name);
+  const [touched, setTouched] = useState(true);          // muestra el error de entrada (el nombre actual puede ser inválido)
+  const [busy, setBusy] = useState(false);
+  const nameErr = validarNombreProducto(name);
+  const sinCambios = name.trim() === product.name.trim();
+
+  async function save() {
+    setTouched(true);
+    if (nameErr) return;
+    setBusy(true);
+    try {
+      await api(`/products/${product.id}`, { method: 'PUT', body: { name: name.trim() }, otp });
+      onSaved();
+    } catch (e) { onError(e); } finally { setBusy(false); }
+  }
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-20" onClick={onClose}>
+      <div className="bg-white rounded-2xl p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+        <h3 className="font-black text-lg mb-1">Renombrar producto</h3>
+        <p className="text-sm text-zinc-500 mb-3">{product.sku} · {product.category}</p>
+        <label className="block text-xs font-bold text-zinc-500 mb-1">Nombre descriptivo</label>
+        <input value={name} autoFocus onChange={(e) => setName(e.target.value)} onBlur={() => setTouched(true)}
+          className={`w-full px-3 py-2 rounded-xl border-2 outline-none ${touched && nameErr ? 'border-red-400 focus:border-red-500' : 'border-zinc-200 focus:border-cartel'}`} />
+        {touched && nameErr && <p className="text-red-600 text-xs font-semibold mt-1">{nameErr}</p>}
+        <div className="flex gap-2 mt-4">
+          <button onClick={save} disabled={busy || !!nameErr || sinCambios}
+            className="flex-1 btn-pos bg-cartel text-white disabled:opacity-50 disabled:cursor-not-allowed">{busy ? 'Guardando…' : 'Guardar nombre'}</button>
+          <button onClick={onClose} className="px-4 rounded-2xl bg-zinc-200 font-bold">Cancelar</button>
+        </div>
+      </div>
     </div>
   );
 }
