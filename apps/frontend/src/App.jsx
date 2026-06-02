@@ -29,7 +29,7 @@ const NAV = [
     { key: 'pos', label: 'Vender', icon: '🛒', perm: 'pos.sell' },
     { key: 'ventas', label: 'Ventas', icon: '🧾', perm: 'pos.sell' },
     { key: 'despacho', label: 'Despacho', icon: '🛵', perm: 'dispatch.manage' },
-    { key: 'prediccion', label: 'Predicción horno', icon: '🔮', perm: 'reports.view' },
+    { key: 'prediccion', label: 'Predicción horno', icon: '🔮', perm: 'forecast.view' },
     { key: 'cash', label: 'Caja', icon: '💵', perm: 'cash.operate' },
     { key: 'merma', label: 'Mermas', icon: '🗑️', perm: 'inventory.merma' },
   ] },

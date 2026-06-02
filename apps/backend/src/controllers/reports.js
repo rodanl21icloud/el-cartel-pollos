@@ -480,28 +480,81 @@ export async function forecast(req, res) {
     byDow[dt.getDay()].push({ pollos, ageWeeks });
   }
   const r1 = (x) => Math.round(x * 10) / 10;
+
+  // Meta de merma = nivel de servicio (cuantil). 0.5 = mínima merma (mediana);
+  // 0.85 = casi sin quiebres. Ajustes opcionales por feriado y clima.
+  const service = Math.min(0.95, Math.max(0.4, Number(req.query.service) || 0.65));
+  const rainOn = req.query.rain !== '0';
+  const holidaysOn = req.query.holidays !== '0';
+  const HOLIDAY_FACTOR = 1.25, RAIN_FACTOR = 1.15, RAIN_THRESHOLD = 55;
+
+  // Cuantil ponderado por recencia (combina tendencia + meta de servicio).
+  const wq = (items, q) => {
+    if (!items.length) return 0;
+    const s = [...items].sort((a, b) => a.v - b.v);
+    const tot = s.reduce((acc, it) => acc + it.w, 0);
+    let cum = 0;
+    for (const it of s) { cum += it.w; if (cum >= q * tot) return it.v; }
+    return s[s.length - 1].v;
+  };
+
   const per_weekday = DOW.map((dia, dow) => {
     const arr = byDow[dow]; const n = arr.length;
-    if (!n) return { dow, dia, n: 0, promedio: 0, reciente: 0, max: 0, recomendado: 0 };
-    const vals = arr.map((a) => a.pollos);
-    const promedio = vals.reduce((s, v) => s + v, 0) / n;
-    const max = Math.max(...vals);
-    // Ponderación por recencia: vida media de 4 semanas.
-    let ws = 0, wsum = 0;
-    for (const a of arr) { const w = Math.pow(0.5, a.ageWeeks / 4); ws += w * a.pollos; wsum += w; }
-    const reciente = wsum > 0 ? ws / wsum : promedio;
-    return { dow, dia, n, promedio: r1(promedio), reciente: r1(reciente), max: Math.round(max), recomendado: Math.round(reciente) };
+    if (!n) return { dow, dia, n: 0, promedio: 0, mediana: 0, max: 0, recomendado: 0 };
+    const items = arr.map((a) => ({ v: a.pollos, w: Math.pow(0.5, a.ageWeeks / 4) }));
+    const wsum = items.reduce((s, it) => s + it.w, 0);
+    const promedio = items.reduce((s, it) => s + it.v * it.w, 0) / wsum;
+    return {
+      dow, dia, n,
+      promedio: r1(promedio), mediana: Math.round(wq(items, 0.5)),
+      max: Math.round(Math.max(...arr.map((a) => a.pollos))),
+      recomendado: Math.round(wq(items, service)),
+    };
   });
 
-  // Próximos 7 días (desde hoy).
+  // Feriados legales de Chile (los del período relevante).
+  const HOLIDAYS = {
+    '2025-09-18': 'Independencia', '2025-09-19': 'Glorias del Ejército', '2025-10-12': 'Encuentro de Dos Mundos',
+    '2025-10-31': 'Iglesias Evangélicas', '2025-11-01': 'Todos los Santos', '2025-12-08': 'Inmaculada Concepción', '2025-12-25': 'Navidad',
+    '2026-01-01': 'Año Nuevo', '2026-04-03': 'Viernes Santo', '2026-04-04': 'Sábado Santo', '2026-05-01': 'Día del Trabajo',
+    '2026-05-21': 'Glorias Navales', '2026-06-29': 'San Pedro y San Pablo', '2026-07-16': 'Virgen del Carmen',
+    '2026-08-15': 'Asunción', '2026-09-18': 'Independencia', '2026-09-19': 'Glorias del Ejército', '2026-10-12': 'Encuentro de Dos Mundos',
+    '2026-10-31': 'Iglesias Evangélicas', '2026-11-01': 'Todos los Santos', '2026-12-08': 'Inmaculada Concepción', '2026-12-25': 'Navidad',
+  };
+
+  // Clima de los próximos 7 días (open-meteo, sin API key). Resiliente: si falla, se omite.
+  let weather = null, weather_ok = false;
+  if (rainOn && process.env.NODE_ENV !== 'serverless' && process.env.NODE_ENV !== 'test') {
+    try {
+      const lat = Number(req.query.lat) || -33.4489, lon = Number(req.query.lon) || -70.6693; // Santiago por defecto
+      const ctrl = new AbortController(); const tm = setTimeout(() => ctrl.abort(), 3500);
+      const wr = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=precipitation_probability_max,temperature_2m_max&timezone=America%2FSantiago&forecast_days=7`, { signal: ctrl.signal });
+      clearTimeout(tm);
+      if (wr.ok) {
+        const j = await wr.json();
+        weather = {};
+        (j.daily?.time || []).forEach((d, i) => { weather[d] = { rain: j.daily.precipitation_probability_max?.[i] ?? null, temp: j.daily.temperature_2m_max?.[i] ?? null }; });
+        weather_ok = true;
+      }
+    } catch { weather_ok = false; }
+  }
+
+  // Próximos 7 días con ajustes por feriado/clima.
   const next_7_days = [];
   for (let i = 0; i < 7; i++) {
     const dt = new Date(now.getTime() + i * 86400000);
+    const fecha = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
     const w = per_weekday[dt.getDay()];
+    const base = w.recomendado;
+    let factor = 1; const ajustes = [];
+    const feriado = holidaysOn ? (HOLIDAYS[fecha] || null) : null;
+    if (feriado) { factor *= HOLIDAY_FACTOR; ajustes.push(`Feriado +${Math.round((HOLIDAY_FACTOR - 1) * 100)}%`); }
+    const wx = weather?.[fecha] || null;
+    if (wx && wx.rain != null && wx.rain >= RAIN_THRESHOLD) { factor *= RAIN_FACTOR; ajustes.push(`Lluvia +${Math.round((RAIN_FACTOR - 1) * 100)}%`); }
     next_7_days.push({
-      fecha: `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`,
-      dia: DOW[dt.getDay()], recomendado: w.recomendado, promedio: w.promedio, max: w.max,
-      etiqueta: i === 0 ? 'Hoy' : i === 1 ? 'Mañana' : null,
+      fecha, dia: DOW[dt.getDay()], etiqueta: i === 0 ? 'Hoy' : i === 1 ? 'Mañana' : null,
+      base, recomendado: Math.round(base * factor), feriado,
+      rain_prob: wx?.rain ?? null, temp_max: wx?.temp ?? null, ajustes,
     });
   }
 
@@ -513,7 +566,7 @@ export async function forecast(req, res) {
     .sort((a, b) => b.unidades - a.unidades).slice(0, 10);
 
   return res.json({
-    period: { from, to }, lookback_weeks: weeks, dias_con_venta: perDay.size,
+    period: { from, to }, lookback_weeks: weeks, dias_con_venta: perDay.size, service, weather_ok,
     promedio_diario: r1([...perDay.values()].reduce((s, v) => s + v, 0) / diasAbiertos),
     per_weekday, next_7_days, por_producto,
   });

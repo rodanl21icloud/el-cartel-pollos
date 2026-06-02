@@ -132,7 +132,7 @@ app.get('/api/reports/stats', requirePermission('reports.view'), stats);
 app.get('/api/reports/dashboard', requirePermission('reports.view'), dashboard);
 app.get('/api/reports/movements', requirePermission('reports.view'), movements);
 app.get('/api/reports/export', requirePermission('reports.view'), exportReport);
-app.get('/api/reports/forecast', requirePermission('reports.view'), forecast);
+app.get('/api/reports/forecast', requirePermission('forecast.view'), forecast);
 
 // Conciliación bancaria
 app.get('/api/bank/summary', requirePermission('reports.view'), bankSummary);

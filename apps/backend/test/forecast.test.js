@@ -43,6 +43,16 @@ describe('Predictor de horno', () => {
     expect(res.body.por_producto.some((p) => p.pollo === 1)).toBe(true);
   });
 
+  it('respeta la meta de servicio (mayor meta ⇒ recomendado no menor)', async () => {
+    const baja = await request(app).get('/api/reports/forecast?weeks=8&service=0.5').set('Authorization', bearer());
+    const alta = await request(app).get('/api/reports/forecast?weeks=8&service=0.9').set('Authorization', bearer());
+    expect(baja.body.service).toBe(0.5);
+    const dow = new Date().getDay();
+    const rb = baja.body.per_weekday.find((x) => x.dow === dow).recomendado;
+    const ra = alta.body.per_weekday.find((x) => x.dow === dow).recomendado;
+    expect(ra).toBeGreaterThanOrEqual(rb);
+  });
+
   it('exporta P&L y flujo en CSV', async () => {
     const pnl = await request(app).get('/api/reports/export?type=pnl').set('Authorization', bearer());
     expect(pnl.status).toBe(200);
@@ -52,9 +62,18 @@ describe('Predictor de horno', () => {
     expect(flujo.text).toContain('Día;Ingresos;Egresos;Neto');
   });
 
-  it('el cajero no puede ver la predicción', async () => {
+  it('la cocina (preparador) y el cajero SÍ pueden ver la predicción (forecast.view)', async () => {
+    const prep = (await login(app, 'prep1', 'prep123')).token;
     const caj = (await login(app, 'cajero1', 'cajero123')).token;
-    const res = await request(app).get('/api/reports/forecast').set('Authorization', 'Bearer ' + caj);
+    const rp = await request(app).get('/api/reports/forecast').set('Authorization', 'Bearer ' + prep);
+    const rc = await request(app).get('/api/reports/forecast').set('Authorization', 'Bearer ' + caj);
+    expect(rp.status).toBe(200);
+    expect(rc.status).toBe(200);
+  });
+
+  it('pero NO pueden ver reportes financieros (reports.view)', async () => {
+    const prep = (await login(app, 'prep1', 'prep123')).token;
+    const res = await request(app).get('/api/reports/pnl').set('Authorization', 'Bearer ' + prep);
     expect(res.status).toBe(403);
   });
 });

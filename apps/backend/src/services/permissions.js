@@ -8,6 +8,7 @@ import { getDb } from '../db.js';
 export const PERMISSIONS = [
   { key: 'pos.sell',           label: 'Vender en POS',            group: 'Operación' },
   { key: 'dispatch.manage',    label: 'Tablero de despacho',      group: 'Operación' },
+  { key: 'forecast.view',      label: 'Ver predicción de horno',  group: 'Operación' },
   { key: 'expenses.manage',    label: 'Registrar gastos',         group: 'Operación' },
   { key: 'cash.operate',       label: 'Abrir/cerrar caja',        group: 'Operación' },
   { key: 'inventory.merma',    label: 'Registrar mermas',         group: 'Inventario' },
@@ -23,8 +24,8 @@ const VALID = new Set(PERMISSIONS.map((p) => p.key));
 // Defaults por rol (se siembran si la matriz está vacía).
 export const DEFAULTS = {
   GERENCIA: PERMISSIONS.map((p) => p.key), // todo
-  CAJERO: ['pos.sell', 'dispatch.manage', 'expenses.manage', 'cash.operate', 'inventory.merma'],
-  PREPARADOR: ['dispatch.manage', 'inventory.merma'],
+  CAJERO: ['pos.sell', 'dispatch.manage', 'forecast.view', 'expenses.manage', 'cash.operate', 'inventory.merma'],
+  PREPARADOR: ['dispatch.manage', 'forecast.view', 'inventory.merma'],
 };
 
 let _cache = null; // { 'ROLE:perm': true }
