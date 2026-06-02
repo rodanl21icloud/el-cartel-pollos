@@ -12,10 +12,12 @@ import { writeAudit } from '../services/audit.js';
 // Espejo de apps/frontend/src/lib/productName.js (validarNombreProducto).
 //   - mínimo 3 caracteres
 //   - no empieza con punto ni carácter especial (debe empezar con letra o dígito)
+//   - sin patrón de código: mayúsculas pegadas a dígitos (UPBEB125, IMP-001)
 function nombreInvalido(raw) {
   const n = String(raw ?? '').trim();
   if (n.length < 3) return true;                                  // vacío, solo espacios o < 3
   if (/^[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ0-9]/.test(n)) return true;          // empieza con punto/carácter especial
+  if (/[A-Z]{2,}-?\d+/.test(n)) return true;                      // patrón de código (UPBEB125, IMP-001)
   return false;
 }
 

@@ -12,16 +12,16 @@ const crear = (name, extra = {}) => request(app).post('/api/products').set('Auth
 const sufijo = () => ' ' + randomUUID().slice(0, 5);
 
 describe('KAN-28 · Validación de nombre de producto (spec oficial)', () => {
-  it('rechaza nombres inválidos: vacío, < 3, o que empiezan con punto/carácter especial', async () => {
-    for (const n of ['.PRUEBA123', '.UPBEB125', 'AB', '   ', '-pollo', '@bebida', '_test']) {
+  it('rechaza inválidos: vacío, < 3, inicio con punto/especial, o patrón de código', async () => {
+    for (const n of ['.PRUEBA123', '.UPBEB125', 'AB', '   ', '-pollo', '@bebida', '_test', 'UPBEB125', 'IMP-001', 'ABC12']) {
       const res = await crear(n);
       expect(res.status, `nombre: "${n}"`).toBe(400);
       expect(res.body.error).toBe('NOMBRE_INVALIDO');
     }
   });
 
-  it('acepta nombres válidos (incluye número o mayúsculas al inicio y símbolos en el cuerpo)', async () => {
-    for (const n of ['Pollo a las Brasas', 'COMBO POLLO + PAPAS 900', '7 Up 125ml', 'Bebida UP 125ml']) {
+  it('acepta nombres válidos (número al inicio y símbolos/espacios en el cuerpo)', async () => {
+    for (const n of ['Pollo a las Brasas', 'COMBO POLLO + PAPAS 900', '7 Up 125ml', 'Bebida UP 125ml', 'PAPA 500G']) {
       const res = await crear(n + sufijo());
       expect(res.status, `nombre: "${n}"`).toBe(201);
     }
