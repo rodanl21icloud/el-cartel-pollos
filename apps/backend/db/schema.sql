@@ -47,6 +47,10 @@ CREATE TABLE IF NOT EXISTS business_settings (
   paper_width   INTEGER NOT NULL DEFAULT 80 CHECK (paper_width IN (58, 80)),
   bank_balance  REAL,                               -- saldo contable bancario
   bank_balance_date TEXT,                           -- fecha del saldo
+  catalog_slug  TEXT,                               -- identificador del catálogo público (URL)
+  whatsapp      TEXT,                               -- número para pedidos por WhatsApp
+  pickup_enabled   INTEGER NOT NULL DEFAULT 1 CHECK (pickup_enabled IN (0,1)),   -- retiro en tienda
+  delivery_enabled INTEGER NOT NULL DEFAULT 1 CHECK (delivery_enabled IN (0,1)), -- entrega a domicilio
   updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -76,7 +80,9 @@ CREATE TABLE IF NOT EXISTS products (
   price           REAL NOT NULL CHECK (price >= 0),
   category        TEXT NOT NULL DEFAULT 'COMBO',
   image_url       TEXT,                             -- URL de la foto del producto
+  description     TEXT,                             -- descripción para el catálogo público
   is_active       INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0,1)),
+  in_catalog      INTEGER NOT NULL DEFAULT 1 CHECK (in_catalog IN (0,1)), -- visible en catálogo público
   created_at      TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );

@@ -15,7 +15,7 @@ import { writeAudit } from '../services/audit.js';
 export async function listCatalog(_req, res) {
   const db = getDb();
   const { rows } = await db.execute({
-    sql: `SELECT p.id, p.sku, p.name, p.price, p.category, p.is_active, p.image_url,
+    sql: `SELECT p.id, p.sku, p.name, p.price, p.category, p.is_active, p.image_url, p.in_catalog,
                  COALESCE((SELECT SUM(pr.qty_per_unit * i.cost_unit)
                            FROM product_recipes pr JOIN ingredients i ON i.id = pr.ingredient_id
                            WHERE pr.product_id = p.id), 0) AS costo,
@@ -29,6 +29,7 @@ export async function listCatalog(_req, res) {
     const ganancia = Math.round((price - costo) * 100) / 100;
     return {
       id: r.id, sku: r.sku, name: r.name, price, category: r.category, image_url: r.image_url,
+      in_catalog: r.in_catalog == null ? true : !!r.in_catalog,
       costo, ganancia, margen: price > 0 ? Math.round((ganancia / price) * 100) : 0,
       has_recipe: Number(r.recipe_lines) > 0,
     };
@@ -62,7 +63,7 @@ export async function createProduct(req, res) {
 /** PUT /api/products/:id  — edita precio / nombre / estado / foto. */
 export async function updateProduct(req, res) {
   const { id } = req.params;
-  const { name, price, is_active, image_url } = req.body || {};
+  const { name, price, is_active, image_url, in_catalog, description } = req.body || {};
 
   const db = getDb();
   const cur = await db.execute({ sql: `SELECT * FROM products WHERE id = ?`, args: [id] });
@@ -77,11 +78,13 @@ export async function updateProduct(req, res) {
     price: price ?? cur.rows[0].price,
     is_active: is_active != null ? (is_active ? 1 : 0) : cur.rows[0].is_active,
     image_url: image_url !== undefined ? (image_url ? String(image_url).trim() : null) : cur.rows[0].image_url,
+    in_catalog: in_catalog != null ? (in_catalog ? 1 : 0) : (cur.rows[0].in_catalog == null ? 1 : cur.rows[0].in_catalog),
+    description: description !== undefined ? (description ? String(description).trim() : null) : cur.rows[0].description,
   };
 
   await db.execute({
-    sql: `UPDATE products SET name = ?, price = ?, is_active = ?, image_url = ?, updated_at = datetime('now') WHERE id = ?`,
-    args: [next.name, next.price, next.is_active, next.image_url, id],
+    sql: `UPDATE products SET name = ?, price = ?, is_active = ?, image_url = ?, in_catalog = ?, description = ?, updated_at = datetime('now') WHERE id = ?`,
+    args: [next.name, next.price, next.is_active, next.image_url, next.in_catalog, next.description, id],
   });
 
   await writeAudit({

@@ -23,6 +23,7 @@ import { listClients, createClient } from './controllers/clients.js';
 import { bankSummary, bankMovements, addBankMovement, reconcileMovement, reconcile } from './controllers/bank.js';
 import { listUsers, createUser, updateUser, resetPassword } from './controllers/users.js';
 import { listDispatch, updateDispatchStatus } from './controllers/dispatch.js';
+import { getPublicCatalog } from './controllers/publicCatalog.js';
 
 const app = express();
 // Detrás del proxy de Render/PaaS: req.ip refleja la IP real del cliente
@@ -44,6 +45,9 @@ app.get('/health', (_req, res) => res.json({ ok: true }));
 // --- Público ---
 // Anti-fuerza bruta: máx. 30 intentos de login por IP cada 5 minutos.
 app.post('/api/auth/login', rateLimit({ windowMs: 5 * 60_000, max: 30 }), login);
+
+// Catálogo público compartible (sin JWT). Solo datos de vitrina.
+app.get('/api/public/catalog/:slug', getPublicCatalog);
 
 // --- Protegido: JWT en todo /api. El OTP de gerencia se aplica de forma
 // SELECTIVA solo a operaciones sensibles del catálogo/permisos (no a las
