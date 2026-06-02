@@ -1,45 +1,72 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { api, apiDownload } from '../lib/api.js';
 import PeriodNav from '../components/PeriodNav.jsx';
+import { Spinner, EmptyState, ErrorState } from '../components/ui/States.jsx';
 
 const money = (n) => '$' + Number(n).toLocaleString('es-CL');
 const pct = (n) => `${n}%`;
 
-// Estado de Resultados (P&L). Solo gerencia.
-export default function Pnl({ role }) {
+// ¿El período no tiene ninguna actividad económica? (sin ventas, gastos, mermas ni retiros)
+const sinActividad = (d) =>
+  !d || (Number(d.ventas) === 0 && Number(d.costo_insumos) === 0 && Number(d.mermas) === 0 &&
+    Number(d.gastos_operativos) === 0 && Number(d.retiros) === 0 &&
+    (!d.gastos_por_categoria || d.gastos_por_categoria.length === 0) && !d.banco);
+
+// Estado de Resultados (P&L). Acceso por permiso `reports.view` (lo gobierna App.jsx).
+export default function Pnl() {
   const [period, setPeriod] = useState(null);
   const [data, setData] = useState(null);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
+  const [dlError, setDlError] = useState('');
 
-  useEffect(() => {
-    if (role !== 'GERENCIA' || !period) return;
-    setData(null); setError('');
+  // Carga el P&L del período actual. Reutilizable por el botón "Reintentar".
+  const load = useCallback(() => {
+    if (!period) return;
+    setLoading(true); setError(null);
     const p = new URLSearchParams({ from: period.from, to: period.to });
-    api(`/reports/pnl?${p}`).then(setData).catch((e) => setError(e.message));
-  }, [role, period]);
+    api(`/reports/pnl?${p}`)
+      .then((d) => setData(d))
+      .catch((e) => setError(e))
+      .finally(() => setLoading(false));
+  }, [period]);
+
+  useEffect(() => { load(); }, [load]);
 
   async function descargar() {
     if (!period) return;
-    setDownloading(true);
+    setDownloading(true); setDlError('');
     try { await apiDownload(`/reports/export?type=pnl&from=${period.from}&to=${period.to}`, `estado_resultados_${period.from.slice(0, 10)}.csv`); }
-    catch (e) { setError(e.message); } finally { setDownloading(false); }
+    catch { setDlError('No se pudo generar el reporte. Intenta nuevamente.'); }
+    finally { setDownloading(false); }
   }
-
-  if (role !== 'GERENCIA') return <p className="text-zinc-500 text-center mt-10">Solo la gerencia puede ver el P&L.</p>;
-  if (error) return <p className="text-red-600 text-center mt-10">{error}</p>;
 
   return (
     <div className="max-w-xl mx-auto space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="font-black text-xl">P&amp;L</h2>
-        <button onClick={descargar} disabled={downloading || !data}
-          className="px-4 py-2 rounded-xl bg-ink text-white font-bold text-sm flex items-center gap-1.5 disabled:opacity-50">
-          <span>⤓</span> {downloading ? 'Generando…' : 'Descargar reporte'}
-        </button>
+        <div className="flex flex-col items-end gap-1">
+          <button onClick={descargar} disabled={downloading || loading || !data || sinActividad(data)}
+            className="px-4 py-2 rounded-xl bg-ink text-white font-bold text-sm flex items-center gap-1.5 disabled:opacity-50">
+            <span>⤓</span> {downloading ? 'Generando…' : 'Descargar reporte'}
+          </button>
+          {dlError && <span className="text-xs text-red-600">{dlError}</span>}
+        </div>
       </div>
+
       <PeriodNav onChange={setPeriod} />
-      {!data ? <p className="text-zinc-500 text-center mt-10">Cargando estado de resultados…</p> : <PnlBody data={data} />}
+
+      {error ? (
+        <ErrorState error={error} onRetry={load} />
+      ) : loading || !data ? (
+        <Spinner label="Cargando estado de resultados…" />
+      ) : sinActividad(data) ? (
+        <EmptyState icon="🧮" title="Sin registros en este período"
+          hint="No hubo ventas ni gastos en las fechas seleccionadas. Prueba con otro período." />
+      ) : (
+        <PnlBody data={data} />
+      )}
     </div>
   );
 }
