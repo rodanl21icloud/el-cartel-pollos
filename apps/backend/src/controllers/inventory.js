@@ -3,6 +3,7 @@
 // La merma exige `reason` -> toda diferencia de inventario queda justificada.
 // ============================================================
 import { randomUUID } from 'node:crypto';
+import bcrypt from 'bcryptjs';
 import { getDb } from '../db.js';
 import { writeAudit } from '../services/audit.js';
 
@@ -62,6 +63,62 @@ export async function registerMerma(req, res) {
     adjustment_id: adjId,
     ingredient: ing.rows[0].name,
     new_stock: current + delta,
+  });
+}
+
+/**
+ * POST /api/inventory/ingredients/:id/set-stock
+ * Ajuste manual AUDITADO de existencias (ingreso de proveedor o corrección).
+ * Body: { new_qty, reason, pin } — exige el PIN de administrador.
+ * Registra stock anterior/nuevo, motivo y timestamp en la auditoría inmutable.
+ */
+export async function setIngredientStock(req, res) {
+  const { id } = req.params;
+  const { new_qty, reason, pin } = req.body || {};
+
+  if (typeof new_qty !== 'number' || !Number.isFinite(new_qty) || new_qty < 0) {
+    return res.status(400).json({ error: 'CANTIDAD_INVALIDA' });
+  }
+  if (!reason || !String(reason).trim()) return res.status(400).json({ error: 'MOTIVO_OBLIGATORIO' });
+  if (!pin) return res.status(400).json({ error: 'PIN_REQUERIDO' });
+
+  const db = getDb();
+  // PIN de administrador.
+  const st = (await db.execute({ sql: `SELECT admin_pin_hash FROM business_settings WHERE id = 1`, args: [] })).rows[0];
+  if (!st || !st.admin_pin_hash) return res.status(409).json({ error: 'PIN_NO_CONFIGURADO', detail: 'Configura el PIN de administrador en Configuración.' });
+  const ok = await bcrypt.compare(String(pin), st.admin_pin_hash);
+  if (!ok) {
+    await writeAudit({ userId: req.user.id, action: 'STOCK_PIN_REJECT', entity: 'ingredients', entityId: id, severity: 'ALERT', ip: req.ip });
+    return res.status(403).json({ error: 'PIN_INVALIDO' });
+  }
+
+  const ing = (await db.execute({ sql: `SELECT id, name, stock_qty, cost_unit FROM ingredients WHERE id = ? AND is_active = 1`, args: [id] })).rows[0];
+  if (!ing) return res.status(404).json({ error: 'INSUMO_NO_ENCONTRADO' });
+
+  const stockAnterior = Number(ing.stock_qty);
+  const stockNuevo = new_qty;
+  const delta = Math.round((stockNuevo - stockAnterior) * 1000) / 1000;
+  const adjId = randomUUID();
+  const motivo = String(reason).trim();
+
+  await db.batch([
+    { sql: `UPDATE ingredients SET stock_qty = ?, updated_at = datetime('now') WHERE id = ?`, args: [stockNuevo, id] },
+    {
+      sql: `INSERT INTO inventory_adjustments (id, ingredient_id, user_id, type, qty_delta, unit_cost, reason)
+            VALUES (?,?,?, 'CONTEO', ?, ?, ?)`,
+      args: [adjId, id, req.user.id, delta, Number(ing.cost_unit), motivo],
+    },
+    {
+      sql: `INSERT INTO audit_logs (id, user_id, action, entity, entity_id, severity, metadata, ip_address)
+            VALUES (?,?, 'STOCK_AJUSTE', 'ingredients', ?, 'WARN', ?, ?)`,
+      args: [randomUUID(), req.user.id, id,
+             JSON.stringify({ ingredient: ing.name, stock_anterior: stockAnterior, stock_nuevo: stockNuevo, delta, motivo }), req.ip || null],
+    },
+  ], 'write');
+
+  return res.status(201).json({
+    adjustment_id: adjId, ingredient: ing.name,
+    stock_anterior: stockAnterior, stock_nuevo: stockNuevo, delta,
   });
 }
 

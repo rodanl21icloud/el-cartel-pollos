@@ -1,26 +1,26 @@
 import { useEffect, useState } from 'react';
 import { api, apiDownload } from '../lib/api.js';
-import { presetRange } from '../lib/period.js';
-import PeriodPicker from '../components/PeriodPicker.jsx';
+import PeriodNav from '../components/PeriodNav.jsx';
 
 const money = (n) => '$' + Number(n).toLocaleString('es-CL');
 const pct = (n) => `${n}%`;
 
 // Estado de Resultados (P&L). Solo gerencia.
 export default function Pnl({ role }) {
-  const [period, setPeriod] = useState({ id: 'anio', ...presetRange('anio') });
+  const [period, setPeriod] = useState(null);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
-    if (role !== 'GERENCIA') return;
+    if (role !== 'GERENCIA' || !period) return;
     setData(null); setError('');
     const p = new URLSearchParams({ from: period.from, to: period.to });
     api(`/reports/pnl?${p}`).then(setData).catch((e) => setError(e.message));
   }, [role, period]);
 
   async function descargar() {
+    if (!period) return;
     setDownloading(true);
     try { await apiDownload(`/reports/export?type=pnl&from=${period.from}&to=${period.to}`, `estado_resultados_${period.from.slice(0, 10)}.csv`); }
     catch (e) { setError(e.message); } finally { setDownloading(false); }
@@ -38,7 +38,7 @@ export default function Pnl({ role }) {
           <span>⤓</span> {downloading ? 'Generando…' : 'Descargar reporte'}
         </button>
       </div>
-      <PeriodPicker value={period} onChange={setPeriod} />
+      <PeriodNav onChange={setPeriod} />
       {!data ? <p className="text-zinc-500 text-center mt-10">Cargando estado de resultados…</p> : <PnlBody data={data} />}
     </div>
   );

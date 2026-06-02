@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, apiDownload } from '../lib/api.js';
-import { presetRange } from '../lib/period.js';
-import PeriodPicker from '../components/PeriodPicker.jsx';
+import PeriodNav from '../components/PeriodNav.jsx';
 
 const money = (n) => '$' + Number(n || 0).toLocaleString('es-CL');
 const METODO = { EFECTIVO: '💵 Efectivo', POS: '💳 Tarjeta', TRANSFERENCIA: '📲 Transf.' };
@@ -11,7 +10,7 @@ const TABS = [['', 'Todos'], ['INGRESO', 'Ingresos'], ['EGRESO', 'Egresos']];
 // Vista de Movimientos: libro unificado de ingresos (ventas) y egresos (gastos)
 // con KPIs de balance/ventas/gastos, filtro de periodo, búsqueda y descarga.
 export default function Movimientos() {
-  const [period, setPeriod] = useState({ id: 'mes', ...presetRange('mes') });
+  const [period, setPeriod] = useState(null);
   const [tab, setTab] = useState('');
   const [q, setQ] = useState('');
   const [data, setData] = useState(null);
@@ -19,6 +18,7 @@ export default function Movimientos() {
   const [downloading, setDownloading] = useState(false);
 
   async function load() {
+    if (!period) return;
     setError('');
     const p = new URLSearchParams({ from: period.from, to: period.to });
     if (tab) p.set('type', tab);
@@ -30,6 +30,7 @@ export default function Movimientos() {
   useEffect(() => { const t = setTimeout(load, 300); return () => clearTimeout(t); }, [q]);
 
   async function descargar() {
+    if (!period) return;
     setDownloading(true);
     try {
       const tipo = tab === 'INGRESO' ? 'ventas' : 'movimientos';
@@ -51,7 +52,7 @@ export default function Movimientos() {
       </div>
       {error && <p className="text-cartel font-semibold">{error}</p>}
 
-      <PeriodPicker value={period} onChange={setPeriod} />
+      <PeriodNav onChange={setPeriod} />
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

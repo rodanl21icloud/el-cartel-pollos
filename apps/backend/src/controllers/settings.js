@@ -1,4 +1,5 @@
 // Datos del negocio para comprobantes (fila única id=1).
+import bcrypt from 'bcryptjs';
 import { getDb } from '../db.js';
 import { writeAudit } from '../services/audit.js';
 
@@ -6,7 +7,25 @@ import { writeAudit } from '../services/audit.js';
 export async function getSettings(_req, res) {
   const db = getDb();
   const { rows } = await db.execute({ sql: `SELECT * FROM business_settings WHERE id = 1`, args: [] });
-  return res.json(rows[0] || { id: 1, name: 'El Cartel de los Pollos', paper_width: 80 });
+  const row = rows[0] || { id: 1, name: 'El Cartel de los Pollos', paper_width: 80 };
+  // Nunca exponer el hash del PIN; solo si está configurado.
+  const { admin_pin_hash, ...safe } = row;
+  return res.json({ ...safe, has_admin_pin: !!admin_pin_hash });
+}
+
+/** PUT /api/settings/admin-pin — fija/cambia el PIN de administrador (settings.manage). */
+export async function setAdminPin(req, res) {
+  const { pin } = req.body || {};
+  if (!/^\d{4,8}$/.test(String(pin || ''))) return res.status(400).json({ error: 'PIN_INVALIDO', detail: 'Debe ser numérico de 4 a 8 dígitos.' });
+  const db = getDb();
+  const hash = await bcrypt.hash(String(pin), 10);
+  await db.execute({
+    sql: `INSERT INTO business_settings (id, admin_pin_hash, updated_at) VALUES (1, ?, datetime('now'))
+          ON CONFLICT(id) DO UPDATE SET admin_pin_hash = excluded.admin_pin_hash, updated_at = excluded.updated_at`,
+    args: [hash],
+  });
+  await writeAudit({ userId: req.user.id, action: 'ADMIN_PIN_SET', entity: 'business_settings', severity: 'WARN', ip: req.ip });
+  return res.json({ ok: true, has_admin_pin: true });
 }
 
 // Normaliza un slug de catálogo: minúsculas, sin tildes, solo a-z0-9 y guiones.

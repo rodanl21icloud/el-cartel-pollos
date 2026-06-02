@@ -70,6 +70,50 @@ export default function Ajustes({ role }) {
         <button onClick={() => openPrint(buildCustomerReceiptHTML(demo, f))} className="px-4 rounded-2xl bg-zinc-200 font-bold">Probar boleta</button>
       </div>
       {toast && <p className="mt-3 text-center font-bold text-green-600">{toast}</p>}
+
+      <AdminPin hasPin={!!f.has_admin_pin} needsOtp={needsOtp} otp={otp}
+        onSaved={() => setF({ ...f, has_admin_pin: true })} />
+    </div>
+  );
+}
+
+// PIN de administrador para autorizar ajustes manuales de stock.
+function AdminPin({ hasPin, needsOtp, otp, onSaved }) {
+  const [pin, setPin] = useState('');
+  const [pin2, setPin2] = useState('');
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+  async function save() {
+    setErr(''); setMsg('');
+    if (!/^\d{4,8}$/.test(pin)) return setErr('PIN de 4 a 8 dígitos');
+    if (pin !== pin2) return setErr('Los PIN no coinciden');
+    try {
+      await api('/settings/admin-pin', { method: 'PUT', body: { pin }, otp: needsOtp && otp ? otp : undefined });
+      setPin(''); setPin2(''); setMsg(hasPin ? 'PIN actualizado' : 'PIN configurado'); onSaved();
+      setTimeout(() => setMsg(''), 2500);
+    } catch (e) {
+      setErr(e.message === 'OTP_GERENCIA_REQUERIDO' ? 'Ingresa el OTP de gerencia arriba' : e.message === 'OTP_INVALIDO' ? 'OTP incorrecto' : e.message);
+    }
+  }
+  return (
+    <div className="mt-6 pt-5 border-t">
+      <h3 className="font-black text-lg mb-1">PIN de administrador</h3>
+      <p className="text-sm text-zinc-500 mb-3">
+        Autoriza los <b>ajustes manuales de stock</b> en Inventario. {hasPin
+          ? <span className="text-green-600 font-semibold">Configurado ✓</span>
+          : <span className="text-amber-600 font-semibold">Sin configurar.</span>}
+      </p>
+      {err && <p className="text-red-600 font-semibold text-sm mb-2">{err}</p>}
+      <div className="grid grid-cols-2 gap-2 mb-2">
+        <input type="password" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+          placeholder={hasPin ? 'Nuevo PIN' : 'PIN (4-8 díg.)'} maxLength={8}
+          className="px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none tracking-widest" />
+        <input type="password" inputMode="numeric" value={pin2} onChange={(e) => setPin2(e.target.value.replace(/\D/g, ''))}
+          placeholder="Repetir PIN" maxLength={8}
+          className="px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none tracking-widest" />
+      </div>
+      <button onClick={save} className="w-full rounded-xl bg-ink text-white font-bold py-2">{hasPin ? 'Actualizar PIN' : 'Configurar PIN'}</button>
+      {msg && <p className="mt-2 text-center font-bold text-green-600">{msg}</p>}
     </div>
   );
 }

@@ -10,9 +10,9 @@ import { verifyHmac } from './middleware/hmac.js';
 import { login } from './controllers/auth.js';
 import { closeCashRegister, getCurrentSession, openSession, registerMovement } from './controllers/cashRegister.js';
 import { syncSale, listProducts, getReceipt, listSales, voidSale } from './controllers/sales.js';
-import { getSettings, updateSettings } from './controllers/settings.js';
+import { getSettings, updateSettings, setAdminPin } from './controllers/settings.js';
 import { registerMerma, listIngredients, lowStockAlerts,
-         createIngredient, deleteIngredient, restockIngredient } from './controllers/inventory.js';
+         createIngredient, deleteIngredient, restockIngredient, setIngredientStock } from './controllers/inventory.js';
 import { createProduct, updateProduct, deleteProduct, updateIngredient, listCatalog } from './controllers/admin.js';
 import { getRecipe, setRecipe } from './controllers/recipes.js';
 import { listCategories, createExpense, listExpenses } from './controllers/expenses.js';
@@ -86,6 +86,7 @@ app.post('/api/sales/:id/void', requirePermission('reports.view'), voidSale);
 // Datos del negocio (comprobantes)
 app.get('/api/settings', getSettings);
 app.put('/api/settings', requirePermission('settings.manage'), requireOtpForMutation, updateSettings);
+app.put('/api/settings/admin-pin', requirePermission('settings.manage'), requireOtpForMutation, setAdminPin);
 
 // Tablero de despacho (número de orden + estados)
 app.get('/api/dispatch', requirePermission('dispatch.manage'), listDispatch);
@@ -101,6 +102,11 @@ app.post('/api/inventory/ingredients', requirePermission('inventory.manage'), cr
 app.put('/api/inventory/ingredients/:id', requirePermission('inventory.manage'), requireOtpForMutation, updateIngredient);
 app.delete('/api/inventory/ingredients/:id', requirePermission('inventory.manage'), requireOtpForMutation, deleteIngredient);
 app.post('/api/inventory/ingredients/:id/restock', requirePermission('inventory.manage'), restockIngredient);
+// Ajuste manual de stock AUDITADO (validado con PIN de administrador). Anti-fuerza-bruta del PIN.
+app.post('/api/inventory/ingredients/:id/set-stock',
+  requirePermission('inventory.manage'),
+  rateLimit({ windowMs: 5 * 60_000, max: 15, key: (r) => r.user?.id || r.ip }),
+  setIngredientStock);
 
 // Administración de carta. Editar/eliminar precio o plato -> también OTP de gerencia.
 app.get('/api/products/catalog', requirePermission('menu.manage'), listCatalog);

@@ -10,11 +10,13 @@ export default function Inventario() {
   const [toast, setToast] = useState(null);
   const [creating, setCreating] = useState(false);
   const [restockId, setRestockId] = useState(null);
+  const [editStock, setEditStock] = useState(null);
+  const [hasPin, setHasPin] = useState(true);
 
   async function load() {
     try { setItems(await api('/inventory/ingredients')); } catch (e) { setError(e.message); }
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); api('/settings').then((s) => setHasPin(!!s.has_admin_pin)).catch(() => {}); }, []);
 
   function flash(msg) { setToast(msg); setTimeout(() => setToast(null), 2600); }
 
@@ -44,6 +46,8 @@ export default function Inventario() {
               <div className="flex gap-2">
                 <button onClick={() => setRestockId(restockId === i.id ? null : i.id)}
                   className="px-3 py-2 rounded-lg bg-green-600 text-white font-bold">Reponer</button>
+                <button onClick={() => setEditStock(i)} title="Ajuste manual auditado"
+                  className="px-3 py-2 rounded-lg bg-ink text-white font-bold">Editar stock</button>
                 <button onClick={() => delIngredient(i, load, flash, setError)}
                   className="px-3 py-2 rounded-lg bg-zinc-200 font-bold">Eliminar</button>
               </div>
@@ -56,9 +60,80 @@ export default function Inventario() {
         {!items.length && <p className="p-4 text-zinc-400">Sin insumos. Crea el primero.</p>}
       </div>
 
+      {editStock && (
+        <StockEditModal ingredient={editStock} hasPin={hasPin}
+          onClose={() => setEditStock(null)}
+          onDone={(r) => { setEditStock(null); load(); flash(`${r.ingredient}: ${r.stock_anterior} → ${r.stock_nuevo}`); }} />
+      )}
+
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-zinc-900 text-white px-6 py-3 rounded-full shadow-lg font-bold">{toast}</div>
       )}
+    </div>
+  );
+}
+
+// Ajuste manual de stock AUDITADO: nueva cantidad + motivo + PIN de administrador.
+const REASONS = ['Ingreso de proveedor', 'Corrección de inventario', 'Conteo físico', 'Merma no registrada'];
+function StockEditModal({ ingredient, hasPin, onClose, onDone }) {
+  const [qty, setQty] = useState(String(ingredient.stock_qty));
+  const [reason, setReason] = useState(REASONS[0]);
+  const [custom, setCustom] = useState('');
+  const [pin, setPin] = useState('');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const nuevo = Number(qty);
+  const delta = Number.isFinite(nuevo) ? Math.round((nuevo - ingredient.stock_qty) * 1000) / 1000 : 0;
+
+  async function save() {
+    setErr('');
+    const motivo = (reason === 'Otro' ? custom : reason).trim();
+    if (!Number.isFinite(nuevo) || nuevo < 0) return setErr('Cantidad inválida');
+    if (!motivo) return setErr('Indica el motivo');
+    if (!/^\d{4,8}$/.test(pin)) return setErr('PIN de 4 a 8 dígitos');
+    setBusy(true);
+    try {
+      const r = await api(`/inventory/ingredients/${ingredient.id}/set-stock`, { method: 'POST', body: { new_qty: nuevo, reason: motivo, pin } });
+      onDone(r);
+    } catch (e) {
+      setErr(e.message === 'PIN_INVALIDO' ? 'PIN incorrecto'
+        : e.message === 'PIN_NO_CONFIGURADO' ? 'No hay PIN configurado. Pídele a gerencia que lo defina en Configuración.'
+        : e.message === 'DEMASIADOS_INTENTOS' ? 'Demasiados intentos. Espera unos minutos.'
+        : e.message);
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-30" onClick={onClose}>
+      <div className="bg-white rounded-2xl p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+        <h3 className="font-black text-lg mb-1">Ajustar stock</h3>
+        <p className="text-sm text-zinc-500 mb-3">{ingredient.name} · actual <b>{ingredient.stock_qty} {ingredient.unit}</b></p>
+        {!hasPin && <p className="text-xs bg-amber-50 text-amber-700 rounded-lg p-2 mb-3">⚠️ No hay PIN de administrador configurado. Gerencia debe definirlo en <b>Configuración</b> antes de poder ajustar.</p>}
+        {err && <p className="text-red-600 font-semibold text-sm mb-2">{err}</p>}
+
+        <label className="block text-xs font-bold text-zinc-500 mb-1">Nueva cantidad ({ingredient.unit})</label>
+        <input type="number" min="0" step="any" value={qty} onChange={(e) => setQty(e.target.value)} autoFocus
+          className="w-full mb-1 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none text-lg font-bold" />
+        {delta !== 0 && <p className={`text-xs mb-2 font-bold ${delta > 0 ? 'text-green-600' : 'text-red-600'}`}>{delta > 0 ? '▲ +' : '▼ '}{delta} {ingredient.unit}</p>}
+
+        <label className="block text-xs font-bold text-zinc-500 mb-1 mt-2">Motivo</label>
+        <select value={reason} onChange={(e) => setReason(e.target.value)} className="w-full mb-2 px-3 py-2 rounded-xl border-2 border-zinc-200 outline-none">
+          {REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+          <option value="Otro">Otro…</option>
+        </select>
+        {reason === 'Otro' && <input value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="Describe el motivo"
+          className="w-full mb-2 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />}
+
+        <label className="block text-xs font-bold text-zinc-500 mb-1 mt-1">PIN de administrador</label>
+        <input type="password" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+          placeholder="••••" maxLength={8} className="w-full mb-3 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none tracking-widest" />
+
+        <div className="flex gap-2">
+          <button onClick={save} disabled={busy || !hasPin} className="flex-1 btn-pos bg-cartel text-white disabled:opacity-50">{busy ? 'Guardando…' : 'Confirmar ajuste'}</button>
+          <button onClick={onClose} className="px-4 rounded-2xl bg-zinc-200 font-bold">Cancelar</button>
+        </div>
+        <p className="text-[11px] text-zinc-400 mt-3">Cada ajuste queda registrado en auditoría (stock anterior, nuevo, motivo, usuario y hora).</p>
+      </div>
     </div>
   );
 }

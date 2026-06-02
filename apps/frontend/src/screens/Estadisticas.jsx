@@ -1,23 +1,24 @@
 import { useEffect, useState } from 'react';
 import { api, apiDownload } from '../lib/api.js';
-import { presetRange } from '../lib/period.js';
-import PeriodPicker from '../components/PeriodPicker.jsx';
+import PeriodNav from '../components/PeriodNav.jsx';
 
 const money = (n) => '$' + Number(n || 0).toLocaleString('es-CL');
 
 export default function Estadisticas() {
-  const [period, setPeriod] = useState({ id: 'mes', ...presetRange('mes') });
+  const [period, setPeriod] = useState(null);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
+    if (!period) return;
     setData(null); setError('');
     const p = new URLSearchParams({ from: period.from, to: period.to });
     api(`/reports/stats?${p}`).then(setData).catch((e) => setError(e.message));
   }, [period]);
 
   async function descargar(tipo) {
+    if (!period) return;
     setDownloading(true);
     try { await apiDownload(`/reports/export?type=${tipo}&from=${period.from}&to=${period.to}`, `${tipo}_${period.from.slice(0, 10)}.csv`); }
     catch (e) { setError(e.message); } finally { setDownloading(false); }
@@ -40,7 +41,7 @@ export default function Estadisticas() {
         </button>
       </div>
 
-      <PeriodPicker value={period} onChange={setPeriod} />
+      <PeriodNav onChange={setPeriod} />
 
       {!data ? <p className="text-zinc-500 text-center mt-10">Cargando estadísticas…</p> : (
         <>
