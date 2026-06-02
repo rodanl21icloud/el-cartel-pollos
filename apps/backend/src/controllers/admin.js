@@ -8,13 +8,14 @@ import { randomUUID, randomBytes } from 'node:crypto';
 import { getDb } from '../db.js';
 import { writeAudit } from '../services/audit.js';
 
-// KAN-28: nombre de producto inválido (debe ser descriptivo, no un código).
+// KAN-28: nombre de producto inválido (debe ser descriptivo).
 // Espejo de apps/frontend/src/lib/productName.js (validarNombreProducto).
+//   - mínimo 3 caracteres
+//   - no empieza con punto ni carácter especial (debe empezar con letra o dígito)
 function nombreInvalido(raw) {
   const n = String(raw ?? '').trim();
-  if (n.length < 3) return true;                 // vacío, solo espacios o < 3
-  if (!/^[a-záéíóúñü]/i.test(n)) return true;     // no empieza con letra (., -, número, símbolo)
-  if (/[A-Z]{2,}-?\d+/.test(n)) return true;      // patrón de código (UPBEB125, IMP-001)
+  if (n.length < 3) return true;                                  // vacío, solo espacios o < 3
+  if (/^[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ0-9]/.test(n)) return true;          // empieza con punto/carácter especial
   return false;
 }
 

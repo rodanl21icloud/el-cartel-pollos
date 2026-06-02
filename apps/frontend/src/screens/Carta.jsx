@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { api } from '../lib/api.js';
-import { validarNombreProducto, esNombreCodigo } from '../lib/productName.js';
+import { validarNombreProducto, esNombreInvalido } from '../lib/productName.js';
 
 const money = (n) => '$' + Number(n).toLocaleString('es-CL');
 const CAT_ORDER = ['POLLO', 'COMBOS', 'COLACIONES', 'PAPAS', 'SNACKS', 'BEBIDAS'];
@@ -132,12 +132,12 @@ export default function Carta({ role }) {
                       : <div className="w-10 h-10 rounded-lg bg-zinc-100 flex items-center justify-center text-zinc-300">🍗</div>}
                     <div>
                       <div className="font-bold flex items-center gap-1.5 flex-wrap">{p.name}
-                        {/* KAN-28 (C): badge naranja si el nombre es de código. Desaparece al renombrar (load() refresca). */}
-                        {esNombreCodigo(p.name) && (
+                        {/* KAN-28 (C): chip naranja si el nombre es inválido. Desaparece al renombrar (load() refresca). */}
+                        {esNombreInvalido(p.name) && (
                           <button onClick={() => setRenameFor(p)}
                             title="Este producto aparece con código en la grilla de venta. Edita el nombre para que sea descriptivo."
                             className="text-[10px] font-bold bg-orange-100 text-orange-700 hover:bg-orange-200 px-1.5 py-0.5 rounded-full">
-                            ⚠️ Nombre de código
+                            ⚠️ Nombre inválido
                           </button>
                         )}
                         {p.in_catalog === false && <span className="text-[10px] font-bold bg-zinc-200 text-zinc-500 px-1.5 py-0.5 rounded">oculto</span>}

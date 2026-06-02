@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
-import { esNombreCodigo } from '../lib/productName.js';
+import { esNombreInvalido } from '../lib/productName.js';
 import { recordSale, flushQueue } from '../lib/offlineStore.js';
 import { buildCustomerReceiptHTML, buildKitchenTicketHTML, whatsappUrl } from '../lib/receipt.js';
 import { openPrint } from '../lib/print.js';
@@ -177,21 +177,21 @@ function ProductSale({ onSold }) {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {visible.map((p) => {
             const qc = qtyInCart(p.id);
-            // KAN-28 (B): advierte si el nombre parece un código interno. Sigue siendo seleccionable.
-            const esCodigo = esNombreCodigo(p.name);
-            const aviso = '⚠️ Este producto tiene un nombre de código interno. Edítalo en Carta antes de venderlo.';
+            // KAN-28 (B): marca en amarillo si el nombre es de código/ inválido. Sigue siendo seleccionable.
+            const invalido = esNombreInvalido(p.name);
+            const aviso = 'Este producto tiene un nombre de código. Edítalo en Carta';
             return (
-              <button key={p.id} onClick={() => tapProduct(p)} title={esCodigo ? aviso : undefined}
-                style={esCodigo ? { backgroundColor: '#FFF9C4' } : undefined}
-                className={`text-zinc-800 border-2 rounded-2xl overflow-hidden text-left active:scale-95 transition relative ${esCodigo ? 'border-amber-400 hover:border-amber-500' : 'bg-white border-zinc-200 hover:border-cartel'}`}>
+              <button key={p.id} onClick={() => tapProduct(p)} title={invalido ? aviso : undefined}
+                style={invalido ? { backgroundColor: '#FFF9C4' } : undefined}
+                className={`text-zinc-800 border-2 rounded-2xl overflow-hidden text-left active:scale-95 transition relative ${invalido ? 'border-amber-400 hover:border-amber-500' : 'bg-white border-zinc-200 hover:border-cartel'}`}>
                 {qc > 0 && <span className="absolute top-1 right-1 z-10 bg-cartel text-white text-xs font-black rounded-full w-6 h-6 flex items-center justify-center">{qc}</span>}
                 {p.has_modifiers && <span className="absolute top-1 left-1 z-10 bg-amber-500 text-white text-[9px] font-bold rounded px-1">opciones</span>}
-                {esCodigo && <span title={aviso} className="absolute bottom-[58px] left-1 z-10 bg-amber-400 text-amber-900 text-[10px] font-black rounded px-1.5 py-0.5 shadow">⚠️ código</span>}
+                {invalido && <span title={aviso} className="absolute bottom-[58px] left-1 z-10 bg-amber-400 text-amber-900 text-[10px] font-black rounded px-1.5 py-0.5 shadow">⚠️ código</span>}
                 {p.image_url
                   ? <img src={p.image_url} alt="" className="w-full h-20 object-cover bg-zinc-100" onError={(e) => { e.target.style.display = 'none'; }} />
                   : <div className="w-full h-20 bg-zinc-100 flex items-center justify-center text-3xl">🍗</div>}
                 <div className="p-2">
-                  <div className={`text-xs font-black leading-tight line-clamp-2 ${esCodigo ? 'text-amber-900' : ''}`}>{esCodigo && <span aria-hidden>⚠️ </span>}{p.name}</div>
+                  <div className={`text-xs font-black leading-tight line-clamp-2 ${invalido ? 'text-amber-900' : ''}`}>{invalido && <span aria-hidden>⚠️ </span>}{p.name}</div>
                   <div className="text-cartel mt-1 font-bold text-sm">{money(p.price)}</div>
                 </div>
               </button>
