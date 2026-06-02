@@ -14,8 +14,8 @@ CREATE TABLE IF NOT EXISTS users (
   username        TEXT NOT NULL UNIQUE,
   password_hash   TEXT NOT NULL,                    -- argon2/bcrypt
   full_name       TEXT NOT NULL,
-  role            TEXT NOT NULL CHECK (role IN ('CAJERO','PREPARADOR','GERENCIA')),
-  otp_secret      TEXT,                             -- secreto TOTP (solo GERENCIA)
+  role            TEXT NOT NULL,                    -- validado por catálogo en código (src/config/roles.js)
+  otp_secret      TEXT,                             -- secreto TOTP (roles administradores)
   is_active       INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0,1)),
   created_at      TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- a cada módulo. `permission` es una clave de módulo (ver services/permissions).
 -- ----------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS role_permissions (
-  role            TEXT NOT NULL CHECK (role IN ('CAJERO','PREPARADOR','GERENCIA')),
+  role            TEXT NOT NULL,                    -- validado por catálogo en código (src/config/roles.js)
   permission      TEXT NOT NULL,
   allowed         INTEGER NOT NULL DEFAULT 0 CHECK (allowed IN (0,1)),
   PRIMARY KEY (role, permission)

@@ -17,7 +17,13 @@ export async function api(path, { method = 'GET', body, otp } = {}) {
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { status: res.status, data });
+  if (!res.ok) {
+    // Sesión vencida/ausente: notificar globalmente para cerrar sesión limpio.
+    if (res.status === 401 && ['TOKEN_AUSENTE', 'TOKEN_INVALIDO', 'NO_AUTENTICADO'].includes(data.error)) {
+      window.dispatchEvent(new CustomEvent('session-expired', { detail: { reason: 'expired' } }));
+    }
+    throw Object.assign(new Error(data.error || res.statusText), { status: res.status, data });
+  }
   return data;
 }
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export default function Login({ onLogin }) {
+export default function Login({ onLogin, notice }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -29,6 +29,7 @@ export default function Login({ onLogin }) {
           <img src="/logo.jpeg" alt="El Cartel de los Pollos" className="w-56 mx-auto rounded-xl" />
           <p className="text-ink-mute text-sm mt-3">Sistema de gestión y POS</p>
         </div>
+        {notice && <p className="text-center text-sm mb-4 bg-amber-50 text-amber-700 rounded-xl py-2 px-3 font-semibold">{notice}</p>}
         <label className="block text-sm font-bold text-slate-600 mb-1">Usuario</label>
         <input autoFocus value={username} onChange={(e) => setUsername(e.target.value)} className="field mb-4 text-lg" />
         <label className="block text-sm font-bold text-slate-600 mb-1">Contraseña</label>

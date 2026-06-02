@@ -1,8 +1,22 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
+import { ROLES as ROLE_CATALOG, roleLabel } from '../config/roles.js';
 
-const ROLES = ['CAJERO', 'PREPARADOR', 'GERENCIA'];
-const roleColor = { GERENCIA: 'bg-cartel/10 text-cartel', CAJERO: 'bg-blue-100 text-blue-700', PREPARADOR: 'bg-amber-100 text-amber-700' };
+const ROLES = ROLE_CATALOG.map((r) => r.key);
+const ROLE_HINT = {
+  CAJERO: 'Vende, cobra y opera la caja.',
+  SUPERVISOR: 'Cajero + anula ventas, registra gastos y ve reportes.',
+  PREPARADOR: 'Cocina: despacho, predicción, mermas, inventario y recetas.',
+  DESPACHO: 'Tablero de despacho y entregas.',
+  GERENCIA: 'Acceso total al negocio.',
+  ADMIN: 'Acceso total + permisos y auditoría.',
+};
+const roleHint = (r) => ROLE_HINT[r] || '';
+const roleColor = {
+  GERENCIA: 'bg-cartel/10 text-cartel', ADMIN: 'bg-purple-100 text-purple-700',
+  SUPERVISOR: 'bg-indigo-100 text-indigo-700', CAJERO: 'bg-blue-100 text-blue-700',
+  PREPARADOR: 'bg-amber-100 text-amber-700', DESPACHO: 'bg-teal-100 text-teal-700',
+};
 
 // Gestión de usuarios: crear, editar rol/estado, resetear clave.
 export default function Usuarios() {
@@ -17,8 +31,11 @@ export default function Usuarios() {
   function flash(m) { setToast(m); setTimeout(() => setToast(''), 2500); }
   function handleErr(e) {
     setError(e.message === 'USUARIO_DUPLICADO' ? 'Ese usuario ya existe'
-      : e.message === 'ULTIMA_GERENCIA' ? 'No puedes dejar el sistema sin gerencia activa'
-      : e.message === 'CLAVE_CORTA' ? 'La clave debe tener al menos 4 caracteres' : e.message);
+      : e.message === 'ULTIMA_GERENCIA' ? 'No puedes dejar el sistema sin un administrador activo'
+      : e.message === 'ROL_NO_DISPONIBLE' ? 'Ese rol aún no está disponible (falta migración de roles)'
+      : e.message === 'CLAVE_CORTA' ? 'La clave debe tener al menos 4 caracteres'
+      : e.message === 'USUARIO_INVALIDO' ? 'Usuario inválido (mín. 3, solo letras/números)'
+      : e.message);
   }
 
   async function create(body) {
@@ -65,7 +82,7 @@ export default function Usuarios() {
             </div>
             <div className="flex items-center gap-2">
               <select value={u.role} onChange={(e) => update(u.id, { role: e.target.value })} className={`text-xs font-bold rounded-lg px-2 py-1.5 ${roleColor[u.role] || 'bg-slate-100'}`}>
-                {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                {ROLES.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
               </select>
               <button onClick={() => update(u.id, { is_active: !u.is_active })} title={u.is_active ? 'Desactivar' : 'Activar'}
                 className={`w-11 h-6 rounded-full relative transition ${u.is_active ? 'bg-emerald-500' : 'bg-slate-300'}`}>
@@ -102,9 +119,10 @@ function NewUser({ onSave }) {
       <div className="grid sm:grid-cols-2 gap-2">
         <input placeholder="Nombre completo" value={f.full_name} onChange={set('full_name')} className="field" />
         <input placeholder="Usuario (sin espacios)" value={f.username} onChange={set('username')} className="field" />
-        <select value={f.role} onChange={set('role')} className="field">{ROLES.map((r) => <option key={r} value={r}>{r}</option>)}</select>
-        <input type="password" placeholder="Clave" value={f.password} onChange={set('password')} className="field" />
+        <select value={f.role} onChange={set('role')} className="field">{ROLES.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}</select>
+        <input type="password" placeholder="Clave (mín. 4)" value={f.password} onChange={set('password')} className="field" />
       </div>
+      <p className="text-xs text-ink-mute px-1">{ROLE_CATALOG.find((r) => r.key === f.role)?.kind === 'ADMIN' ? '🔒 Rol administrador: recibirá un secreto OTP.' : 'Rol operativo.'} {roleHint(f.role)}</p>
       <button onClick={() => onSave({ ...f, username: f.username.trim(), full_name: f.full_name.trim() })} className="w-full btn-pos bg-cartel text-white">Crear usuario</button>
     </div>
   );

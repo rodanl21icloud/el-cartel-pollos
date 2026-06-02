@@ -24,6 +24,7 @@ import { bankSummary, bankMovements, addBankMovement, reconcileMovement, reconci
 import { listUsers, createUser, updateUser, resetPassword } from './controllers/users.js';
 import { listDispatch, updateDispatchStatus } from './controllers/dispatch.js';
 import { getPublicCatalog } from './controllers/publicCatalog.js';
+import { listAudit, auditActions } from './controllers/audit.js';
 
 const app = express();
 // Detrás del proxy de Render/PaaS: req.ip refleja la IP real del cliente
@@ -81,7 +82,7 @@ app.post('/api/sales/sync', requirePermission('pos.sell'), verifyHmac, syncSale)
 // Listado de ventas (transacciones) + comprobante (imprimir / reenviar)
 app.get('/api/sales', requirePermission('pos.sell'), listSales);
 app.get('/api/sales/:id/receipt', getReceipt);
-app.post('/api/sales/:id/void', requirePermission('reports.view'), voidSale);
+app.post('/api/sales/:id/void', requirePermission('sales.void'), voidSale);
 
 // Datos del negocio (comprobantes)
 app.get('/api/settings', getSettings);
@@ -154,6 +155,10 @@ app.put('/api/users/:id', requirePermission('permissions.manage'), updateUser);
 app.post('/api/users/:id/password', requirePermission('permissions.manage'), resetPassword);
 
 // Administración de permisos (matriz rol×módulo). PUT también exige OTP.
+// Auditoría / actividad (solo lectura)
+app.get('/api/audit', requirePermission('audit.view'), listAudit);
+app.get('/api/audit/actions', requirePermission('audit.view'), auditActions);
+
 app.get('/api/permissions', requirePermission('permissions.manage'), getPermissions);
 app.put('/api/permissions', requirePermission('permissions.manage'), requireOtpForMutation, updatePermission);
 

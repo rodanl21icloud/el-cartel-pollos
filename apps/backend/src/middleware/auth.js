@@ -56,8 +56,8 @@ export async function requireOtpForMutation(req, res, next) {
   if (!WRITE_METHODS.has(req.method)) return next();
   if (!req.user) return res.status(401).json({ error: 'NO_AUTENTICADO' });
 
-  // La gerencia opera sin token de excepción.
-  if (req.user.role === 'GERENCIA') return next();
+  // Gerencia/Admin operan sin token de excepción.
+  if (req.user.role === 'GERENCIA' || req.user.role === 'ADMIN') return next();
 
   const otp = req.headers['x-management-otp'];
   if (!otp) {
@@ -75,7 +75,7 @@ export async function requireOtpForMutation(req, res, next) {
   const db = getDb();
   const { rows } = await db.execute({
     sql: `SELECT id, otp_secret FROM users
-          WHERE role = 'GERENCIA' AND is_active = 1 AND otp_secret IS NOT NULL`,
+          WHERE role IN ('GERENCIA','ADMIN') AND is_active = 1 AND otp_secret IS NOT NULL`,
     args: [],
   });
 

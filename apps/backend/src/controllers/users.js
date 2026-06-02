@@ -7,8 +7,10 @@ import bcrypt from 'bcryptjs';
 import { authenticator } from 'otplib';
 import { getDb } from '../db.js';
 import { writeAudit } from '../services/audit.js';
+import { ROLE_KEYS } from '../config/roles.js';
 
-const ROLES = ['CAJERO', 'PREPARADOR', 'GERENCIA'];
+const ROLES = ROLE_KEYS;
+const OTP_ROLES = new Set(['GERENCIA', 'ADMIN']); // roles con secreto TOTP para mutaciones sensibles
 
 /** GET /api/users */
 export async function listUsers(_req, res) {
@@ -31,7 +33,7 @@ export async function createUser(req, res) {
 
   const db = getDb();
   const hash = await bcrypt.hash(String(password), 10);
-  const otp = role === 'GERENCIA' ? authenticator.generateSecret() : null;
+  const otp = OTP_ROLES.has(role) ? authenticator.generateSecret() : null;
   const id = randomUUID();
   try {
     await db.execute({
@@ -40,6 +42,7 @@ export async function createUser(req, res) {
     });
   } catch (e) {
     if (String(e.message).includes('UNIQUE')) return res.status(409).json({ error: 'USUARIO_DUPLICADO' });
+    if (/CHECK|constraint/i.test(String(e.message))) return res.status(409).json({ error: 'ROL_NO_DISPONIBLE', detail: 'Ejecuta la migración de roles (migrate-roles.mjs).' });
     throw e;
   }
   await writeAudit({ userId: req.user.id, action: 'USER_CREATE', entity: 'users', entityId: id, severity: 'INFO', ip: req.ip, metadata: { username, role } });
@@ -57,10 +60,14 @@ export async function updateUser(req, res) {
   const cur = (await db.execute({ sql: `SELECT * FROM users WHERE id = ?`, args: [id] })).rows[0];
   if (!cur) return res.status(404).json({ error: 'USUARIO_NO_ENCONTRADO' });
 
-  // Anti-lockout: no dejar el sistema sin gerencia activa.
-  const quita = (role && role !== 'GERENCIA' && cur.role === 'GERENCIA') || (is_active === false && cur.role === 'GERENCIA');
+  // Anti-lockout: no dejar el sistema sin un administrador (gerencia/admin) activo.
+  const wasAdmin = OTP_ROLES.has(cur.role);
+  const becomesNonAdmin = role && !OTP_ROLES.has(role);
+  const quita = wasAdmin && (becomesNonAdmin || is_active === false);
   if (quita) {
-    const otros = (await db.execute({ sql: `SELECT COUNT(*) n FROM users WHERE role='GERENCIA' AND is_active=1 AND id <> ?`, args: [id] })).rows[0].n;
+    const otros = (await db.execute({
+      sql: `SELECT COUNT(*) n FROM users WHERE role IN ('GERENCIA','ADMIN') AND is_active=1 AND id <> ?`, args: [id],
+    })).rows[0].n;
     if (Number(otros) === 0) return res.status(409).json({ error: 'ULTIMA_GERENCIA' });
   }
 
@@ -69,10 +76,10 @@ export async function updateUser(req, res) {
     role: role || cur.role,
     is_active: is_active != null ? (is_active ? 1 : 0) : cur.is_active,
   };
-  // Si pasa a GERENCIA y no tiene OTP, generarlo.
+  // Si pasa a un rol administrador y no tiene OTP, generarlo.
   let newOtp = null;
   let otpSql = '', otpArgs = [];
-  if (next.role === 'GERENCIA' && !cur.otp_secret) { newOtp = authenticator.generateSecret(); otpSql = ', otp_secret = ?'; otpArgs = [newOtp]; }
+  if (OTP_ROLES.has(next.role) && !cur.otp_secret) { newOtp = authenticator.generateSecret(); otpSql = ', otp_secret = ?'; otpArgs = [newOtp]; }
 
   await db.execute({
     sql: `UPDATE users SET full_name=?, role=?, is_active=?${otpSql}, updated_at=datetime('now') WHERE id=?`,

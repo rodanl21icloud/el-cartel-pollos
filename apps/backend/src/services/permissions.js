@@ -3,30 +3,41 @@
 // rol×permiso. Cacheado en memoria (invalidado al actualizar).
 // ============================================================
 import { getDb } from '../db.js';
+import { ROLES, ROLE_KEYS } from '../config/roles.js';
 
 // Catálogo de módulos/permisos. La UI lo usa para dibujar la matriz.
+// `group` agrupa por área para la pantalla de Roles y permisos.
 export const PERMISSIONS = [
   { key: 'pos.sell',           label: 'Vender en POS',            group: 'Operación' },
+  { key: 'sales.void',         label: 'Anular ventas',            group: 'Operación' },
+  { key: 'cash.operate',       label: 'Abrir/cerrar caja',        group: 'Operación' },
   { key: 'dispatch.manage',    label: 'Tablero de despacho',      group: 'Operación' },
   { key: 'forecast.view',      label: 'Ver predicción de horno',  group: 'Operación' },
   { key: 'expenses.manage',    label: 'Registrar gastos',         group: 'Operación' },
-  { key: 'cash.operate',       label: 'Abrir/cerrar caja',        group: 'Operación' },
   { key: 'inventory.merma',    label: 'Registrar mermas',         group: 'Inventario' },
   { key: 'inventory.manage',   label: 'Gestionar insumos',        group: 'Inventario' },
   { key: 'recipes.manage',     label: 'Gestionar recetas',        group: 'Catálogo' },
   { key: 'menu.manage',        label: 'Gestionar carta',          group: 'Catálogo' },
-  { key: 'reports.view',       label: 'Ver reportes y P&L',       group: 'Gerencia' },
-  { key: 'settings.manage',    label: 'Editar datos del negocio', group: 'Gerencia' },
-  { key: 'permissions.manage', label: 'Administrar permisos',     group: 'Gerencia' },
+  { key: 'reports.view',       label: 'Ver reportes y P&L',       group: 'Finanzas' },
+  { key: 'settings.manage',    label: 'Editar datos del negocio', group: 'Administración' },
+  { key: 'audit.view',         label: 'Ver auditoría/actividad',  group: 'Administración' },
+  { key: 'permissions.manage', label: 'Administrar permisos',     group: 'Administración' },
 ];
 const VALID = new Set(PERMISSIONS.map((p) => p.key));
+const ALL = PERMISSIONS.map((p) => p.key);
 
-// Defaults por rol (se siembran si la matriz está vacía).
+// Defaults por rol (least-privilege). Se siembran si la matriz está vacía
+// y se completan al agregar roles/permisos vía scripts/migrate-perms.mjs.
 export const DEFAULTS = {
-  GERENCIA: PERMISSIONS.map((p) => p.key), // todo
-  CAJERO: ['pos.sell', 'dispatch.manage', 'forecast.view', 'expenses.manage', 'cash.operate', 'inventory.merma'],
-  PREPARADOR: ['dispatch.manage', 'forecast.view', 'inventory.merma'],
+  CAJERO:     ['pos.sell', 'cash.operate', 'dispatch.manage', 'forecast.view', 'inventory.merma'],
+  SUPERVISOR: ['pos.sell', 'cash.operate', 'dispatch.manage', 'forecast.view', 'inventory.merma', 'sales.void', 'expenses.manage', 'reports.view'],
+  PREPARADOR: ['dispatch.manage', 'forecast.view', 'inventory.merma', 'inventory.manage', 'recipes.manage'],
+  DESPACHO:   ['dispatch.manage', 'forecast.view'],
+  GERENCIA:   ALL, // dueño/a: todo el negocio
+  ADMIN:      ALL, // administrador del sistema: todo
 };
+// Roles que conservan la administración de permisos pase lo que pase (anti-lockout).
+const SUPERADMINS = new Set(['GERENCIA', 'ADMIN']);
 
 let _cache = null; // { 'ROLE:perm': true }
 
@@ -59,22 +70,26 @@ export function invalidateCache() { _cache = null; }
 
 /** ¿El rol tiene el permiso? */
 export async function hasPermission(role, permission) {
-  if (role === 'GERENCIA' && permission === 'permissions.manage') return true; // salvaguarda
+  // Salvaguarda: gerencia/admin nunca pierden la administración de permisos.
+  if (SUPERADMINS.has(role) && permission === 'permissions.manage') return true;
   const db = getDb();
   const cache = _cache || (await loadCache(db));
   return !!cache[`${role}:${permission}`];
 }
 
-/** Matriz completa para la UI de administración. */
+/** Matriz completa para la UI de administración (data-driven desde el catálogo). */
 export async function getMatrix() {
   const db = getDb();
   if (!_cache) await loadCache(db);
-  const roles = ['CAJERO', 'PREPARADOR', 'GERENCIA'];
   return {
     permissions: PERMISSIONS,
-    roles,
-    matrix: roles.reduce((acc, role) => {
-      acc[role] = PERMISSIONS.reduce((m, p) => { m[p.key] = !!_cache[`${role}:${p.key}`]; return m; }, {});
+    roles: ROLE_KEYS,
+    role_meta: ROLES,
+    matrix: ROLE_KEYS.reduce((acc, role) => {
+      acc[role] = PERMISSIONS.reduce((m, p) => {
+        m[p.key] = (SUPERADMINS.has(role) && p.key === 'permissions.manage') || !!_cache[`${role}:${p.key}`];
+        return m;
+      }, {});
       return acc;
     }, {}),
   };
@@ -82,10 +97,10 @@ export async function getMatrix() {
 
 /** Actualiza una celda (role, permission, allowed). */
 export async function setPermission(role, permission, allowed) {
-  if (!['CAJERO', 'PREPARADOR', 'GERENCIA'].includes(role)) { const e = new Error('ROL_INVALIDO'); e.status = 400; throw e; }
+  if (!ROLE_KEYS.includes(role)) { const e = new Error('ROL_INVALIDO'); e.status = 400; throw e; }
   if (!VALID.has(permission)) { const e = new Error('PERMISO_INVALIDO'); e.status = 400; throw e; }
-  // No permitir que gerencia se quite la administración de permisos (anti-lockout).
-  if (role === 'GERENCIA' && permission === 'permissions.manage' && !allowed) {
+  // No permitir que gerencia/admin se quiten la administración de permisos (anti-lockout).
+  if (SUPERADMINS.has(role) && permission === 'permissions.manage' && !allowed) {
     const e = new Error('NO_PUEDES_BLOQUEAR_GERENCIA'); e.status = 409; throw e;
   }
   const db = getDb();

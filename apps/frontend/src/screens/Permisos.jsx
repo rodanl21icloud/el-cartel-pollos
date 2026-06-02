@@ -1,5 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
+import { roleLabel } from '../config/roles.js';
+import { Spinner, ErrorState } from '../components/ui/States.jsx';
 
 // Matriz rol × módulo. Gerencia activa/desactiva el acceso de cada rol.
 export default function Permisos() {
@@ -29,8 +31,8 @@ export default function Permisos() {
     setSaving('');
   }
 
-  if (error && !data) return <p className="text-red-600 text-center mt-10">{error}</p>;
-  if (!data) return <p className="text-zinc-500 text-center mt-10">Cargando permisos…</p>;
+  if (error && !data) return <ErrorState error={error} onRetry={load} />;
+  if (!data) return <Spinner label="Cargando permisos…" />;
 
   // Agrupar permisos por "group" para legibilidad.
   const groups = {};
@@ -38,8 +40,8 @@ export default function Permisos() {
 
   return (
     <div className="max-w-3xl mx-auto bg-white rounded-2xl p-5 shadow">
-      <h2 className="font-black text-xl mb-1">Permisos por módulo</h2>
-      <p className="text-sm text-zinc-500 mb-4">Activa qué puede hacer cada rol. Los cambios aplican de inmediato.</p>
+      <h2 className="font-black text-xl mb-1">Roles y permisos</h2>
+      <p className="text-sm text-zinc-500 mb-4">Activa qué puede hacer cada rol. Los cambios aplican de inmediato y quedan en auditoría.</p>
       {error && <p className="text-red-600 font-semibold mb-3">{error}</p>}
 
       <div className="overflow-x-auto">
@@ -47,7 +49,7 @@ export default function Permisos() {
           <thead>
             <tr className="text-left border-b">
               <th className="py-2">Módulo</th>
-              {data.roles.map((r) => <th key={r} className="text-center px-2">{r}</th>)}
+              {data.roles.map((r) => <th key={r} className="text-center px-2 whitespace-nowrap text-xs">{roleLabel(r)}</th>)}
             </tr>
           </thead>
           <tbody>
