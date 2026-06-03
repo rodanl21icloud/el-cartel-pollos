@@ -13,44 +13,58 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_TTL = process.env.JWT_TTL || '12h';
 
 export async function login(req, res) {
-  const { username, password } = req.body || {};
-  if (!username || !password) {
-    return res.status(400).json({ error: 'CREDENCIALES_INCOMPLETAS' });
-  }
+  try {
+    const { username, password } = req.body || {};
+    if (!username || !password) {
+      return res.status(400).json({ error: 'CREDENCIALES_INCOMPLETAS' });
+    }
 
-  const db = getDb();
-  const { rows } = await db.execute({
-    sql: `SELECT id, username, password_hash, full_name, role, is_active
-          FROM users WHERE username = ?`,
-    args: [username],
-  });
-
-  const user = rows[0];
-  const ok = user && user.is_active && (await bcrypt.compare(password, user.password_hash));
-  if (!ok) {
-    await writeAudit({
-      userId: user?.id ?? null, action: 'LOGIN_FAIL', entity: 'users',
-      entityId: user?.id ?? null, severity: 'WARN', ip: req.ip, metadata: { username },
+    const db = getDb();
+    const { rows } = await db.execute({
+      sql: `SELECT id, username, password_hash, full_name, role, is_active FROM users WHERE username = ?`,
+      args: [username],
     });
-    return res.status(401).json({ error: 'CREDENCIALES_INVALIDAS' });
+
+    const user = rows[0];
+    const ok = user && user.is_active && (await bcrypt.compare(password, user.password_hash));
+
+    if (!ok) {
+      await writeAudit({
+        userId: user?.id ?? null,
+        action: 'LOGIN_FAIL',
+        entity: 'users',
+        entityId: user?.id ?? null,
+        severity: 'WARN',
+        ip: req.ip,
+        metadata: { username },
+      });
+      return res.status(401).json({ error: 'CREDENCIALES_INVALIDAS' });
+    }
+
+    const token = jwt.sign(
+      { sub: user.id, role: user.role, username: user.username },
+      JWT_SECRET,
+      { algorithm: 'HS256', expiresIn: JWT_TTL }
+    );
+
+    const { sessionId, key } = issueSessionKey(user.id);
+
+    await writeAudit({
+      userId: user.id,
+      action: 'LOGIN_OK',
+      entity: 'users',
+      entityId: user.id,
+      severity: 'INFO',
+      ip: req.ip,
+    });
+
+    return res.json({
+      token,
+      user: { id: user.id, name: user.full_name, role: user.role },
+      session: { id: sessionId, key },
+    });
+  } catch (err) {
+    console.error('[LOGIN ERROR]', err.message, err.stack);
+    return res.status(500).json({ error: 'ERROR_INTERNO_LOGIN', detail: err.message });
   }
-
-  const token = jwt.sign(
-    { sub: user.id, role: user.role, username: user.username },
-    JWT_SECRET, { algorithm: 'HS256', expiresIn: JWT_TTL }
-  );
-
-  // Clave de sesión para firma HMAC: se entrega SOLO aquí.
-  const { sessionId, key } = issueSessionKey(user.id);
-
-  await writeAudit({
-    userId: user.id, action: 'LOGIN_OK', entity: 'users',
-    entityId: user.id, severity: 'INFO', ip: req.ip,
-  });
-
-  return res.json({
-    token,
-    user: { id: user.id, name: user.full_name, role: user.role },
-    session: { id: sessionId, key }, // el cliente guarda `key` solo en memoria
-  });
 }
