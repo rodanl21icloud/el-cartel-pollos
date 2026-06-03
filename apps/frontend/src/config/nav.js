@@ -12,6 +12,7 @@ export const NAV = [
       { key: 'retroactiva', label: 'Venta retroactiva', icon: '🕓', perm: 'sales.backdate' },
       { key: 'cash', label: 'Caja', icon: '💵', perm: 'cash.operate' },
       { key: 'despacho', label: 'Despacho', icon: '🛵', perm: 'dispatch.manage' },
+      { key: 'kds', label: 'Cocina (KDS)', icon: '👨‍🍳', perm: 'dispatch.manage' },
       { key: 'prediccion', label: 'Predicción horno', icon: '🔮', perm: 'forecast.view' },
       { key: 'merma', label: 'Mermas', icon: '🗑️', perm: 'inventory.merma' },
     ],

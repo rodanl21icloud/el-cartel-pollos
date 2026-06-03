@@ -24,6 +24,7 @@ import Carta from './screens/Carta.jsx';
 import Cartelera from './screens/Cartelera.jsx';
 import Modificadores from './screens/Modificadores.jsx';
 import Despacho from './screens/Despacho.jsx';
+import Kds from './screens/Kds.jsx';
 import Ajustes from './screens/Ajustes.jsx';
 import Clientes from './screens/Clientes.jsx';
 import Usuarios from './screens/Usuarios.jsx';
@@ -168,6 +169,7 @@ export default function App() {
           {screen === 'ventas' && <Ventas canVoid={!!perms['sales.void']} />}
           {screen === 'retroactiva' && <VentaRetroactiva user={user} />}
           {screen === 'despacho' && <Despacho />}
+          {screen === 'kds' && <Kds />}
           {screen === 'prediccion' && <Prediccion />}
           {screen === 'clientes' && <Clientes />}
           {screen === 'gastos' && <Gastos />}

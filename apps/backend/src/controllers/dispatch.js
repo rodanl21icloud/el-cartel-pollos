@@ -15,6 +15,7 @@ export async function listDispatch(req, res) {
 
   const { rows } = await db.execute({
     sql: `SELECT s.id, s.order_number, s.dispatch_status, s.payment_method, s.total, s.sold_at,
+                 s.kind, s.note, s.delivery_address,
                  (SELECT GROUP_CONCAT(p.name || ' x' || si.qty, ', ')
                   FROM sale_items si JOIN products p ON p.id = si.product_id
                   WHERE si.sale_id = s.id) AS detalle
@@ -24,10 +25,24 @@ export async function listDispatch(req, res) {
     args: [day],
   });
 
+  // Ítems por pedido (para el KDS: cantidad, nombre y modificadores).
+  const itemsRes = await db.execute({
+    sql: `SELECT si.sale_id, p.name, si.qty, si.modifiers
+          FROM sale_items si JOIN products p ON p.id = si.product_id
+          JOIN sales s ON s.id = si.sale_id
+          WHERE s.business_day = ? AND s.status = 'CONFIRMADA'`,
+    args: [day],
+  });
+  const itemsBySale = {};
+  for (const it of itemsRes.rows) {
+    (itemsBySale[it.sale_id] ||= []).push({ name: it.name, qty: Number(it.qty), modifiers: it.modifiers || null });
+  }
+
   const orders = rows.map((r) => ({
     sale_id: r.id, order_number: r.order_number, status: r.dispatch_status,
     payment_method: r.payment_method, total: Number(r.total), sold_at: r.sold_at,
-    detalle: r.detalle || '',
+    kind: r.kind, note: r.note || null, delivery_address: r.delivery_address || null,
+    detalle: r.detalle || '', items: itemsBySale[r.id] || [],
   }));
   // Resumen por estado.
   const counts = STATES.reduce((a, s) => { a[s] = orders.filter((o) => o.status === s).length; return a; }, {});
