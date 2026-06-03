@@ -2,17 +2,20 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { getCategoryAsset } from '../lib/categoryAssets.js';
 
 // ============================================================
-// Cartelera pública tipo "digital menuboard" (KFC/McDonald's) para TV 16:9.
-// Sin login, sin interacción. Rota slides automáticamente cada 8s y refresca
-// los datos cada 60s. El lienzo es siempre 1280×720 escalado a la pantalla.
+// Cartelera pública "digital menuboard" 16:9 para TV. Rediseño TDAH-friendly:
+// UN foco por slide, pocos ítems, jerarquía brutal (precio enorme) y estrategias
+// de marketing (combo destacado, "el más pedido", cross-sell, promo, QR fuerte).
+// Mantiene: lienzo 1280×720 autoescalado, rotación 8s, refresco 60s, QR WhatsApp.
 //   /cartelera/:slug  |  /tv/:slug
 // ============================================================
 const money = (n) => '$' + Number(n || 0).toLocaleString('es-CL');
 const BASE_W = 1280, BASE_H = 720;
 const SLIDE_MS = 8000;
-const RYE = { fontFamily: "'Rye', serif" }; // tipografía western para títulos/precio destacado
+const MAX_ITEMS = 5;                 // ≤5 ítems por slide (anti sobrecarga / Hick's law)
+const RYE = { fontFamily: "'Rye', serif" };
+// 👉 Promo opcional. Deja '' para ocultar la cinta. Ej: 'SOLO HOY 2x1 EN PAPAS'.
+const PROMO = '';
 
-// Logo del negocio (ilustración a color sobre fondo blanco -> se muestra tal cual).
 function Logo({ className = 'h-10' }) {
   return (
     <img src="/logo.jpeg" alt="El Cartel de los Pollos"
@@ -21,43 +24,52 @@ function Logo({ className = 'h-10' }) {
   );
 }
 
-// Reparte categorías en `n` columnas balanceando la altura estimada (greedy).
-function distribuirColumnas(categories, n) {
-  const cols = Array.from({ length: n }, () => ({ altura: 0, cats: [] }));
-  for (const c of categories) {
-    const peso = c.items.length + 1.6; // ~1 fila por item + encabezado
-    const menor = cols.reduce((a, b) => (b.altura < a.altura ? b : a));
-    menor.cats.push(c); menor.altura += peso;
-  }
-  return cols.map((c) => c.cats);
+function Ribbon() {
+  if (!PROMO) return null;
+  return (
+    <div className="absolute top-7 -left-14 rotate-[-45deg] z-20 bg-red-600 text-white font-black text-lg tracking-wide px-16 py-1.5 shadow-xl">
+      {PROMO}
+    </div>
+  );
 }
 
-// Definición de slides. Las dos primeras son "hero" (foto grande + lista);
-// las siguientes son de columnas. La última recoge "todo lo demás".
-const SLIDE_DEFS = [
-  { layout: 'hero', cats: ['POLLO'] },
-  { layout: 'hero', cats: ['COMBOS'] },
-  { layout: 'cols', cats: ['COLACIONES', 'PAPAS', 'SNACKS'] },
-  { layout: 'cols', cats: ['BEBIDAS'] },
-];
+const num = (n) => Number(n) || 0;
+const chunk = (arr, n) => { const o = []; for (let i = 0; i < arr.length; i += n) o.push(arr.slice(i, i + n)); return o; };
 
-// Construye los slides reales a partir de las categorías recibidas:
-// salta categorías vacías/inexistentes y agrega las no contempladas al último.
+// Orden de marketing: combos primero (mayor ticket), luego estrella y complementos.
+const ORDER = ['COMBOS', 'COMBO', 'POLLO', 'PAPAS', 'COLACIONES', 'SNACKS', 'BEBIDAS'];
+const ordIdx = (n) => { const i = ORDER.indexOf(n.toUpperCase()); return i === -1 ? 99 : i; };
+
+// Línea de cross-sell/upsell según la categoría y los precios mínimos disponibles.
+function crossSell(catName, min) {
+  const u = catName.toUpperCase();
+  if (u === 'POLLO' && min.PAPAS) return `+ Papas desde ${money(min.PAPAS)} 🍟`;
+  if ((u === 'COMBOS' || u === 'COMBO')) return min.BEBIDAS ? `+ Bebida desde ${money(min.BEBIDAS)} 🥤` : 'Pollo + papas en un solo combo 💥';
+  if (u === 'PAPAS' && min.BEBIDAS) return `+ Bebida desde ${money(min.BEBIDAS)} 🥤`;
+  const c = min.COMBOS || min.COMBO;
+  return c ? `¿Hambre? Combo desde ${money(c)} 🔥` : null;
+}
+
+// Construye la lista plana de slides (1 foco c/u).
 function construirSlides(categories) {
-  const byName = Object.fromEntries(categories.map((c) => [c.name, c]));
-  const conocidas = new Set(SLIDE_DEFS.flatMap((d) => d.cats));
-  const resto = categories.filter((c) => !conocidas.has(c.name)).map((c) => c.name);
+  const cats = [...categories].filter((c) => c.items?.length).sort((a, b) => ordIdx(a.name) - ordIdx(b.name) || a.name.localeCompare(b.name));
+  const min = {}; for (const c of cats) min[c.name.toUpperCase()] = Math.min(...c.items.map((i) => num(i.price)));
 
-  return SLIDE_DEFS
-    .map((d, i) => {
-      const nombres = i === SLIDE_DEFS.length - 1 ? [...d.cats, ...resto] : d.cats; // BEBIDAS + lo demás
-      const cats = nombres.map((n) => byName[n]).filter((c) => c && c.items?.length);
-      return { layout: d.layout, cats };
-    })
-    .filter((s) => s.cats.length);
+  const slides = [];
+  // 1) COMBO DESTACADO: el combo más caro (anclaje de precio + foco único).
+  const pool = cats.filter((c) => ['COMBOS', 'COMBO'].includes(c.name.toUpperCase()));
+  const src = pool.length ? pool : cats;
+  let best = null, bestCat = null;
+  for (const c of src) for (const it of c.items) if (!best || num(it.price) > num(best.price)) { best = it; bestCat = c; }
+  if (best) slides.push({ type: 'featured', item: best, cat: bestCat, cs: crossSell(bestCat.name, min) });
+
+  // 2) Un slide por categoría, troceado a ≤5 ítems.
+  for (const c of cats) {
+    const parts = chunk(c.items, MAX_ITEMS);
+    parts.forEach((items, idx) => slides.push({ type: 'cat', cat: c, items, part: idx + 1, parts: parts.length, cs: crossSell(c.name, min) }));
+  }
+  return slides;
 }
-
-const maxPrecio = (items) => Math.max(...items.map((i) => Number(i.price) || 0));
 
 export default function PublicCartelera({ slug }) {
   const [data, setData] = useState(null);
@@ -65,24 +77,22 @@ export default function PublicCartelera({ slug }) {
   const [current, setCurrent] = useState(0);
 
   const wrapRef = useRef(null);
-  const boardRef = useRef(null);
   const bodyRef = useRef(null);
   const colsRef = useRef(null);
   const [scale, setScale] = useState(1);
   const [innerScale, setInnerScale] = useState(1);
 
-  // ── Fuente western 'Rye' (Google Fonts), inyectada una sola vez ────────
+  // Fuente western 'Rye'
   useEffect(() => {
     if (!document.getElementById('rye-font')) {
       const link = document.createElement('link');
-      link.id = 'rye-font';
-      link.rel = 'stylesheet';
+      link.id = 'rye-font'; link.rel = 'stylesheet';
       link.href = 'https://fonts.googleapis.com/css2?family=Rye&display=swap';
       document.head.appendChild(link);
     }
   }, []);
 
-  // ── Auto-refresco de datos cada 60s (igual que antes) ──────────────────
+  // Auto-refresco de datos cada 60s (igual que antes)
   useEffect(() => {
     let alive = true;
     const fetchData = () =>
@@ -91,11 +101,7 @@ export default function PublicCartelera({ slug }) {
         .then((d) => {
           if (!alive) return;
           setData(d); setError('');
-          // Precarga las imágenes de las categorías presentes para evitar flicker.
-          d.categories.forEach((c) => {
-            const asset = getCategoryAsset(c.name);
-            if (asset.image) { const img = new Image(); img.src = asset.image; }
-          });
+          d.categories.forEach((c) => { const a = getCategoryAsset(c.name); if (a.image) { const img = new Image(); img.src = a.image; } });
         })
         .catch(() => { if (alive && !data) setError('Cartelera no encontrada'); });
     fetchData();
@@ -105,30 +111,23 @@ export default function PublicCartelera({ slug }) {
 
   const slides = useMemo(() => (data ? construirSlides(data.categories) : []), [data]);
 
-  // ── Rotación automática de slides cada 8s ──────────────────────────────
+  // Rotación automática cada 8s
   useEffect(() => {
     if (slides.length <= 1) return;
     const id = setInterval(() => setCurrent((s) => (s + 1) % slides.length), SLIDE_MS);
     return () => clearInterval(id);
   }, [slides.length]);
-
-  // Si cambian los datos y el índice queda fuera de rango, lo reseteo.
   useEffect(() => { if (current >= slides.length) setCurrent(0); }, [slides.length, current]);
 
-  // ── Escalado del lienzo 16:9 + ajuste interno por slide (igual que antes,
-  //    recalculado también al cambiar de slide para que cada uno encaje) ──
+  // Escalado del lienzo 16:9 + ajuste interno por slide (igual que antes)
   useLayoutEffect(() => {
     function fit() {
       const wrap = wrapRef.current; if (!wrap) return;
       setScale(Math.min(wrap.clientWidth / BASE_W, wrap.clientHeight / BASE_H));
       const body = bodyRef.current, cols = colsRef.current;
-      if (body && cols) {
-        const avail = body.clientHeight, need = cols.scrollHeight;
-        setInnerScale(need > avail + 1 ? avail / need : 1);
-      }
+      if (body && cols) { const avail = body.clientHeight, need = cols.scrollHeight; setInnerScale(need > avail + 1 ? avail / need : 1); }
     }
-    fit();
-    window.addEventListener('resize', fit);
+    fit(); window.addEventListener('resize', fit);
     return () => window.removeEventListener('resize', fit);
   }, [data, current]);
 
@@ -142,51 +141,50 @@ export default function PublicCartelera({ slug }) {
     ? { transform: `scale(${innerScale})`, transformOrigin: 'top left', width: `${100 / innerScale}%`, height: `${100 / innerScale}%` }
     : undefined;
 
-  // QR que abre el chat de WhatsApp del negocio.
   const waDigits = (business.whatsapp || '').replace(/\D/g, '');
-  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=72x72&data=${encodeURIComponent('https://wa.me/' + waDigits)}&bgcolor=161616&color=ffffff&margin=4`;
+  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent('https://wa.me/' + waDigits)}&bgcolor=ffffff&color=0a0a0a&margin=4`;
 
   return (
     <div ref={wrapRef} className="w-screen h-screen bg-black overflow-hidden flex items-center justify-center">
-      {/* Keyframe de aparición entre slides (sin librerías externas). */}
-      <style>{`@keyframes cartelFade{from{opacity:0}to{opacity:1}}.cartel-fade{animation:cartelFade .6s ease-in-out both}`}</style>
+      <style>{`@keyframes cartelFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}.cartel-fade{animation:cartelFade .55s ease-out both}@keyframes cartelBar{from{width:0}to{width:100%}}@keyframes ringPulse{0%,100%{box-shadow:0 0 0 0 rgba(74,222,128,.7)}50%{box-shadow:0 0 0 10px rgba(74,222,128,0)}}`}</style>
 
-      {/* Lienzo fijo 16:9 escalado a la pantalla */}
-      <div ref={boardRef}
-        style={{ width: BASE_W, height: BASE_H, transform: `scale(${scale})`, transformOrigin: 'center center' }}
+      <div style={{ width: BASE_W, height: BASE_H, transform: `scale(${scale})`, transformOrigin: 'center center' }}
         className="bg-zinc-900 text-white flex flex-col shrink-0 shadow-2xl overflow-hidden">
 
-        {/* HEADER (~80px): logo del negocio + Instagram */}
+        {/* HEADER */}
         <header className="bg-cartel px-8 py-4 flex items-center justify-between shrink-0">
           <Logo className="h-12" />
           {business.instagram && <span className="text-white/90 font-bold text-lg">{business.instagram}</span>}
         </header>
 
-        {/* CONTENIDO DEL SLIDE (se remonta con key para animar la transición) */}
+        {/* CONTENIDO (1 foco por slide) */}
         <div ref={bodyRef} className="flex-1 overflow-hidden">
           <div key={current} ref={colsRef} className="cartel-fade w-full h-full" style={innerStyle}>
-            {slide.layout === 'hero'
-              ? <SlideHero cat={slide.cats[0]} />
-              : <SlideColumnas cats={slide.cats} />}
+            {slide.type === 'featured' ? <SlideFeatured slide={slide} /> : <SlideCategoria slide={slide} />}
           </div>
         </div>
 
-        {/* FOOTER: dirección | dots de slide | QR de WhatsApp */}
-        <footer className="bg-zinc-950 text-white/75 text-base px-8 py-3 flex items-center justify-between shrink-0">
-          <span className="w-1/3 truncate text-white/80 text-base">{business.address || ''}</span>
+        {/* BARRA DE PROGRESO del slide (ritmo predecible) */}
+        <div className="h-1.5 bg-white/10 shrink-0">
+          <div key={current} className="h-full bg-amber-400" style={{ animation: `cartelBar ${SLIDE_MS}ms linear forwards` }} />
+        </div>
+
+        {/* FOOTER: dirección | dots | CTA QR fuerte */}
+        <footer className="bg-zinc-950 px-8 py-3 flex items-center justify-between shrink-0">
+          <span className="w-1/3 truncate text-white/70 text-base">{business.address || ''}</span>
           <span className="w-1/3 flex items-center justify-center gap-2">
             {slides.map((_, i) => (
-              <span key={i} className={`rounded-full transition-all ${i === current ? 'w-3 h-3 bg-amber-400' : 'w-2.5 h-2.5 bg-white/30'}`} />
+              <span key={i} className={`rounded-full transition-all ${i === current ? 'w-3 h-3 bg-amber-400' : 'w-2 h-2 bg-white/25'}`} />
             ))}
           </span>
           <span className="w-1/3 flex justify-end">
             {business.whatsapp && (
               <span className="flex items-center gap-3">
-                <img src={qrSrc} alt="QR WhatsApp" className="w-14 h-14 rounded-md" style={{ imageRendering: 'pixelated' }} />
-                <span className="flex flex-col">
-                  <span className="text-green-400 font-bold text-base leading-tight">WhatsApp</span>
-                  <span className="text-white/70 text-sm">{business.whatsapp}</span>
+                <span className="text-right">
+                  <span className="block text-green-400 font-black text-xl leading-tight">Escanea y pide 📲</span>
+                  <span className="block text-white/70 text-sm">por WhatsApp · {business.whatsapp}</span>
                 </span>
+                <img src={qrSrc} alt="QR WhatsApp" className="w-16 h-16 rounded-md" style={{ imageRendering: 'pixelated', animation: 'ringPulse 2.5s ease-in-out infinite' }} />
               </span>
             )}
           </span>
@@ -196,124 +194,68 @@ export default function PublicCartelera({ slug }) {
   );
 }
 
-// ── Slide HERO: foto de categoría a la izquierda (55%) + lista grande (45%) ──
-// La imagen va LIMPIA: solo foto + overlay de gradiente (sin texto/emoji encima).
-function SlideHero({ cat }) {
+// ── Slide COMBO DESTACADO: un solo producto, foto a sangre, precio gigante ──
+function SlideFeatured({ slide }) {
+  const { item, cat, cs } = slide;
   const asset = getCategoryAsset(cat.name);
-  const max = maxPrecio(cat.items);
+  return (
+    <div className="relative h-full overflow-hidden">
+      <div className={`absolute inset-0 bg-gradient-to-br ${asset.gradient}`} />
+      {asset.image && (
+        <img src={asset.image} alt={item.name} className="absolute inset-0 w-full h-full object-cover object-center"
+          loading="eager" fetchpriority="high" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+      )}
+      <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/55 to-black/20" />
+      <Ribbon />
+      <div className="relative h-full flex flex-col justify-center px-14">
+        <span className="self-start inline-flex items-center gap-2 bg-amber-400 text-zinc-900 font-black text-2xl px-5 py-2 rounded-full mb-4 animate-pulse">🔥 COMBO DESTACADO</span>
+        <div className="text-white font-black uppercase tracking-tight leading-[0.95] max-w-[60%] line-clamp-3 drop-shadow-lg" style={{ ...RYE, fontSize: 62 }}>{item.name}</div>
+        <div className="text-amber-400 font-black tabular-nums mt-2 drop-shadow-lg" style={{ ...RYE, fontSize: 128, lineHeight: 1 }}>{money(item.price)}</div>
+        {cs && <div className="text-amber-200 font-bold text-3xl mt-4">{cs}</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── Slide de CATEGORÍA: foto (52%) + ≤5 ítems grandes (48%), 1 destacado ──
+function SlideCategoria({ slide }) {
+  const { cat, items, part, parts, cs } = slide;
+  const asset = getCategoryAsset(cat.name);
+  const max = Math.max(...items.map((i) => num(i.price)));
   return (
     <div className="h-full flex">
-      {/* Izquierda: foto limpia con overlay en gradiente para profundidad */}
-      <div className={`relative w-[55%] h-full overflow-hidden bg-gradient-to-br ${asset.gradient}`}>
+      {/* Foto + identidad de categoría */}
+      <div className={`relative w-[52%] h-full overflow-hidden bg-gradient-to-br ${asset.gradient}`}>
         {asset.image && (
-          <img src={asset.image} alt={cat.name}
-            className="absolute inset-0 w-full h-full object-cover object-center"
-            loading="eager" fetchpriority="high"
-            onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+          <img src={asset.image} alt={cat.name} className="absolute inset-0 w-full h-full object-cover object-center"
+            loading="eager" fetchpriority="high" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
         )}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
-      </div>
-
-      {/* Derecha: logo + lista de precios grande */}
-      <div className="w-[45%] h-full px-8 py-6 flex flex-col justify-center">
-        <div className="flex justify-end mb-3"><Logo className="h-14" /></div>
-        <ul>
-          {cat.items.map((p, i) => (
-            <li key={i} className="flex items-baseline gap-3 py-2.5 border-b border-white/10 last:border-0">
-              <span className="font-semibold text-white text-lg leading-snug">{p.name}</span>
-              <span className="flex-1 border-b border-dotted border-white/25 translate-y-[-4px]" />
-              <span className={`font-black text-amber-400 text-3xl tabular-nums whitespace-nowrap ${p.price === max ? 'animate-pulse' : ''}`}
-                style={p.price === max ? RYE : undefined}>
-                {money(p.price)}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  );
-}
-
-// ── Slide de COLUMNAS: una o varias categorías repartidas a lo ancho ──────
-function SlideColumnas({ cats }) {
-  // Una sola categoría grande (p.ej. BEBIDAS): logo + título + items en 2 columnas.
-  if (cats.length === 1) {
-    const c = cats[0];
-    const asset = getCategoryAsset(c.name);
-    const max = maxPrecio(c.items);
-    const mitad = Math.ceil(c.items.length / 2);
-    const columnas = [c.items.slice(0, mitad), c.items.slice(mitad)];
-    return (
-      <div className="h-full px-10 py-5 flex flex-col">
-        <div className="flex justify-end"><Logo className="h-10" /></div>
-        <h2 className="relative flex items-center justify-center gap-3 text-amber-400 font-black text-4xl uppercase tracking-wide mb-5 overflow-hidden">
-          {asset.image && (
-            <span className="absolute inset-0 opacity-10" style={{ backgroundImage: `url(${asset.image})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(2px)' }} />
-          )}
-          <span className="relative z-10">{asset.emoji}</span>
-          <span className="relative z-10" style={RYE}>{c.name}</span>
-        </h2>
-        <div className="flex-1 flex gap-12">
-          {columnas.map((items, ci) => (
-            <ul key={ci} className="flex-1">
-              {items.map((p, i) => (
-                <li key={i} className="flex items-baseline gap-3 py-2.5 border-b border-white/10">
-                  <span className="font-semibold text-white text-lg leading-snug">{p.name}</span>
-                  <span className="flex-1 border-b border-dotted border-white/25 translate-y-[-4px]" />
-                  <span className={`font-black text-amber-400 text-2xl tabular-nums whitespace-nowrap ${p.price === max ? 'animate-pulse' : ''}`}
-                    style={p.price === max ? RYE : undefined}>
-                    {money(p.price)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ))}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-black/35" />
+        <Ribbon />
+        <div className="absolute left-8 right-8 bottom-7">
+          <div className="leading-none drop-shadow-lg" style={{ fontSize: 64 }}>{asset.emoji}</div>
+          <div className="text-white font-black uppercase tracking-tight leading-none mt-1 drop-shadow-lg" style={{ ...RYE, fontSize: 60 }}>{cat.name}</div>
+          {parts > 1 && <div className="text-white/70 font-bold text-lg mt-1">{part} / {parts}</div>}
         </div>
       </div>
-    );
-  }
 
-  // Varias categorías: logo arriba + columnas (cada bloque = categoría).
-  const columnas = distribuirColumnas(cats, Math.min(3, cats.length));
-  return (
-    <div className="h-full px-10 py-5 flex flex-col">
-      <div className="flex justify-end mb-1"><Logo className="h-10" /></div>
-      <div className="flex-1 flex gap-10 items-start">
-        {columnas.map((col, ci) => (
-          <div key={ci} className="flex-1 min-w-0">
-            {col.map((c) => <BloqueCategoria key={c.name} cat={c} />)}
-          </div>
-        ))}
+      {/* Lista grande (≤5) */}
+      <div className="w-[48%] h-full px-8 py-6 flex flex-col justify-center">
+        <ul className="space-y-2.5">
+          {items.map((p, i) => {
+            const hot = num(p.price) === max && items.length > 1;
+            return (
+              <li key={i} className={`relative rounded-2xl px-4 py-3 flex items-center gap-3 ${hot ? 'bg-white/10 ring-2 ring-amber-400' : ''}`}>
+                {hot && <span className="absolute -top-3 left-4 bg-amber-400 text-zinc-900 font-black text-xs px-3 py-1 rounded-full shadow">⭐ EL MÁS PEDIDO</span>}
+                <span className="flex-1 min-w-0 font-bold text-white text-2xl leading-tight line-clamp-2">{p.name}</span>
+                <span className={`font-black text-amber-400 tabular-nums whitespace-nowrap ${hot ? 'text-5xl animate-pulse' : 'text-4xl'}`} style={RYE}>{money(p.price)}</span>
+              </li>
+            );
+          })}
+        </ul>
+        {cs && <div className="mt-5 text-center text-amber-300 font-bold text-2xl">{cs}</div>}
       </div>
     </div>
-  );
-}
-
-function BloqueCategoria({ cat }) {
-  const asset = getCategoryAsset(cat.name);
-  const max = maxPrecio(cat.items);
-  return (
-    <section className="mb-5">
-      <h2 className="relative flex items-center gap-2 text-amber-400 font-black text-2xl uppercase tracking-wide border-b-2 border-white/15 pb-1 mb-2 overflow-hidden">
-        {asset.image && (
-          <span className="absolute inset-0 opacity-10" style={{ backgroundImage: `url(${asset.image})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(2px)' }} />
-        )}
-        <span className="relative z-10">{asset.emoji}</span>
-        <span className="relative z-10" style={RYE}>{cat.name}</span>
-      </h2>
-      <ul>
-        {cat.items.map((p, i) => (
-          <li key={i} className="flex items-baseline gap-2 py-1 border-b border-white/10 last:border-0">
-            <span className="font-semibold text-white text-base leading-tight">{p.name}</span>
-            <span className="flex-1 border-b border-dotted border-white/20 translate-y-[-3px]" />
-            <span className={`font-black text-amber-400 text-xl tabular-nums whitespace-nowrap ${p.price === max ? 'animate-pulse' : ''}`}
-              style={p.price === max ? RYE : undefined}>
-              {money(p.price)}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }
 
