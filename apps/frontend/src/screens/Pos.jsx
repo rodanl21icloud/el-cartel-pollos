@@ -3,7 +3,7 @@ import { api } from '../lib/api.js';
 import { esNombreInvalido } from '../lib/productName.js';
 import { recordSale, flushQueue } from '../lib/offlineStore.js';
 import { buildCustomerReceiptHTML, buildKitchenTicketHTML, whatsappUrl } from '../lib/receipt.js';
-import { openPrint } from '../lib/print.js';
+import { openPrint } from '../lib/print.js'; import { getCategoryAsset } from '../lib/categoryAssets.js';
 
 const PAYMENTS = [
   { id: 'EFECTIVO', label: '💵 Efectivo', color: 'bg-green-600' },
@@ -174,11 +174,11 @@ function ProductSale({ onSold }) {
             </button>
           ))}
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2.5 p-1">
           {visible.map((p) => {
             const qc = qtyInCart(p.id);
             // KAN-28 (B): marca en amarillo si el nombre es de código/ inválido. Sigue siendo seleccionable.
-            const invalido = esNombreInvalido(p.name);
+            const asset = getCategoryAsset(p.category);             const invalido = esNombreInvalido(p.name);
             const aviso = 'Este producto tiene un nombre de código. Edítalo en Carta';
             return (
               <button key={p.id} onClick={() => tapProduct(p)} title={invalido ? aviso : undefined}
@@ -189,7 +189,7 @@ function ProductSale({ onSold }) {
                 {invalido && <span title={aviso} className="absolute bottom-[58px] left-1 z-10 bg-amber-400 text-amber-900 text-[10px] font-black rounded px-1.5 py-0.5 shadow">⚠️ código</span>}
                 {p.image_url
                   ? <img src={p.image_url} alt="" className="w-full h-20 object-cover bg-zinc-100" onError={(e) => { e.target.style.display = 'none'; }} />
-                  : <div className="w-full h-20 bg-zinc-100 flex items-center justify-center text-3xl">🍗</div>}
+                  : <div className={`w-full h-20 bg-gradient-to-br ${asset.gradient} flex items-center justify-center text-3xl">🍗</div>}
                 <div className="p-2">
                   <div className={`text-xs font-black leading-tight line-clamp-2 ${invalido ? 'text-amber-900' : ''}`}>{invalido && <span aria-hidden>⚠️ </span>}{p.name}</div>
                   <div className="text-cartel mt-1 font-bold text-sm">{money(p.price)}</div>
