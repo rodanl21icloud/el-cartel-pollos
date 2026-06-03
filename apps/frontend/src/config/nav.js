@@ -19,6 +19,7 @@ export const NAV = [
   {
     section: 'Catálogo', kind: 'OPERACION', items: [
       { key: 'carta', label: 'Carta', icon: '🍗', perm: 'menu.manage' },
+      { key: 'cartelera', label: 'Cartelera', icon: '📋', perm: 'menu.manage' },
       { key: 'modificadores', label: 'Modificadores', icon: '✨', perm: 'menu.manage' },
       { key: 'inventario', label: 'Inventario', icon: '📦', perm: 'inventory.manage' },
     ],

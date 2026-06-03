@@ -21,6 +21,7 @@ import VentaRetroactiva from './screens/VentaRetroactiva.jsx';
 import Permisos from './screens/Permisos.jsx';
 import Inventario from './screens/Inventario.jsx';
 import Carta from './screens/Carta.jsx';
+import Cartelera from './screens/Cartelera.jsx';
 import Modificadores from './screens/Modificadores.jsx';
 import Despacho from './screens/Despacho.jsx';
 import Ajustes from './screens/Ajustes.jsx';
@@ -180,6 +181,7 @@ export default function App() {
           {screen === 'flujo' && <Flujo role={user.role} />}
           {screen === 'pnl' && <Pnl role={user.role} />}
           {screen === 'carta' && <Carta role={user.role} />}
+          {screen === 'cartelera' && <Cartelera />}
           {screen === 'modificadores' && <Modificadores role={user.role} />}
           {screen === 'ajustes' && <Ajustes role={user.role} />}
           {screen === 'usuarios' && <Usuarios />}
