@@ -11,18 +11,16 @@ export const CATEGORY_ASSETS = {
     gradient: 'from-orange-500 to-red-600',
     bgColor: 'bg-orange-50',
     textColor: 'text-orange-700',
-    // Pollo ENTERO asado dorado con hierbas. Icónico para "pollos a las brasas".
-    // (La URL original 1598103442097 quedó 404 en Unsplash; reemplazada.)
-    image: 'https://images.unsplash.com/photo-1594221708779-94832f4320d1?w=800&q=85',
+    // Imagen propia: pollo entero al spiedo, fondo negro (apps/frontend/public).
+    image: '/hero-pollo.jpg',
   },
   COMBOS: {
     emoji: '🥡',
     gradient: 'from-yellow-500 to-orange-500',
     bgColor: 'bg-yellow-50',
     textColor: 'text-yellow-700',
-    // Pollo frito dorado en canasta, fondo oscuro de madera. Máximo contraste.
-    // (La URL propuesta 1598866594240 daba 404; reemplazada por esta verificada.)
-    image: 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=800&q=85',
+    // Imagen propia: pollo + papas bastón sobre pizarra negra (apps/frontend/public).
+    image: '/hero-combos.jpg',
   },
   COLACIONES: {
     emoji: '🥗',
@@ -37,9 +35,8 @@ export const CATEGORY_ASSETS = {
     gradient: 'from-yellow-400 to-amber-500',
     bgColor: 'bg-yellow-50',
     textColor: 'text-yellow-700',
-    // Papas fritas doradas con kétchup. El ámbar/naranja es el color que más
-    // activa el apetito. By Louis Hansel (fotógrafo gastronómico profesional).
-    image: 'https://images.unsplash.com/photo-1518013431117-eb1465fa5752?w=800&q=85',
+    // Imagen propia: montaña de papas bastón doradas, luz ámbar (apps/frontend/public).
+    image: '/hero-papas.jpg',
   },
   SNACKS: {
     emoji: '🍿',
