@@ -27,6 +27,7 @@ export async function api(path, { method = 'GET', body, otp } = {}) {
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
+    // Sesión vencida/ausente: notificar globalmente para cerrar sesión limpio.
     if (res.status === 401 && ['TOKEN_AUSENTE', 'TOKEN_INVALIDO', 'NO_AUTENTICADO'].includes(data.error)) {
       window.dispatchEvent(new CustomEvent('session-expired', { detail: { reason: 'expired' } }));
     }
@@ -34,4 +35,15 @@ export async function api(path, { method = 'GET', body, otp } = {}) {
     throw Object.assign(new Error(msg), { status: res.status, data });
   }
   return data;
+}
+
+export async function apiDownload(path, filename) {
+  const token = getToken();
+  const res = await fetch(`${BASE}/api${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) throw new Error('No se pudo generar el reporte');
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
