@@ -12,30 +12,26 @@ export async function api(path, { method = 'GET', body, otp } = {}) {
   if (token) headers.Authorization = `Bearer ${token}`;
   if (otp) headers['x-management-otp'] = otp; // requerido para PUT/DELETE de cajero/preparador
 
-  const res = await fetch(`${BASE}/api${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let res;
+  try {
+    res = await fetch(`${BASE}/api${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch (networkErr) {
+    // Error de red (servidor caído, sin conexión, CORS bloqueado, etc.)
+    throw Object.assign(new Error(`Sin conexión: ${networkErr.message}`), { status: 0 });
+  }
+
   const data = await res.json().catch(() => ({}));
+
   if (!res.ok) {
-    // Sesión vencida/ausente: notificar globalmente para cerrar sesión limpio.
     if (res.status === 401 && ['TOKEN_AUSENTE', 'TOKEN_INVALIDO', 'NO_AUTENTICADO'].includes(data.error)) {
       window.dispatchEvent(new CustomEvent('session-expired', { detail: { reason: 'expired' } }));
     }
-    throw Object.assign(new Error(data.error || res.statusText), { status: res.status, data });
+    const msg = data.error || data.message || data.detail || `HTTP ${res.status}`;
+    throw Object.assign(new Error(msg), { status: res.status, data });
   }
   return data;
-}
-
-// Descarga autenticada (CSV/binario): añade el JWT y dispara el guardado del archivo.
-export async function apiDownload(path, filename) {
-  const token = getToken();
-  const res = await fetch(`${BASE}/api${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-  if (!res.ok) throw new Error('No se pudo generar el reporte');
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
