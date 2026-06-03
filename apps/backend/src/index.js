@@ -53,7 +53,7 @@ app.get('/api/public/catalog/:slug', getPublicCatalog);
 // --- Protegido: JWT en todo /api. El OTP de gerencia se aplica de forma
 // SELECTIVA solo a operaciones sensibles del catálogo/permisos (no a las
 // acciones operativas como avanzar el despacho o editar una receta). ---
-app.use('/api', requireAuth);
+// [KAN-16] Rate limit global: 300 req/min por IP app.use('/api', rateLimit({ windowMs: 60_000, max: 300, standardHeaders: true, legacyHeaders: false })); app.use('/api', requireAuth);
 
 // Permisos efectivos del usuario actual (para que la UI muestre/oculte).
 app.get('/api/permissions/me', myPermissions);
