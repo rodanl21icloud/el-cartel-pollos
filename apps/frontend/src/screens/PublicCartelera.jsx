@@ -67,7 +67,15 @@ export default function PublicCartelera({ slug }) {
     const fetchData = () =>
       fetch(`/api/public/catalog/${encodeURIComponent(slug)}`)
         .then((r) => (r.ok ? r.json() : Promise.reject(new Error('no'))))
-        .then((d) => { if (alive) { setData(d); setError(''); } })
+        .then((d) => {
+          if (!alive) return;
+          setData(d); setError('');
+          // Precarga las imágenes de las categorías presentes para evitar flicker.
+          d.categories.forEach((c) => {
+            const asset = getCategoryAsset(c.name);
+            if (asset.image) { const img = new Image(); img.src = asset.image; }
+          });
+        })
         .catch(() => { if (alive && !data) setError('Cartelera no encontrada'); });
     fetchData();
     const id = setInterval(fetchData, 60_000);
@@ -159,21 +167,25 @@ function SlideHero({ cat, badge }) {
   const max = maxPrecio(cat.items);
   return (
     <div className="h-full flex">
-      {/* Izquierda: foto con overlay + emoji + nombre */}
+      {/* Izquierda: foto con overlay en gradiente + emoji + nombre */}
       <div className={`relative w-[55%] h-full overflow-hidden bg-gradient-to-br ${asset.gradient}`}>
         {asset.image && (
-          <img src={asset.image} alt="" className="absolute inset-0 w-full h-full object-cover"
+          <img src={asset.image} alt={cat.name}
+            className="absolute inset-0 w-full h-full object-cover object-center"
+            loading="eager" fetchpriority="high"
             onError={(e) => { e.currentTarget.style.display = 'none'; }} />
         )}
-        <div className="absolute inset-0 bg-black/60" />
+        {/* Doble overlay: oscurece el lado del texto, se aclara hacia el centro */}
+        <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
         {badge && (
           <div className="absolute top-6 left-6 bg-amber-400 text-zinc-900 font-black px-5 py-2 rounded-full text-lg shadow-lg animate-pulse">
             {badge}
           </div>
         )}
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
-          <div className="leading-none" style={{ fontSize: 110 }}>{asset.emoji}</div>
-          <div className="font-black text-6xl text-white uppercase tracking-tight mt-3 drop-shadow-lg">{cat.name}</div>
+          <div className="leading-none text-[80px]" style={{ filter: 'drop-shadow(0 4px 16px rgba(0,0,0,0.8))' }}>{asset.emoji}</div>
+          <div className="font-black text-7xl text-white uppercase tracking-tight mt-3"
+            style={{ textShadow: '0 4px 24px rgba(0,0,0,0.9)' }}>{cat.name}</div>
         </div>
       </div>
 
@@ -206,8 +218,12 @@ function SlideColumnas({ cats }) {
     const columnas = [c.items.slice(0, mitad), c.items.slice(mitad)];
     return (
       <div className="h-full px-10 py-6 flex flex-col">
-        <h2 className="flex items-center justify-center gap-3 text-amber-400 font-black text-4xl uppercase tracking-wide mb-6">
-          <span>{asset.emoji}</span> {c.name}
+        <h2 className="relative flex items-center justify-center gap-3 text-amber-400 font-black text-4xl uppercase tracking-wide mb-6 overflow-hidden">
+          {asset.image && (
+            <span className="absolute inset-0 opacity-10" style={{ backgroundImage: `url(${asset.image})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(2px)' }} />
+          )}
+          <span className="relative z-10">{asset.emoji}</span>
+          <span className="relative z-10">{c.name}</span>
         </h2>
         <div className="flex-1 flex gap-12">
           {columnas.map((items, ci) => (
@@ -246,8 +262,12 @@ function BloqueCategoria({ cat }) {
   const max = maxPrecio(cat.items);
   return (
     <section className="mb-5">
-      <h2 className="flex items-center gap-2 text-amber-400 font-black text-2xl uppercase tracking-wide border-b-2 border-white/15 pb-1 mb-2">
-        <span>{asset.emoji}</span> {cat.name}
+      <h2 className="relative flex items-center gap-2 text-amber-400 font-black text-2xl uppercase tracking-wide border-b-2 border-white/15 pb-1 mb-2 overflow-hidden">
+        {asset.image && (
+          <span className="absolute inset-0 opacity-10" style={{ backgroundImage: `url(${asset.image})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(2px)' }} />
+        )}
+        <span className="relative z-10">{asset.emoji}</span>
+        <span className="relative z-10">{cat.name}</span>
       </h2>
       <ul>
         {cat.items.map((p, i) => (
