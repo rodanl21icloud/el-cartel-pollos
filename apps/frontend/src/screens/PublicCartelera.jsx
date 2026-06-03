@@ -10,6 +10,16 @@ import { getCategoryAsset } from '../lib/categoryAssets.js';
 const money = (n) => '$' + Number(n || 0).toLocaleString('es-CL');
 const BASE_W = 1280, BASE_H = 720;
 const SLIDE_MS = 8000;
+const RYE = { fontFamily: "'Rye', serif" }; // tipografía western para títulos/precio destacado
+
+// Logo del negocio (ilustración a color sobre fondo blanco -> se muestra tal cual).
+function Logo({ className = 'h-10' }) {
+  return (
+    <img src="/logo.jpeg" alt="El Cartel de los Pollos"
+      className={`${className} w-auto object-contain rounded-md`}
+      style={{ filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.8))' }} />
+  );
+}
 
 // Reparte categorías en `n` columnas balanceando la altura estimada (greedy).
 function distribuirColumnas(categories, n) {
@@ -25,8 +35,8 @@ function distribuirColumnas(categories, n) {
 // Definición de slides. Las dos primeras son "hero" (foto grande + lista);
 // las siguientes son de columnas. La última recoge "todo lo demás".
 const SLIDE_DEFS = [
-  { layout: 'hero', cats: ['POLLO'], badge: '⭐ POLLO ASADO AL SPIEDO' },
-  { layout: 'hero', cats: ['COMBOS'], badge: '🔥 LO MÁS PEDIDO' },
+  { layout: 'hero', cats: ['POLLO'] },
+  { layout: 'hero', cats: ['COMBOS'] },
   { layout: 'cols', cats: ['COLACIONES', 'PAPAS', 'SNACKS'] },
   { layout: 'cols', cats: ['BEBIDAS'] },
 ];
@@ -42,7 +52,7 @@ function construirSlides(categories) {
     .map((d, i) => {
       const nombres = i === SLIDE_DEFS.length - 1 ? [...d.cats, ...resto] : d.cats; // BEBIDAS + lo demás
       const cats = nombres.map((n) => byName[n]).filter((c) => c && c.items?.length);
-      return { layout: d.layout, badge: d.badge, cats };
+      return { layout: d.layout, cats };
     })
     .filter((s) => s.cats.length);
 }
@@ -60,6 +70,17 @@ export default function PublicCartelera({ slug }) {
   const colsRef = useRef(null);
   const [scale, setScale] = useState(1);
   const [innerScale, setInnerScale] = useState(1);
+
+  // ── Fuente western 'Rye' (Google Fonts), inyectada una sola vez ────────
+  useEffect(() => {
+    if (!document.getElementById('rye-font')) {
+      const link = document.createElement('link');
+      link.id = 'rye-font';
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=Rye&display=swap';
+      document.head.appendChild(link);
+    }
+  }, []);
 
   // ── Auto-refresco de datos cada 60s (igual que antes) ──────────────────
   useEffect(() => {
@@ -121,6 +142,10 @@ export default function PublicCartelera({ slug }) {
     ? { transform: `scale(${innerScale})`, transformOrigin: 'top left', width: `${100 / innerScale}%`, height: `${100 / innerScale}%` }
     : undefined;
 
+  // QR que abre el chat de WhatsApp del negocio.
+  const waDigits = (business.whatsapp || '').replace(/\D/g, '');
+  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=72x72&data=${encodeURIComponent('https://wa.me/' + waDigits)}&bgcolor=161616&color=ffffff&margin=4`;
+
   return (
     <div ref={wrapRef} className="w-screen h-screen bg-black overflow-hidden flex items-center justify-center">
       {/* Keyframe de aparición entre slides (sin librerías externas). */}
@@ -131,30 +156,40 @@ export default function PublicCartelera({ slug }) {
         style={{ width: BASE_W, height: BASE_H, transform: `scale(${scale})`, transformOrigin: 'center center' }}
         className="bg-zinc-900 text-white flex flex-col shrink-0 shadow-2xl overflow-hidden">
 
-        {/* HEADER (~80px) */}
-        <header className="bg-cartel px-8 py-5 flex items-center justify-between shrink-0">
-          <h1 className="text-3xl font-black tracking-tight uppercase leading-none">{business.name}</h1>
-          {business.instagram && <span className="text-white/85 font-bold text-lg">{business.instagram}</span>}
+        {/* HEADER (~80px): logo del negocio + Instagram */}
+        <header className="bg-cartel px-8 py-4 flex items-center justify-between shrink-0">
+          <Logo className="h-12" />
+          {business.instagram && <span className="text-white/90 font-bold text-lg">{business.instagram}</span>}
         </header>
 
         {/* CONTENIDO DEL SLIDE (se remonta con key para animar la transición) */}
         <div ref={bodyRef} className="flex-1 overflow-hidden">
           <div key={current} ref={colsRef} className="cartel-fade w-full h-full" style={innerStyle}>
             {slide.layout === 'hero'
-              ? <SlideHero cat={slide.cats[0]} badge={slide.badge} />
+              ? <SlideHero cat={slide.cats[0]} />
               : <SlideColumnas cats={slide.cats} />}
           </div>
         </div>
 
-        {/* FOOTER (~40px): dirección | dots de slide | WhatsApp */}
-        <footer className="bg-zinc-950 text-white/55 text-sm px-8 py-2.5 flex items-center justify-between shrink-0">
-          <span className="w-1/3 truncate">{business.address || ''}</span>
+        {/* FOOTER: dirección | dots de slide | QR de WhatsApp */}
+        <footer className="bg-zinc-950 text-white/75 text-base px-8 py-3 flex items-center justify-between shrink-0">
+          <span className="w-1/3 truncate text-white/80 text-base">{business.address || ''}</span>
           <span className="w-1/3 flex items-center justify-center gap-2">
             {slides.map((_, i) => (
               <span key={i} className={`rounded-full transition-all ${i === current ? 'w-3 h-3 bg-amber-400' : 'w-2.5 h-2.5 bg-white/30'}`} />
             ))}
           </span>
-          <span className="w-1/3 text-right truncate">{business.whatsapp ? `📲 ${business.whatsapp}` : ''}</span>
+          <span className="w-1/3 flex justify-end">
+            {business.whatsapp && (
+              <span className="flex items-center gap-3">
+                <img src={qrSrc} alt="QR WhatsApp" className="w-14 h-14 rounded-md" style={{ imageRendering: 'pixelated' }} />
+                <span className="flex flex-col">
+                  <span className="text-green-400 font-bold text-base leading-tight">WhatsApp</span>
+                  <span className="text-white/70 text-sm">{business.whatsapp}</span>
+                </span>
+              </span>
+            )}
+          </span>
         </footer>
       </div>
     </div>
@@ -162,12 +197,13 @@ export default function PublicCartelera({ slug }) {
 }
 
 // ── Slide HERO: foto de categoría a la izquierda (55%) + lista grande (45%) ──
-function SlideHero({ cat, badge }) {
+// La imagen va LIMPIA: solo foto + overlay de gradiente (sin texto/emoji encima).
+function SlideHero({ cat }) {
   const asset = getCategoryAsset(cat.name);
   const max = maxPrecio(cat.items);
   return (
     <div className="h-full flex">
-      {/* Izquierda: foto con overlay en gradiente + emoji + nombre */}
+      {/* Izquierda: foto limpia con overlay en gradiente para profundidad */}
       <div className={`relative w-[55%] h-full overflow-hidden bg-gradient-to-br ${asset.gradient}`}>
         {asset.image && (
           <img src={asset.image} alt={cat.name}
@@ -175,28 +211,19 @@ function SlideHero({ cat, badge }) {
             loading="eager" fetchpriority="high"
             onError={(e) => { e.currentTarget.style.display = 'none'; }} />
         )}
-        {/* Doble overlay: oscurece el lado del texto, se aclara hacia el centro */}
         <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
-        {badge && (
-          <div className="absolute top-6 left-6 bg-amber-400 text-zinc-900 font-black px-5 py-2 rounded-full text-lg shadow-lg animate-pulse">
-            {badge}
-          </div>
-        )}
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
-          <div className="leading-none text-[80px]" style={{ filter: 'drop-shadow(0 4px 16px rgba(0,0,0,0.8))' }}>{asset.emoji}</div>
-          <div className="font-black text-7xl text-white uppercase tracking-tight mt-3"
-            style={{ textShadow: '0 4px 24px rgba(0,0,0,0.9)' }}>{cat.name}</div>
-        </div>
       </div>
 
-      {/* Derecha: lista de precios grande */}
+      {/* Derecha: logo + lista de precios grande */}
       <div className="w-[45%] h-full px-8 py-6 flex flex-col justify-center">
+        <div className="flex justify-end mb-3"><Logo className="h-14" /></div>
         <ul>
           {cat.items.map((p, i) => (
             <li key={i} className="flex items-baseline gap-3 py-2.5 border-b border-white/10 last:border-0">
               <span className="font-semibold text-white text-lg leading-snug">{p.name}</span>
               <span className="flex-1 border-b border-dotted border-white/25 translate-y-[-4px]" />
-              <span className={`font-black text-amber-400 text-3xl tabular-nums whitespace-nowrap ${p.price === max ? 'animate-pulse' : ''}`}>
+              <span className={`font-black text-amber-400 text-3xl tabular-nums whitespace-nowrap ${p.price === max ? 'animate-pulse' : ''}`}
+                style={p.price === max ? RYE : undefined}>
                 {money(p.price)}
               </span>
             </li>
@@ -209,7 +236,7 @@ function SlideHero({ cat, badge }) {
 
 // ── Slide de COLUMNAS: una o varias categorías repartidas a lo ancho ──────
 function SlideColumnas({ cats }) {
-  // Una sola categoría grande (p.ej. BEBIDAS): título + items en 2 columnas.
+  // Una sola categoría grande (p.ej. BEBIDAS): logo + título + items en 2 columnas.
   if (cats.length === 1) {
     const c = cats[0];
     const asset = getCategoryAsset(c.name);
@@ -217,13 +244,14 @@ function SlideColumnas({ cats }) {
     const mitad = Math.ceil(c.items.length / 2);
     const columnas = [c.items.slice(0, mitad), c.items.slice(mitad)];
     return (
-      <div className="h-full px-10 py-6 flex flex-col">
-        <h2 className="relative flex items-center justify-center gap-3 text-amber-400 font-black text-4xl uppercase tracking-wide mb-6 overflow-hidden">
+      <div className="h-full px-10 py-5 flex flex-col">
+        <div className="flex justify-end"><Logo className="h-10" /></div>
+        <h2 className="relative flex items-center justify-center gap-3 text-amber-400 font-black text-4xl uppercase tracking-wide mb-5 overflow-hidden">
           {asset.image && (
             <span className="absolute inset-0 opacity-10" style={{ backgroundImage: `url(${asset.image})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(2px)' }} />
           )}
           <span className="relative z-10">{asset.emoji}</span>
-          <span className="relative z-10">{c.name}</span>
+          <span className="relative z-10" style={RYE}>{c.name}</span>
         </h2>
         <div className="flex-1 flex gap-12">
           {columnas.map((items, ci) => (
@@ -232,7 +260,8 @@ function SlideColumnas({ cats }) {
                 <li key={i} className="flex items-baseline gap-3 py-2.5 border-b border-white/10">
                   <span className="font-semibold text-white text-lg leading-snug">{p.name}</span>
                   <span className="flex-1 border-b border-dotted border-white/25 translate-y-[-4px]" />
-                  <span className={`font-black text-amber-400 text-2xl tabular-nums whitespace-nowrap ${p.price === max ? 'animate-pulse' : ''}`}>
+                  <span className={`font-black text-amber-400 text-2xl tabular-nums whitespace-nowrap ${p.price === max ? 'animate-pulse' : ''}`}
+                    style={p.price === max ? RYE : undefined}>
                     {money(p.price)}
                   </span>
                 </li>
@@ -244,15 +273,18 @@ function SlideColumnas({ cats }) {
     );
   }
 
-  // Varias categorías: se reparten en columnas (cada bloque = categoría).
+  // Varias categorías: logo arriba + columnas (cada bloque = categoría).
   const columnas = distribuirColumnas(cats, Math.min(3, cats.length));
   return (
-    <div className="h-full px-10 py-6 flex gap-10 items-start">
-      {columnas.map((col, ci) => (
-        <div key={ci} className="flex-1 min-w-0">
-          {col.map((c) => <BloqueCategoria key={c.name} cat={c} />)}
-        </div>
-      ))}
+    <div className="h-full px-10 py-5 flex flex-col">
+      <div className="flex justify-end mb-1"><Logo className="h-10" /></div>
+      <div className="flex-1 flex gap-10 items-start">
+        {columnas.map((col, ci) => (
+          <div key={ci} className="flex-1 min-w-0">
+            {col.map((c) => <BloqueCategoria key={c.name} cat={c} />)}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -267,14 +299,15 @@ function BloqueCategoria({ cat }) {
           <span className="absolute inset-0 opacity-10" style={{ backgroundImage: `url(${asset.image})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(2px)' }} />
         )}
         <span className="relative z-10">{asset.emoji}</span>
-        <span className="relative z-10">{cat.name}</span>
+        <span className="relative z-10" style={RYE}>{cat.name}</span>
       </h2>
       <ul>
         {cat.items.map((p, i) => (
           <li key={i} className="flex items-baseline gap-2 py-1 border-b border-white/10 last:border-0">
             <span className="font-semibold text-white text-base leading-tight">{p.name}</span>
             <span className="flex-1 border-b border-dotted border-white/20 translate-y-[-3px]" />
-            <span className={`font-black text-amber-400 text-xl tabular-nums whitespace-nowrap ${p.price === max ? 'animate-pulse' : ''}`}>
+            <span className={`font-black text-amber-400 text-xl tabular-nums whitespace-nowrap ${p.price === max ? 'animate-pulse' : ''}`}
+              style={p.price === max ? RYE : undefined}>
               {money(p.price)}
             </span>
           </li>
