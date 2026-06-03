@@ -21,7 +21,7 @@ export default function Carta({ role }) {
   const [renameFor, setRenameFor] = useState(null);
   const [share, setShare] = useState(false);
   const [error, setError] = useState('');
-  const [toast, setToast] = useState(null);
+  const [toast, setToast] = useState(null);   const [loading, setLoading] = useState(false);
   const needsOtp = role !== 'GERENCIA';
   const otpArg = needsOtp && otp ? otp : undefined;
 
@@ -90,7 +90,7 @@ export default function Carta({ role }) {
           <button onClick={() => setShare(true)} className="px-4 py-2 rounded-xl bg-ink text-white font-bold flex items-center gap-1.5">
             <span>🔗</span> Catálogo virtual
           </button>
-          <button onClick={() => setCreating(!creating)} className="px-4 py-2 rounded-xl bg-cartel text-white font-bold">
+          <button onClick={() => setCreating(!creating)} disabled={loading} className="px-4 py-2 rounded-xl bg-cartel text-white font-bold">
             {creating ? 'Cancelar' : '+ Nuevo plato'}
           </button>
         </div>
@@ -98,7 +98,7 @@ export default function Carta({ role }) {
       {error && <p className="text-red-600 font-semibold">{error}</p>}
       {creating && <NewProduct onSave={createProduct} />}
 
-      {/* Filtros */}
+      {/* Filtros */}         {loading && <p className="text-xs text-zinc-400 animate-pulse px-1">Actualizando…</p>}
       <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar producto…"
         className="w-full px-4 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
               <div className="flex gap-2 overflow-x-auto pb-1">
@@ -140,7 +140,7 @@ export default function Carta({ role }) {
                 <td className="p-3">
                   <div className="flex items-center gap-2">
                     {p.image_url
-                      ? <img src={p.image_url} alt="" className="w-10 h-10 rounded-lg object-cover bg-zinc-100" onError={(e) => { e.target.style.display = 'none'; }} />
+                      ? <img src={p.image_url || getCategoryAsset(p.category)?.image || ''} alt="" className="w-10 h-10 rounded-lg object-cover bg-zinc-100" onError={(e) => { e.target.style.display = 'none'; }} />
                       : <div className="w-10 h-10 rounded-lg bg-zinc-100 flex items-center justify-center text-zinc-300">🍗</div>}
                     <div>
                       <div className="font-bold flex items-center gap-1.5 flex-wrap">{p.name}
@@ -182,7 +182,7 @@ export default function Carta({ role }) {
                 </td>
               </tr>
             ))}
-            {!visible.length && <tr><td colSpan="6" className="p-4 text-zinc-400 text-center">Sin productos.</td></tr>}
+            {!visible.length && <tr><td colSpan="6" className="p-6 text-zinc-400 text-center text-sm">{q ? `Sin resultados para "${q}"` : cat !== 'TODO' ? `Sin productos en ${cat.charAt(0) + cat.slice(1).toLowerCase()}` : 'No hay productos aún.'}</td></tr>}
           </tbody>
         </table>
       </div>
@@ -346,7 +346,7 @@ function NewProduct({ onSave }) {
           className="px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
         <select value={category} onChange={(e) => setCategory(e.target.value)}
           className="px-3 py-2 rounded-xl border-2 border-zinc-200 outline-none">
-          {[...CAT_ORDER, 'OTROS'].map((c) => <option key={c} value={c}>{c}</option>)}
+          {[...CAT_ORDER, 'OTROS'].map((c) => <option key={c} value={c}>{getCategoryAsset(c)?.emoji} {c}</option>)}
         </select>
       </div>
       <input placeholder="URL de foto (opcional)" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)}
@@ -445,7 +445,7 @@ function RecipeBuilder({ product, ingredients, otp, onClose, onSaved, onError })
               <div className="flex justify-between"><span>Costo de insumos ({usados})</span><b>{money(costo)}</b></div>
               <div className="flex justify-between border-t mt-1 pt-1">
                 <span>Margen</span>
-                <b className={margen >= 0 ? 'text-green-600' : 'text-red-600'}>
+                <b className={marginColor(margen)}>
                   {money(margen)} ({product.price > 0 ? Math.round((margen / product.price) * 100) : 0}%)
                 </b>
               </div>
