@@ -79,7 +79,7 @@ const ENTERAS = new Set(['unidad', 'empaque']);
  */
 export async function setIngredientStock(req, res) {
   const { id } = req.params;
-  const { new_qty, reason, pin, note, mode, cost_unit } = req.body || {};
+  const { new_qty, reason, pin, note, mode, cost_unit, name } = req.body || {};
 
   if (typeof new_qty !== 'number' || !Number.isFinite(new_qty) || new_qty < 0) {
     return res.status(400).json({ error: 'CANTIDAD_INVALIDA' });
@@ -114,6 +114,7 @@ export async function setIngredientStock(req, res) {
   const delta = Math.round((stockNuevo - stockAnterior) * 1000) / 1000;
   const costAnterior = Number(ing.cost_unit);
   const costNuevo = costProvided ? cost_unit : costAnterior;
+  const nameNuevo = (name !== undefined && String(name).trim()) ? String(name).trim() : ing.name;
   const adjId = randomUUID();
   const motivo = String(reason).trim();
   const obs = note ? String(note).trim() : null;
@@ -121,23 +122,28 @@ export async function setIngredientStock(req, res) {
   // La observación se anexa al motivo en el ajuste de inventario (traza completa).
   const reasonFull = obs ? `${motivo} — ${obs}` : motivo;
 
-  await db.batch([
-    { sql: `UPDATE ingredients SET stock_qty = ?, cost_unit = ?, updated_at = datetime('now') WHERE id = ?`, args: [stockNuevo, costNuevo, id] },
-    {
-      sql: `INSERT INTO inventory_adjustments (id, ingredient_id, user_id, type, qty_delta, unit_cost, reason)
-            VALUES (?,?,?, 'CONTEO', ?, ?, ?)`,
-      args: [adjId, id, req.user.id, delta, costNuevo, reasonFull],
-    },
-    {
-      sql: `INSERT INTO audit_logs (id, user_id, action, entity, entity_id, severity, metadata, ip_address)
-            VALUES (?,?, 'STOCK_AJUSTE', 'ingredients', ?, 'WARN', ?, ?)`,
-      args: [randomUUID(), req.user.id, id,
-             JSON.stringify({ ingredient: ing.name, unidad: ing.unit, tipo, stock_anterior: stockAnterior, stock_nuevo: stockNuevo, delta, costo_anterior: costAnterior, costo_nuevo: costNuevo, motivo, observacion: obs }), req.ip || null],
-    },
-  ], 'write');
+  try {
+    await db.batch([
+      { sql: `UPDATE ingredients SET name = ?, stock_qty = ?, cost_unit = ?, updated_at = datetime('now') WHERE id = ?`, args: [nameNuevo, stockNuevo, costNuevo, id] },
+      {
+        sql: `INSERT INTO inventory_adjustments (id, ingredient_id, user_id, type, qty_delta, unit_cost, reason)
+              VALUES (?,?,?, 'CONTEO', ?, ?, ?)`,
+        args: [adjId, id, req.user.id, delta, costNuevo, reasonFull],
+      },
+      {
+        sql: `INSERT INTO audit_logs (id, user_id, action, entity, entity_id, severity, metadata, ip_address)
+              VALUES (?,?, 'STOCK_AJUSTE', 'ingredients', ?, 'WARN', ?, ?)`,
+        args: [randomUUID(), req.user.id, id,
+               JSON.stringify({ ingredient: nameNuevo, nombre_anterior: ing.name, unidad: ing.unit, tipo, stock_anterior: stockAnterior, stock_nuevo: stockNuevo, delta, costo_anterior: costAnterior, costo_nuevo: costNuevo, motivo, observacion: obs }), req.ip || null],
+      },
+    ], 'write');
+  } catch (e) {
+    if (String(e.message).includes('UNIQUE')) return res.status(409).json({ error: 'NOMBRE_DUPLICADO' });
+    throw e;
+  }
 
   return res.status(201).json({
-    adjustment_id: adjId, ingredient: ing.name, tipo,
+    adjustment_id: adjId, ingredient: nameNuevo, tipo,
     stock_anterior: stockAnterior, stock_nuevo: stockNuevo, delta,
     cost_anterior: costAnterior, cost_nuevo: costNuevo,
   });

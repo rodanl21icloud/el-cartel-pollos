@@ -89,6 +89,7 @@ function StockEditModal({ ingredient, hasPin, onClose, onDone }) {
   const [note, setNote] = useState('');
   const [pin, setPin] = useState('');
   const [costo, setCosto] = useState(String(ingredient.cost_unit ?? ''));
+  const [nombre, setNombre] = useState(ingredient.name);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -100,10 +101,11 @@ function StockEditModal({ ingredient, hasPin, onClose, onDone }) {
   const stockChanged = valido && delta !== 0;
   const costoNum = costo === '' ? NaN : Number(costo);
   const costChanged = Number.isFinite(costoNum) && costoNum >= 0 && costoNum !== Number(ingredient.cost_unit);
+  const nameChanged = nombre.trim() !== '' && nombre.trim() !== ingredient.name;
 
   async function save() {
     setErr('');
-    if (!stockChanged && !costChanged) return setErr('No hay cambios que guardar');
+    if (!stockChanged && !costChanged && !nameChanged) return setErr('No hay cambios que guardar');
     if (costo !== '' && !(Number.isFinite(costoNum) && costoNum >= 0)) return setErr('Costo unitario inválido');
     if (stockChanged && soloEnteros && !Number.isInteger(nuevo)) return setErr(`La unidad "${ingredient.unit}" no admite decimales`);
     const motivo = (reason === 'Otro' ? custom : reason).trim();
@@ -114,14 +116,16 @@ function StockEditModal({ ingredient, hasPin, onClose, onDone }) {
       // Stock y costo se editan juntos por el endpoint auditado con PIN.
       await api(`/inventory/ingredients/${ingredient.id}/set-stock`, {
         method: 'POST',
-        body: { new_qty: stockChanged ? nuevo : actual, reason: motivo, note: note.trim() || undefined, mode, pin, cost_unit: costChanged ? costoNum : undefined },
+        body: { new_qty: stockChanged ? nuevo : actual, reason: motivo, note: note.trim() || undefined, mode, pin, cost_unit: costChanged ? costoNum : undefined, name: nameChanged ? nombre.trim() : undefined },
       });
       const partes = [];
+      if (nameChanged) partes.push(`nombre "${nombre.trim()}"`);
       if (stockChanged) partes.push(`${actual} → ${nuevo} ${ingredient.unit}`);
       if (costChanged) partes.push(`costo ${money(costoNum)}`);
-      onDone(`${ingredient.name}: ${partes.join(' · ')}`);
+      onDone(`${nameChanged ? nombre.trim() : ingredient.name}: ${partes.join(' · ')}`);
     } catch (e) {
       setErr(e.message === 'PIN_INVALIDO' ? 'PIN incorrecto'
+        : e.message === 'NOMBRE_DUPLICADO' ? 'Ya existe un insumo con ese nombre'
         : e.message === 'PIN_NO_CONFIGURADO' ? 'No hay PIN configurado. Pídele a gerencia que lo defina en Configuración.'
         : e.message === 'DECIMAL_NO_PERMITIDO' ? `La unidad "${ingredient.unit}" no admite decimales`
         : e.message === 'COSTO_INVALIDO' ? 'Costo unitario inválido'
@@ -142,6 +146,11 @@ function StockEditModal({ ingredient, hasPin, onClose, onDone }) {
         <p className="text-sm mb-3">{ingredient.name} · stock <b>{actual} {ingredient.unit}</b> · costo <b>{money(ingredient.cost_unit)}</b></p>
         {!hasPin && <p className="text-xs bg-amber-50 text-amber-700 rounded-lg p-2 mb-3">⚠️ No hay PIN de administrador configurado. Gerencia debe definirlo en <b>Configuración</b> antes de poder ajustar.</p>}
         {err && <p className="text-red-600 font-semibold text-sm mb-2">{err}</p>}
+
+        {/* Nombre del insumo */}
+        <label className="block text-xs font-bold text-zinc-500 mb-1">Nombre</label>
+        <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder={ingredient.name}
+          className="w-full mb-3 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none font-bold" />
 
         {/* Costo unitario del insumo */}
         <label className="block text-xs font-bold text-zinc-500 mb-1">Costo unitario ($)</label>
@@ -196,7 +205,7 @@ function StockEditModal({ ingredient, hasPin, onClose, onDone }) {
           placeholder="••••" maxLength={8} className="w-full mb-3 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none tracking-widest" />
 
         <div className="flex gap-2">
-          <button onClick={save} disabled={busy || (!stockChanged && !costChanged) || !hasPin} className="flex-1 btn-pos bg-cartel text-white disabled:opacity-50">{busy ? 'Guardando…' : 'Guardar'}</button>
+          <button onClick={save} disabled={busy || (!stockChanged && !costChanged && !nameChanged) || !hasPin} className="flex-1 btn-pos bg-cartel text-white disabled:opacity-50">{busy ? 'Guardando…' : 'Guardar'}</button>
           <button onClick={onClose} className="px-4 rounded-2xl bg-zinc-200 font-bold">Cancelar</button>
         </div>
         <p className="text-[11px] text-zinc-400 mt-3">Queda en auditoría: tipo, stock anterior y nuevo, motivo, observación, usuario y hora. No borra el historial del insumo.</p>
