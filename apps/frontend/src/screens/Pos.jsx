@@ -4,6 +4,7 @@ import { esNombreInvalido } from '../lib/productName.js';
 import { recordSale, flushQueue } from '../lib/offlineStore.js';
 import { buildCustomerReceiptHTML, buildKitchenTicketHTML, whatsappUrl } from '../lib/receipt.js';
 import { openPrint } from '../lib/print.js'; import { getCategoryAsset } from '../lib/categoryAssets.js';
+import AbrirCajaModal from '../components/AbrirCajaModal.jsx';
 
 const PAYMENTS = [
   { id: 'EFECTIVO', label: '💵 Efectivo', color: 'bg-green-600' },
@@ -20,6 +21,7 @@ export default function Pos({ onNavigate }) {
   const [mode, setMode] = useState('choose'); // choose | productos | libre
   const [settings, setSettings] = useState({ name: 'El Cartel de los Pollos', paper_width: 80 });
   const [lastSale, setLastSale] = useState(null);
+  const [showApertura, setShowApertura] = useState(true); // KAN-31: pedir fondo al entrar con caja cerrada
 
   async function loadCaja() {
     try { setCaja(await api('/cash-register/current')); } catch { setCaja({ open: false }); }
@@ -30,16 +32,23 @@ export default function Pos({ onNavigate }) {
 
   if (caja === null) return <p className="text-zinc-500 text-center mt-10">Cargando…</p>;
 
-  // Caja cerrada -> no se puede vender.
+  // Caja cerrada -> no se puede vender. Se exige abrir la caja declarando el fondo
+  // (KAN-31: el modal aparece al entrar; "Cancelar" deja el acceso bloqueado).
   if (!caja.open) {
     return (
       <div className="max-w-md mx-auto bg-white rounded-2xl p-8 shadow text-center mt-6">
         <div className="text-5xl mb-2">🔒</div>
         <h2 className="text-2xl font-black mb-1">Caja cerrada</h2>
         <p className="text-zinc-500 mb-5">Debes abrir la caja antes de registrar ventas.</p>
-        <button onClick={() => onNavigate && onNavigate('cash')} className="btn-pos bg-cartel text-white w-full">
+        <button onClick={() => setShowApertura(true)} className="btn-pos bg-cartel text-white w-full">
           Abrir caja
         </button>
+        {showApertura && (
+          <AbrirCajaModal
+            onOpened={() => { setShowApertura(false); loadCaja(); }}
+            onCancel={() => setShowApertura(false)}
+          />
+        )}
       </div>
     );
   }
