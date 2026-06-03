@@ -13,14 +13,20 @@ if (!JWT_SECRET) throw new Error('JWT_SECRET no configurado');
 
 const WRITE_METHODS = new Set(['PUT', 'DELETE']);
 
+// Rutas públicas que no requieren autenticación
+const PUBLIC_PATHS = new Set(['/auth/login']);
+
 /**
  * requireAuth — valida el JWT y adjunta req.user.
+ * Las rutas en PUBLIC_PATHS se omiten automáticamente.
  */
 export function requireAuth(req, res, next) {
+  // Permitir rutas públicas sin token
+  if (PUBLIC_PATHS.has(req.path)) return next();
+
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token) return res.status(401).json({ error: 'TOKEN_AUSENTE' });
-
   try {
     const payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
     req.user = { id: payload.sub, role: payload.role, username: payload.username };
@@ -32,7 +38,7 @@ export function requireAuth(req, res, next) {
 
 /**
  * requireRole — restringe por rol.
- *   requireRole('GERENCIA')
+ * requireRole('GERENCIA')
  */
 export function requireRole(...roles) {
   return (req, res, next) => {
@@ -75,7 +81,7 @@ export async function requireOtpForMutation(req, res, next) {
   const db = getDb();
   const { rows } = await db.execute({
     sql: `SELECT id, otp_secret FROM users
-          WHERE role IN ('GERENCIA','ADMIN') AND is_active = 1 AND otp_secret IS NOT NULL`,
+    WHERE role IN ('GERENCIA','ADMIN') AND is_active = 1 AND otp_secret IS NOT NULL`,
     args: [],
   });
 
