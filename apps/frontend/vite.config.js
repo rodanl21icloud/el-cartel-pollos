@@ -43,7 +43,7 @@ export default defineConfig({
           },
         ],
         // Nunca cachear ventas ni mutaciones: la cola IndexedDB ya las maneja.
-        navigateFallbackDenylist: [/^\/api\//],
+        navigateFallbackDenylist: [/^\/api\//, /^\/landing/],
       },
       devOptions: { enabled: false },
     }),
