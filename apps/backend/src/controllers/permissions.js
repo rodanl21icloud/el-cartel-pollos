@@ -11,6 +11,7 @@ export async function getPermissions(_req, res) {
 export async function myPermissions(req, res) {
   const { hasPermission } = await import('../services/permissions.js');
   const out = {};
+    if (!req.user) return res.status(401).json({ error: 'NO_AUTH' });
   for (const p of PERMISSIONS) out[p.key] = await hasPermission(req.user.role, p.key);
   return res.json({ role: req.user.role, permissions: out });
 }
