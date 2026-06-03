@@ -29,7 +29,7 @@ export async function createUser(req, res) {
   if (!username || !/^[a-z0-9_.]{3,}$/i.test(String(username).trim())) return res.status(400).json({ error: 'USUARIO_INVALIDO' });
   if (!full_name || !String(full_name).trim()) return res.status(400).json({ error: 'NOMBRE_REQUERIDO' });
   if (!ROLES.includes(role)) return res.status(400).json({ error: 'ROL_INVALIDO' });
-  if (!password || String(password).length < 4) return res.status(400).json({ error: 'CLAVE_CORTA' });
+  if (!password || String(password).length < 8) return res.status(400).json({ error: 'CLAVE_CORTA' });
 
   const db = getDb();
   const hash = await bcrypt.hash(String(password), 10);
@@ -92,7 +92,7 @@ export async function updateUser(req, res) {
 /** POST /api/users/:id/password  Body: { password } */
 export async function resetPassword(req, res) {
   const { password } = req.body || {};
-  if (!password || String(password).length < 4) return res.status(400).json({ error: 'CLAVE_CORTA' });
+  if (!password || String(password).length < 8) return res.status(400).json({ error: 'CLAVE_CORTA' });
   const db = getDb();
   const cur = (await db.execute({ sql: `SELECT id FROM users WHERE id = ?`, args: [req.params.id] })).rows[0];
   if (!cur) return res.status(404).json({ error: 'USUARIO_NO_ENCONTRADO' });
