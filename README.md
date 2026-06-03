@@ -2,6 +2,18 @@
 
 Operación **delivery-only**. Inventario teórico estricto vía **BOM**, **cierre de caja ciego**, **offline-first** y arquitectura **Zero Trust**. Sin ensaladas/vegetales frescos en el modelo de negocio.
 
+## 📚 Documentación (equipo de desarrollo)
+- **[docs/ARQUITECTURA.md](docs/ARQUITECTURA.md)** — visión general, stack, flujo de una venta, ruteo SPA, PWA, deploy.
+- **[docs/MODULOS.md](docs/MODULOS.md)** — guía funcional de **cada módulo** (pantalla · endpoints · permiso · tablas · reglas).
+- **[docs/MODELO-DATOS.md](docs/MODELO-DATOS.md)** — tablas, relaciones e invariantes.
+- **[docs/API.md](docs/API.md)** — referencia de endpoints agrupada por módulo.
+- **[docs/SEGURIDAD-RBAC.md](docs/SEGURIDAD-RBAC.md)** — JWT, firma HMAC, OTP, PIN admin y **matriz roles×permisos**.
+- **[docs/ONBOARDING.md](docs/ONBOARDING.md)** — puesta en marcha local, scripts, convenciones, tests y despliegue.
+- Referencia adicional: [docs/rbac-matrix.md](docs/rbac-matrix.md) · [docs/audit-events.md](docs/audit-events.md).
+
+> El resto de este README es histórico (puede tener detalles desfasados); la fuente
+> actualizada es la carpeta **`docs/`**.
+
 ## Stack
 - **Frontend:** Vite + React + TailwindCSS (UI Poka-yoke: botones grandes, sin texto libre innecesario).
 - **Backend:** Node.js + Express (export de handler listo para Serverless/PaaS).
