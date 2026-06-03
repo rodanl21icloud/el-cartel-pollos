@@ -79,10 +79,14 @@ const ENTERAS = new Set(['unidad', 'empaque']);
  */
 export async function setIngredientStock(req, res) {
   const { id } = req.params;
-  const { new_qty, reason, pin, note, mode } = req.body || {};
+  const { new_qty, reason, pin, note, mode, cost_unit } = req.body || {};
 
   if (typeof new_qty !== 'number' || !Number.isFinite(new_qty) || new_qty < 0) {
     return res.status(400).json({ error: 'CANTIDAD_INVALIDA' });
+  }
+  const costProvided = cost_unit !== undefined && cost_unit !== null && cost_unit !== '';
+  if (costProvided && (typeof cost_unit !== 'number' || !Number.isFinite(cost_unit) || cost_unit < 0)) {
+    return res.status(400).json({ error: 'COSTO_INVALIDO' });
   }
   if (!reason || !String(reason).trim()) return res.status(400).json({ error: 'MOTIVO_OBLIGATORIO' });
   if (!pin) return res.status(400).json({ error: 'PIN_REQUERIDO' });
@@ -108,6 +112,8 @@ export async function setIngredientStock(req, res) {
   const stockAnterior = Number(ing.stock_qty);
   const stockNuevo = new_qty;
   const delta = Math.round((stockNuevo - stockAnterior) * 1000) / 1000;
+  const costAnterior = Number(ing.cost_unit);
+  const costNuevo = costProvided ? cost_unit : costAnterior;
   const adjId = randomUUID();
   const motivo = String(reason).trim();
   const obs = note ? String(note).trim() : null;
@@ -116,23 +122,24 @@ export async function setIngredientStock(req, res) {
   const reasonFull = obs ? `${motivo} — ${obs}` : motivo;
 
   await db.batch([
-    { sql: `UPDATE ingredients SET stock_qty = ?, updated_at = datetime('now') WHERE id = ?`, args: [stockNuevo, id] },
+    { sql: `UPDATE ingredients SET stock_qty = ?, cost_unit = ?, updated_at = datetime('now') WHERE id = ?`, args: [stockNuevo, costNuevo, id] },
     {
       sql: `INSERT INTO inventory_adjustments (id, ingredient_id, user_id, type, qty_delta, unit_cost, reason)
             VALUES (?,?,?, 'CONTEO', ?, ?, ?)`,
-      args: [adjId, id, req.user.id, delta, Number(ing.cost_unit), reasonFull],
+      args: [adjId, id, req.user.id, delta, costNuevo, reasonFull],
     },
     {
       sql: `INSERT INTO audit_logs (id, user_id, action, entity, entity_id, severity, metadata, ip_address)
             VALUES (?,?, 'STOCK_AJUSTE', 'ingredients', ?, 'WARN', ?, ?)`,
       args: [randomUUID(), req.user.id, id,
-             JSON.stringify({ ingredient: ing.name, unidad: ing.unit, tipo, stock_anterior: stockAnterior, stock_nuevo: stockNuevo, delta, motivo, observacion: obs }), req.ip || null],
+             JSON.stringify({ ingredient: ing.name, unidad: ing.unit, tipo, stock_anterior: stockAnterior, stock_nuevo: stockNuevo, delta, costo_anterior: costAnterior, costo_nuevo: costNuevo, motivo, observacion: obs }), req.ip || null],
     },
   ], 'write');
 
   return res.status(201).json({
     adjustment_id: adjId, ingredient: ing.name, tipo,
     stock_anterior: stockAnterior, stock_nuevo: stockNuevo, delta,
+    cost_anterior: costAnterior, cost_nuevo: costNuevo,
   });
 }
 

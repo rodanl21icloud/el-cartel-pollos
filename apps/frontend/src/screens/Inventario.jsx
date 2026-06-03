@@ -89,7 +89,6 @@ function StockEditModal({ ingredient, hasPin, onClose, onDone }) {
   const [note, setNote] = useState('');
   const [pin, setPin] = useState('');
   const [costo, setCosto] = useState(String(ingredient.cost_unit ?? ''));
-  const [otp, setOtp] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -106,22 +105,17 @@ function StockEditModal({ ingredient, hasPin, onClose, onDone }) {
     setErr('');
     if (!stockChanged && !costChanged) return setErr('No hay cambios que guardar');
     if (costo !== '' && !(Number.isFinite(costoNum) && costoNum >= 0)) return setErr('Costo unitario inválido');
+    if (stockChanged && soloEnteros && !Number.isInteger(nuevo)) return setErr(`La unidad "${ingredient.unit}" no admite decimales`);
     const motivo = (reason === 'Otro' ? custom : reason).trim();
-    if (stockChanged) {
-      if (soloEnteros && !Number.isInteger(nuevo)) return setErr(`La unidad "${ingredient.unit}" no admite decimales`);
-      if (!motivo) return setErr('Indica el motivo del cambio de stock');
-      if (!/^\d{4,8}$/.test(pin)) return setErr('PIN de 4 a 8 dígitos para cambiar el stock');
-    }
+    if (!motivo) return setErr('Indica el motivo');
+    if (!/^\d{4,8}$/.test(pin)) return setErr('PIN de 4 a 8 dígitos');
     setBusy(true);
     try {
-      if (costChanged) {
-        await api(`/inventory/ingredients/${ingredient.id}`, { method: 'PUT', body: { cost_unit: costoNum }, otp: otp || undefined });
-      }
-      if (stockChanged) {
-        await api(`/inventory/ingredients/${ingredient.id}/set-stock`, {
-          method: 'POST', body: { new_qty: nuevo, reason: motivo, note: note.trim() || undefined, mode, pin },
-        });
-      }
+      // Stock y costo se editan juntos por el endpoint auditado con PIN.
+      await api(`/inventory/ingredients/${ingredient.id}/set-stock`, {
+        method: 'POST',
+        body: { new_qty: stockChanged ? nuevo : actual, reason: motivo, note: note.trim() || undefined, mode, pin, cost_unit: costChanged ? costoNum : undefined },
+      });
       const partes = [];
       if (stockChanged) partes.push(`${actual} → ${nuevo} ${ingredient.unit}`);
       if (costChanged) partes.push(`costo ${money(costoNum)}`);
@@ -130,9 +124,8 @@ function StockEditModal({ ingredient, hasPin, onClose, onDone }) {
       setErr(e.message === 'PIN_INVALIDO' ? 'PIN incorrecto'
         : e.message === 'PIN_NO_CONFIGURADO' ? 'No hay PIN configurado. Pídele a gerencia que lo defina en Configuración.'
         : e.message === 'DECIMAL_NO_PERMITIDO' ? `La unidad "${ingredient.unit}" no admite decimales`
+        : e.message === 'COSTO_INVALIDO' ? 'Costo unitario inválido'
         : e.message === 'DEMASIADOS_INTENTOS' ? 'Demasiados intentos. Espera unos minutos.'
-        : e.message === 'OTP_GERENCIA_REQUERIDO' ? 'Cambiar el costo requiere el OTP de gerencia (ingrésalo abajo).'
-        : e.message === 'OTP_INVALIDO' ? 'OTP incorrecto'
         : e.message);
     } finally { setBusy(false); }
   }
@@ -202,17 +195,8 @@ function StockEditModal({ ingredient, hasPin, onClose, onDone }) {
         <input type="password" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
           placeholder="••••" maxLength={8} className="w-full mb-3 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none tracking-widest" />
 
-        {costChanged && (
-          <>
-            <label className="block text-xs font-bold text-zinc-500 mb-1">OTP de gerencia (para cambiar el costo)</label>
-            <input inputMode="numeric" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-              placeholder="Solo si no eres gerencia" maxLength={6}
-              className="w-full mb-3 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none tracking-widest" />
-          </>
-        )}
-
         <div className="flex gap-2">
-          <button onClick={save} disabled={busy || (!stockChanged && !costChanged) || (stockChanged && !hasPin)} className="flex-1 btn-pos bg-cartel text-white disabled:opacity-50">{busy ? 'Guardando…' : 'Guardar'}</button>
+          <button onClick={save} disabled={busy || (!stockChanged && !costChanged) || !hasPin} className="flex-1 btn-pos bg-cartel text-white disabled:opacity-50">{busy ? 'Guardando…' : 'Guardar'}</button>
           <button onClick={onClose} className="px-4 rounded-2xl bg-zinc-200 font-bold">Cancelar</button>
         </div>
         <p className="text-[11px] text-zinc-400 mt-3">Queda en auditoría: tipo, stock anterior y nuevo, motivo, observación, usuario y hora. No borra el historial del insumo.</p>
