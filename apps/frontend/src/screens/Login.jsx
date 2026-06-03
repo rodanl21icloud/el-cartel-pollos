@@ -8,11 +8,20 @@ export default function Login({ onLogin, notice }) {
 
   async function submit(e) {
     e.preventDefault();
-    setError(''); setLoading(true);
+    setError('');
+    setLoading(true);
     try {
       await onLogin(username.trim(), password);
     } catch (err) {
-      setError(err.message === 'CREDENCIALES_INVALIDAS' ? 'Usuario o contraseña incorrectos' : 'Error de conexión');
+      if (err.message === 'CREDENCIALES_INVALIDAS') {
+        setError('Usuario o contraseña incorrectos');
+      } else if (err.message === 'TOKEN_AUSENTE' || err.message === 'TOKEN_INVALIDO' || err.message === 'NO_AUTENTICADO') {
+        setError('Error de sesión. Intenta de nuevo.');
+      } else if (err.message === 'ERROR_INTERNO_LOGIN') {
+        setError('Error interno del servidor. Contacta al administrador.');
+      } else {
+        setError(err.message || 'Error de conexión');
+      }
     } finally {
       setLoading(false);
     }
@@ -29,14 +38,23 @@ export default function Login({ onLogin, notice }) {
           <img src="/logo.jpeg" alt="El Cartel de los Pollos" className="w-56 mx-auto rounded-xl" />
           <p className="text-ink-mute text-sm mt-3">Sistema de gestión y POS</p>
         </div>
+
         {notice && <p className="text-center text-sm mb-4 bg-amber-50 text-amber-700 rounded-xl py-2 px-3 font-semibold">{notice}</p>}
+
         <label className="block text-sm font-bold text-slate-600 mb-1">Usuario</label>
         <input autoFocus value={username} onChange={(e) => setUsername(e.target.value)} className="field mb-4 text-lg" />
+
         <label className="block text-sm font-bold text-slate-600 mb-1">Contraseña</label>
         <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="field mb-4 text-lg" />
+
         {error && <p className="text-cartel text-sm mb-3 font-semibold">{error}</p>}
-        <button disabled={loading} className="w-full btn-pos bg-cartel text-white disabled:opacity-50 hover:bg-cartel-dark">
-          {loading ? 'Ingresando…' : 'Ingresar'}
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full btn-cartel py-3 text-base font-bold"
+        >
+          {loading ? 'Ingresando...' : 'Ingresar'}
         </button>
       </form>
     </div>
