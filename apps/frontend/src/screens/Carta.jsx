@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { api } from '../lib/api.js';
 import { validarNombreProducto, esNombreInvalido } from '../lib/productName.js';
+import { getCategoryAsset } from '../lib/categoryAssets.js';
 
 const money = (n) => '$' + Number(n).toLocaleString('es-CL');
 const CAT_ORDER = ['POLLO', 'COMBOS', 'COLACIONES', 'PAPAS', 'SNACKS', 'BEBIDAS'];
@@ -100,15 +101,26 @@ export default function Carta({ role }) {
       {/* Filtros */}
       <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar producto…"
         className="w-full px-4 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {tabs.map((t) => (
-          <button key={t} onClick={() => setCat(t)}
-            className={`px-4 py-1.5 rounded-full font-bold whitespace-nowrap text-sm ${cat === t ? 'bg-cartel text-white' : 'bg-white text-zinc-600 border border-zinc-200'}`}>
-            {t === 'TODO' ? 'Todo' : t.charAt(0) + t.slice(1).toLowerCase()}
-          </button>
-        ))}
-      </div>
-
+              <div className="flex gap-2 overflow-x-auto pb-1">
+          {tabs.map((t) => {
+            const asset = t !== 'TODO' ? getCategoryAsset(t) : null;
+            const isActive = cat === t;
+            return (
+              <button
+                key={t}
+                onClick={() => setCat(t)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full font-bold whitespace-nowrap text-sm transition-all ${
+                  isActive
+                    ? (asset ? `bg-gradient-to-r ${asset.gradient} text-white shadow-md` : 'bg-cartel text-white')
+                    : (asset ? `${asset.bgColor} ${asset.textColor} border border-transparent` : 'bg-white text-zinc-600 border border-zinc-200')
+                }`}
+              >
+                {asset && <span>{asset.emoji}</span>}
+                {t === 'TODO' ? 'Todo' : t.charAt(0) + t.slice(1).toLowerCase()}
+              </button>
+            );
+          })}
+        </div>
       {/* Tabla */}
       <div className="bg-white rounded-2xl shadow overflow-x-auto">
         <table className="w-full text-sm min-w-[640px]">
