@@ -27,8 +27,8 @@ export const CATEGORY_ASSETS = {
     gradient: 'from-green-500 to-emerald-600',
     bgColor: 'bg-green-50',
     textColor: 'text-green-700',
-    // Presas de pollo glaseadas en tabla oscura con salsa, close-up apetitoso.
-    image: 'https://images.unsplash.com/photo-1527477396000-e27163b481c2?w=800&q=85',
+    // Foto propia: arroz con presa de pollo asado (apps/frontend/public).
+    image: '/cat-colaciones.jpg',
   },
   PAPAS: {
     emoji: '🍟',
@@ -43,16 +43,16 @@ export const CATEGORY_ASSETS = {
     gradient: 'from-amber-500 to-yellow-600',
     bgColor: 'bg-amber-50',
     textColor: 'text-amber-700',
-    // Snack apetitoso, fondo oscuro. (Solo se usa como fondo sutil de header.)
-    image: 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=800&q=85',
+    // Foto propia: fritos dorados (aros de cebolla) con kétchup (apps/frontend/public).
+    image: '/cat-snacks.jpg',
   },
   BEBIDAS: {
     emoji: '🥤',
     gradient: 'from-blue-500 to-cyan-600',
     bgColor: 'bg-blue-50',
     textColor: 'text-blue-700',
-    // Bebidas frías con hielo, tono dorado/cítrico. Refresca y contrasta.
-    image: 'https://images.unsplash.com/photo-1546173159-315724a31696?w=800&q=85',
+    // Foto propia: bebida cola con hielo y limón (apps/frontend/public).
+    image: '/cat-bebidas.jpg',
   },
   DEFAULT: {
     emoji: '🍽️',

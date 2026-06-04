@@ -44,8 +44,7 @@ const ordIdx = (n) => { const i = ORDER.indexOf(n.toUpperCase()); return i === -
 function crossSell(catName, min) {
   const u = catName.toUpperCase();
   if (u === 'POLLO' && min.PAPAS) return `+ Papas desde ${money(min.PAPAS)} 🍟`;
-  if ((u === 'COMBOS' || u === 'COMBO')) return min.BEBIDAS ? `+ Bebida desde ${money(min.BEBIDAS)} 🥤` : 'Pollo + papas en un solo combo 💥';
-  if (u === 'PAPAS' && min.BEBIDAS) return `+ Bebida desde ${money(min.BEBIDAS)} 🥤`;
+  if (u === 'COMBOS' || u === 'COMBO') return 'Pollo + papas en un solo combo 💥';
   const c = min.COMBOS || min.COMBO;
   return c ? `¿Hambre? Combo desde ${money(c)} 🔥` : null;
 }
@@ -142,7 +141,7 @@ export default function PublicCartelera({ slug }) {
     : undefined;
 
   const waDigits = (business.whatsapp || '').replace(/\D/g, '');
-  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent('https://wa.me/' + waDigits)}&bgcolor=ffffff&color=0a0a0a&margin=4`;
+  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent('https://wa.me/' + waDigits)}&bgcolor=ffffff&color=0a0a0a&margin=4`;
 
   return (
     <div ref={wrapRef} className="w-screen h-screen bg-black overflow-hidden flex items-center justify-center">
@@ -153,8 +152,8 @@ export default function PublicCartelera({ slug }) {
 
         {/* HEADER */}
         <header className="bg-cartel px-8 py-4 flex items-center justify-between shrink-0">
-          <Logo className="h-12" />
-          {business.instagram && <span className="text-white/90 font-bold text-lg">{business.instagram}</span>}
+          <Logo className="h-20" />
+          {business.instagram && <span className="text-white font-black text-3xl tracking-tight">{business.instagram}</span>}
         </header>
 
         {/* CONTENIDO (1 foco por slide) */}
@@ -179,12 +178,12 @@ export default function PublicCartelera({ slug }) {
           </span>
           <span className="w-1/3 flex justify-end">
             {business.whatsapp && (
-              <span className="flex items-center gap-3">
+              <span className="flex items-center gap-4">
                 <span className="text-right">
-                  <span className="block text-green-400 font-black text-xl leading-tight">Escanea y pide 📲</span>
-                  <span className="block text-white/70 text-sm">por WhatsApp · {business.whatsapp}</span>
+                  <span className="block text-green-400 font-black text-3xl leading-tight">Escanea y pide 📲</span>
+                  <span className="block text-white font-black text-2xl tabular-nums">WhatsApp · {business.whatsapp}</span>
                 </span>
-                <img src={qrSrc} alt="QR WhatsApp" className="w-16 h-16 rounded-md" style={{ imageRendering: 'pixelated', animation: 'ringPulse 2.5s ease-in-out infinite' }} />
+                <img src={qrSrc} alt="QR WhatsApp" className="w-28 h-28 rounded-lg bg-white p-1" style={{ imageRendering: 'pixelated', animation: 'ringPulse 2.5s ease-in-out infinite' }} />
               </span>
             )}
           </span>
