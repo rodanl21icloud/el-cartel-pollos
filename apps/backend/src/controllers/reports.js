@@ -64,7 +64,7 @@ export async function consumoInsumos(req, res) {
   const { rows } = await db.execute({
     sql: `SELECT i.name, i.unit, COALESCE(SUM(ABS(ia.qty_delta)),0) qty
           FROM inventory_adjustments ia JOIN ingredients i ON i.id = ia.ingredient_id
-          WHERE ia.type='VENTA' AND ia.created_at >= ? AND ia.created_at <= ?
+          WHERE ia.type='VENTA' AND datetime(ia.created_at) >= datetime(?) AND datetime(ia.created_at) <= datetime(?)
             AND (i.name LIKE '%ollo%' OR i.name LIKE '%apa%')
           GROUP BY i.id`,
     args: [from, to],
@@ -90,7 +90,7 @@ export async function preciosInsumos(req, res) {
   const { rows } = await db.execute({
     sql: `SELECT ia.ingredient_id, i.name, i.unit, ia.qty_delta qty, ia.unit_cost cost, ia.created_at fecha
           FROM inventory_adjustments ia JOIN ingredients i ON i.id = ia.ingredient_id
-          WHERE ia.type='REPOSICION' AND ia.created_at >= ? AND ia.created_at <= ?
+          WHERE ia.type='REPOSICION' AND datetime(ia.created_at) >= datetime(?) AND datetime(ia.created_at) <= datetime(?)
           ORDER BY ia.created_at ASC`,
     args: [from, to],
   });
