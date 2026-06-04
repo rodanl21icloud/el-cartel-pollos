@@ -85,9 +85,25 @@ CREATE TABLE IF NOT EXISTS products (
   description     TEXT,                             -- descripción para el catálogo público
   is_active       INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0,1)),
   in_catalog      INTEGER NOT NULL DEFAULT 1 CHECK (in_catalog IN (0,1)), -- visible en catálogo público
+  available       INTEGER NOT NULL DEFAULT 1 CHECK (available IN (0,1)),  -- disponible para vender (agotado = 0)
   created_at      TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- ----------------------------------------------------------------
+-- PRODUCT_PRICE_HISTORY — historial de cambios de precio de venta.
+-- ----------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS product_price_history (
+  id          TEXT PRIMARY KEY,
+  product_id  TEXT NOT NULL,
+  old_price   REAL,
+  new_price   REAL NOT NULL,
+  changed_by  TEXT,
+  reason      TEXT,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_pph_product ON product_price_history(product_id, created_at);
 
 -- ----------------------------------------------------------------
 -- PRODUCT_RECIPES — BOM (Bill of Materials). Receta por producto.

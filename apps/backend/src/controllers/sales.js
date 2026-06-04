@@ -187,7 +187,7 @@ export async function listProducts(req, res) {
   const { rows } = await getDb().execute({
     sql: `SELECT p.id, p.sku, p.name, p.price, p.category, p.image_url,
                  (SELECT COUNT(*) FROM product_modifier_groups pmg WHERE pmg.product_id = p.id) AS mod_groups
-          FROM products p WHERE p.is_active = 1 ORDER BY p.name`,
+          FROM products p WHERE p.is_active = 1 AND p.available = 1 ORDER BY p.name`,
     args: [],
   });
   return res.json(rows.map((r) => ({

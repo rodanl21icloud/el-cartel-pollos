@@ -46,6 +46,10 @@ export default function Carta({ role }) {
   const q = search.trim().toLowerCase();
   const visible = items.filter((p) => (cat === 'TODO' || p.category === cat) && (!q || p.name.toLowerCase().includes(q)));
 
+  const [showBulk, setShowBulk] = useState(false);
+  const [bulk, setBulk] = useState({ cat: 'TODO', mode: 'pct', value: '' });
+  const [histFor, setHistFor] = useState(null);
+
   async function savePrice(p, price) {
     if (Number(price) === p.price) return;
     setError('');
@@ -77,6 +81,21 @@ export default function Carta({ role }) {
       load(); flash(p.in_catalog ? 'Oculto del catálogo' : 'Visible en el catálogo');
     } catch (e) { handleErr(e); }
   }
+  async function toggleAvailable(p) {
+    setError('');
+    try {
+      await api(`/products/${p.id}`, { method: 'PUT', body: { available: p.available === false }, otp: otpArg });
+      load(); flash(p.available === false ? 'Disponible para vender' : 'Marcado como agotado');
+    } catch (e) { handleErr(e); }
+  }
+  async function applyBulk() {
+    if (bulk.value === '' || isNaN(Number(bulk.value))) return setError('Ingresa un valor');
+    setError('');
+    try {
+      const r = await api('/products/bulk-price', { method: 'PUT', body: { category: bulk.cat, mode: bulk.mode, value: Number(bulk.value) }, otp: otpArg });
+      setBulk((b) => ({ ...b, value: '' })); setShowBulk(false); load(); flash(`${r.updated} precio(s) actualizado(s)`);
+    } catch (e) { handleErr(e); }
+  }
 
   return (
     <div className="max-w-5xl mx-auto space-y-3">
@@ -97,6 +116,36 @@ export default function Carta({ role }) {
       </div>
       {error && <p className="text-red-600 font-semibold">{error}</p>}
       {creating && <NewProduct onSave={createProduct} />}
+
+      {/* Cambio masivo de precios */}
+      <div className="bg-white rounded-2xl shadow p-3">
+        <button onClick={() => setShowBulk((s) => !s)} className="font-bold text-sm text-cartel">{showBulk ? '▾' : '▸'} Cambio masivo de precios</button>
+        {showBulk && (
+          <>
+            <div className="mt-3 grid sm:grid-cols-4 gap-2 items-end">
+              <label className="text-xs font-bold text-zinc-500 flex flex-col gap-1">Categoría
+                <select value={bulk.cat} onChange={(e) => setBulk({ ...bulk, cat: e.target.value })} className="px-2 py-2 rounded-lg border-2 border-zinc-200 outline-none">
+                  <option value="TODO">Todas</option>
+                  {cats.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </label>
+              <label className="text-xs font-bold text-zinc-500 flex flex-col gap-1">Tipo
+                <select value={bulk.mode} onChange={(e) => setBulk({ ...bulk, mode: e.target.value })} className="px-2 py-2 rounded-lg border-2 border-zinc-200 outline-none">
+                  <option value="pct">% porcentaje</option>
+                  <option value="monto">+/- monto</option>
+                  <option value="set">Fijar precio</option>
+                </select>
+              </label>
+              <label className="text-xs font-bold text-zinc-500 flex flex-col gap-1">Valor
+                <input type="number" value={bulk.value} onChange={(e) => setBulk({ ...bulk, value: e.target.value })}
+                  placeholder={bulk.mode === 'pct' ? 'Ej: 10 = +10%' : 'Ej: 500'} className="px-2 py-2 rounded-lg border-2 border-zinc-200 outline-none" />
+              </label>
+              <button onClick={applyBulk} className="px-3 py-2 rounded-xl bg-cartel text-white font-bold">Aplicar</button>
+            </div>
+            <p className="text-[11px] text-zinc-400 mt-2">Afecta los productos activos de la categoría elegida. Queda en el historial de precios y en auditoría.</p>
+          </>
+        )}
+      </div>
 
       {/* Filtros */}         {loading && <p className="text-xs text-zinc-400 animate-pulse px-1">Actualizando…</p>}
       <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar producto…"
@@ -153,6 +202,7 @@ export default function Carta({ role }) {
                           </button>
                         )}
                         {p.in_catalog === false && <span className="text-[10px] font-bold bg-zinc-200 text-zinc-500 px-1.5 py-0.5 rounded">oculto</span>}
+                        {p.available === false && <span className="text-[10px] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded">agotado</span>}
                       </div>
                       <div className="text-xs text-zinc-400">{p.sku} · {p.category}</div>
                     </div>
@@ -177,6 +227,8 @@ export default function Carta({ role }) {
                   <button onClick={() => toggleCatalog(p)} className="text-lg mr-1" title={p.in_catalog === false ? 'Mostrar en catálogo' : 'Ocultar del catálogo'}>
                     {p.in_catalog === false ? '🙈' : '👁️'}
                   </button>
+                  <button onClick={() => toggleAvailable(p)} className="text-lg mr-1" title={p.available === false ? 'Marcar disponible' : 'Marcar agotado'}>{p.available === false ? '🔴' : '🟢'}</button>
+                  <button onClick={() => setHistFor(p)} className="text-zinc-400 hover:text-cartel text-lg mr-1" title="Historial de precio">📈</button>
                   <button onClick={() => setImage(p)} className="text-zinc-400 hover:text-cartel text-lg mr-1" title="Foto">📷</button>
                   <button onClick={() => removeProduct(p)} className="text-zinc-400 hover:text-red-600 text-lg" title="Eliminar">🗑</button>
                 </td>
@@ -202,7 +254,36 @@ export default function Carta({ role }) {
       )}
       {share && <CatalogShareModal otp={otpArg} count={items.filter((p) => p.in_catalog !== false).length}
         onClose={() => setShare(false)} onError={handleErr} flash={flash} />}
+      {histFor && <PriceHistoryModal product={histFor} onClose={() => setHistFor(null)} />}
       {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-zinc-900 text-white px-6 py-3 rounded-full shadow-lg font-bold">{toast}</div>}
+    </div>
+  );
+}
+
+// Historial de cambios de precio de venta de un producto.
+function PriceHistoryModal({ product, onClose }) {
+  const [rows, setRows] = useState(null);
+  useEffect(() => { api(`/products/${product.id}/price-history`).then(setRows).catch(() => setRows([])); }, [product.id]);
+  const f = (iso) => { try { return new Date(iso.includes('T') ? iso : iso.replace(' ', 'T') + 'Z').toLocaleDateString('es-CL'); } catch { return ''; } };
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="w-full max-w-md bg-white rounded-2xl p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <h3 className="font-black text-lg mb-1">Historial de precio</h3>
+        <p className="text-sm text-zinc-500 mb-3">{product.name}</p>
+        {!rows ? <p className="text-zinc-400 text-sm">Cargando…</p>
+          : !rows.length ? <p className="text-zinc-400 text-sm">Sin cambios de precio registrados.</p>
+            : (
+              <ul className="divide-y text-sm max-h-80 overflow-auto">
+                {rows.map((r, i) => (
+                  <li key={i} className="py-2 flex justify-between gap-2">
+                    <span className="min-w-0">{money(r.old_price ?? 0)} → <b>{money(r.new_price)}</b><span className="block text-xs text-zinc-400">{r.reason} · {r.usuario}</span></span>
+                    <span className="text-xs text-zinc-400 whitespace-nowrap">{f(r.created_at)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+        <button onClick={onClose} className="w-full mt-4 py-2.5 rounded-xl bg-zinc-100 font-bold">Cerrar</button>
+      </div>
     </div>
   );
 }
