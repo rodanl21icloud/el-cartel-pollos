@@ -76,7 +76,8 @@ export function buildKitchenTicketHTML(data, settings = {}) {
   const w = settings.paper_width || 80;
   const rows = (data.items || []).map((i) =>
     `<div class="big">${i.qty} x ${esc(i.name)}</div>` +
-    (i.modifiers || []).map((m) => `<div style="padding-left:12px">› ${esc(m.name)}</div>`).join('')
+    (i.modifiers || []).map((m) => `<div style="padding-left:12px">› ${esc(m.name)}</div>`).join('') +
+    (i.note ? `<div style="padding-left:12px">📝 ${esc(i.note)}</div>` : '')
   ).join('');
   const inner = `
     <div class="c b">COCINA</div>

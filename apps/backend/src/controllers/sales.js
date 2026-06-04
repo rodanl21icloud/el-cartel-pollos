@@ -100,7 +100,7 @@ export async function getReceipt(req, res) {
   if (!sale.rows.length) return res.status(404).json({ error: 'VENTA_NO_ENCONTRADA' });
 
   const items = await db.execute({
-    sql: `SELECT p.name, si.qty, si.unit_price, si.line_total, si.modifiers
+    sql: `SELECT p.name, si.qty, si.unit_price, si.line_total, si.modifiers, si.note
           FROM sale_items si JOIN products p ON p.id = si.product_id
           WHERE si.sale_id = ? ORDER BY p.name`,
     args: [req.params.id],
@@ -115,7 +115,7 @@ export async function getReceipt(req, res) {
     dispatch_status: s.dispatch_status, cashier: s.cashier,
     items: items.rows.map((i) => ({
       name: i.name, qty: i.qty, unit_price: Number(i.unit_price), line_total: Number(i.line_total),
-      modifiers: i.modifiers ? JSON.parse(i.modifiers) : [],
+      modifiers: i.modifiers ? JSON.parse(i.modifiers) : [], note: i.note || null,
     })),
   });
 }

@@ -153,6 +153,7 @@ CREATE TABLE IF NOT EXISTS sale_items (
   unit_price      REAL NOT NULL CHECK (unit_price >= 0),  -- snapshot del precio base
   modifiers       TEXT,                                   -- JSON: adiciones elegidas [{name, price_delta}]
   modifiers_total REAL NOT NULL DEFAULT 0,                -- suma de price_delta por unidad
+  note            TEXT,                                   -- nota/instrucción especial por ítem
   line_total      REAL NOT NULL CHECK (line_total >= 0),
   FOREIGN KEY (sale_id)    REFERENCES sales(id)    ON DELETE CASCADE,
   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT

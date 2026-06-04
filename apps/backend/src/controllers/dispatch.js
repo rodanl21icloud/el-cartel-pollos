@@ -27,7 +27,7 @@ export async function listDispatch(req, res) {
 
   // Ítems por pedido (para el KDS: cantidad, nombre y modificadores).
   const itemsRes = await db.execute({
-    sql: `SELECT si.sale_id, p.name, si.qty, si.modifiers
+    sql: `SELECT si.sale_id, p.name, si.qty, si.modifiers, si.note
           FROM sale_items si JOIN products p ON p.id = si.product_id
           JOIN sales s ON s.id = si.sale_id
           WHERE s.business_day = ? AND s.status = 'CONFIRMADA'`,
@@ -35,7 +35,7 @@ export async function listDispatch(req, res) {
   });
   const itemsBySale = {};
   for (const it of itemsRes.rows) {
-    (itemsBySale[it.sale_id] ||= []).push({ name: it.name, qty: Number(it.qty), modifiers: it.modifiers || null });
+    (itemsBySale[it.sale_id] ||= []).push({ name: it.name, qty: Number(it.qty), modifiers: it.modifiers || null, note: it.note || null });
   }
 
   const orders = rows.map((r) => ({

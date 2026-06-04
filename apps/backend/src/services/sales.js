@@ -124,6 +124,7 @@ export async function registerSale(payload, ctx) {
       qty, unit_price: unitPrice, line_total: lineTotal,
       modifiers: chosen.length ? JSON.stringify(chosen.map((o) => ({ name: o.name, price_delta: o.price_delta }))) : null,
       modifiers_total: modsTotal,
+      note: line.note ? String(line.note).trim().slice(0, 200) : null,
     });
 
     for (const r of recipeRes.rows.filter((x) => x.product_id === product.id)) {
@@ -186,9 +187,9 @@ export async function registerSale(payload, ctx) {
 
   for (const it of saleItems) {
     stmts.push({
-      sql: `INSERT INTO sale_items (id, sale_id, product_id, qty, unit_price, modifiers, modifiers_total, line_total)
-            VALUES (?,?,?,?,?,?,?,?)`,
-      args: [it.id, it.sale_id, it.product_id, it.qty, it.unit_price, it.modifiers, it.modifiers_total, it.line_total],
+      sql: `INSERT INTO sale_items (id, sale_id, product_id, qty, unit_price, modifiers, modifiers_total, line_total, note)
+            VALUES (?,?,?,?,?,?,?,?,?)`,
+      args: [it.id, it.sale_id, it.product_id, it.qty, it.unit_price, it.modifiers, it.modifiers_total, it.line_total, it.note],
     });
   }
 

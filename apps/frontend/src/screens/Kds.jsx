@@ -131,6 +131,7 @@ function Tarjeta({ o, now, fresh, onMove }) {
               <span className="font-bold text-2xl leading-tight">{it.name}</span>
             </div>
             {mods(it.modifiers).map((m, j) => <span key={j} className="ml-9 mr-2 text-cyan-300 text-base">+ {m}</span>)}
+            {it.note && <span className="block ml-9 text-yellow-200 text-base font-semibold">📝 {it.note}</span>}
           </li>
         ))}
         {!o.items?.length && o.detalle && <li className="text-xl">{o.detalle}</li>}

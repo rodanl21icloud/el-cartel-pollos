@@ -135,22 +135,23 @@ function ProductSale({ onSold }) {
         if (i >= 0) { const x = [...ls]; x[i] = { ...x[i], qty: x[i].qty + 1 }; return x; }
       }
       const modsTotal = modifiers.reduce((s, m) => s + m.price_delta, 0);
-      return [...ls, { uid: ++_uid, productId: p.id, name: p.name, basePrice: p.price, qty: 1, modifiers, modsTotal }];
+      return [...ls, { uid: ++_uid, productId: p.id, name: p.name, basePrice: p.price, qty: 1, modifiers, modsTotal, note: '' }];
     });
   }
   function incLine(uid) { setLines((ls) => ls.map((l) => l.uid === uid ? { ...l, qty: l.qty + 1 } : l)); }
   function decLine(uid) { setLines((ls) => ls.flatMap((l) => l.uid === uid ? (l.qty <= 1 ? [] : [{ ...l, qty: l.qty - 1 }]) : [l])); }
+  function setLineNote(uid, val) { setLines((ls) => ls.map((l) => l.uid === uid ? { ...l, note: val } : l)); }
 
   async function createSale(method, { discount = 0, client = null, deliveryFee = 0 } = {}) {
     if (!lines.length) return;
     const receiptItems = lines.map((l) => ({
       name: l.name, qty: l.qty, unit_price: l.basePrice, line_total: (l.basePrice + l.modsTotal) * l.qty,
-      modifiers: l.modifiers.map((m) => ({ name: m.name, price_delta: m.price_delta })),
+      modifiers: l.modifiers.map((m) => ({ name: m.name, price_delta: m.price_delta })), note: l.note?.trim() || null,
     }));
     const soldAt = new Date().toISOString();
     const net = Math.max(0, total - discount) + deliveryFee;
     const payload = { client_uuid: crypto.randomUUID(), payment_method: method, sold_at: soldAt,
-      items: lines.map((l) => ({ product_id: l.productId, qty: l.qty, modifier_option_ids: l.modifiers.map((m) => m.id) })) };
+      items: lines.map((l) => ({ product_id: l.productId, qty: l.qty, modifier_option_ids: l.modifiers.map((m) => m.id), note: l.note?.trim() || undefined })) };
     if (discount > 0) payload.discount = discount;
     if (deliveryFee > 0) payload.delivery_fee = deliveryFee;
     if (client && (client.phone || client.name)) payload.client = client;
@@ -216,11 +217,13 @@ function ProductSale({ onSold }) {
         <div className="flex-1 space-y-2 overflow-auto">
           {lines.map((l) => (
             <div key={l.uid} className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <span className="font-semibold text-sm">{l.name}</span>
                 {l.modifiers.map((m, i) => (
                   <div key={i} className="text-xs text-zinc-500">› {m.name}{m.price_delta > 0 ? ` +${money(m.price_delta)}` : ''}</div>
                 ))}
+                <input value={l.note || ''} onChange={(e) => setLineNote(l.uid, e.target.value)} placeholder="Nota (ej: sin ají, bien cocido)"
+                  className="mt-1 w-full text-xs px-2 py-1 rounded-lg border border-zinc-200 focus:border-cartel outline-none" />
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <button onClick={() => decLine(l.uid)} className="w-8 h-8 rounded-lg bg-zinc-200 text-xl font-black">−</button>
