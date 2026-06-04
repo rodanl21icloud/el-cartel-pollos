@@ -56,10 +56,18 @@ function OpenSession({ session, onClosed, reload, error, setError }) {
   const [transf, setTransf] = useState('');
   const [depAmount, setDepAmount] = useState('');
   const [depReason, setDepReason] = useState('');
+  const [cierre, setCierre] = useState({ pollos_crudos_fin: '', merma_pollos: '', sacos_papas_fin: '' });
+  const [obsCierre, setObsCierre] = useState('');
   const [busy, setBusy] = useState(false);
 
   const efectivo = counting ? denomTotal(efectivoCounts) : Number(efectivoManual) || 0;
   function setCount(v, val) { setEfectivoCounts((c) => ({ ...c, [v]: Math.max(0, Math.floor(Number(val) || 0)) })); }
+  const setCi = (k, v) => setCierre((c) => ({ ...c, [k]: v }));
+  // Conteo de cierre obligatorio (enteros ≥ 0).
+  const cierreOk = ['pollos_crudos_fin', 'merma_pollos', 'sacos_papas_fin'].every((k) => {
+    const v = String(cierre[k]).trim(); const n = Number(v);
+    return v !== '' && Number.isInteger(n) && n >= 0;
+  });
 
   async function deposito() {
     setError('');
@@ -87,6 +95,10 @@ function OpenSession({ session, onClosed, reload, error, setError }) {
           pos_declarado: Number(pos || 0),
           transferencias_declaradas: Number(transf || 0),
           detail: counting ? detail : undefined,
+          pollos_crudos_fin: Number(cierre.pollos_crudos_fin),
+          merma_pollos: Number(cierre.merma_pollos),
+          sacos_papas_fin: Number(cierre.sacos_papas_fin),
+          obs_cierre: obsCierre.trim() || undefined,
         },
       });
       onClosed(data);
@@ -165,8 +177,31 @@ function OpenSession({ session, onClosed, reload, error, setError }) {
           <span>Total declarado</span><span className="text-cartel tabular-nums">{money(totalDeclarado)}</span>
         </div>
 
+        {/* Conteo de cierre de turno (no afecta el inventario). */}
+        <div className="border-t pt-3 mb-3">
+          <p className="font-bold text-zinc-700 mb-2">Cierre de turno 🐔</p>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              ['pollos_crudos_fin', 'Pollos crudos'],
+              ['merma_pollos', 'Merma pollos'],
+              ['sacos_papas_fin', 'Sacos de papa'],
+            ].map(([k, label]) => (
+              <label key={k} className="block">
+                <span className="block text-xs font-semibold text-zinc-500 mb-1">{label}</span>
+                <input type="number" min="0" step="1" inputMode="numeric" value={cierre[k]}
+                  onChange={(e) => setCi(k, e.target.value)} placeholder="0"
+                  className="w-full px-2 py-2 text-lg text-center rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
+              </label>
+            ))}
+          </div>
+          <textarea value={obsCierre} onChange={(e) => setObsCierre(e.target.value)} rows={2}
+            placeholder="Observación (opcional)"
+            className="w-full mt-2 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none text-sm" />
+          {!cierreOk && <p className="text-amber-600 text-xs font-semibold mt-1">Completa el conteo de cierre (números enteros).</p>}
+        </div>
+
         {error && <p className="text-red-600 font-semibold mb-3">{error}</p>}
-        <button onClick={cerrar} disabled={busy} className="w-full btn-pos bg-cartel text-white disabled:opacity-50">
+        <button onClick={cerrar} disabled={busy || !cierreOk} className="w-full btn-pos bg-cartel text-white disabled:opacity-50">
           {busy ? 'Cerrando…' : 'Cerrar caja'}
         </button>
       </div>

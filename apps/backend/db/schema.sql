@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS business_settings (
   bank_balance  REAL,                               -- saldo contable bancario
   bank_balance_date TEXT,                           -- fecha del saldo
   catalog_slug  TEXT,                               -- identificador del catálogo público (URL)
+  conteo_umbral INTEGER NOT NULL DEFAULT 3,         -- descalce/merma de pollos que dispara alerta de turno
   whatsapp      TEXT,                               -- número para pedidos por WhatsApp
   admin_pin_hash TEXT,                              -- PIN de administrador (bcrypt) para ajustes de stock
   pickup_enabled   INTEGER NOT NULL DEFAULT 1 CHECK (pickup_enabled IN (0,1)),   -- retiro en tienda
@@ -242,6 +243,11 @@ CREATE TABLE IF NOT EXISTS cash_register_closures (
   pos_declarado            REAL NOT NULL,
   transferencias_declarado REAL NOT NULL,
   closing_detail           TEXT,                  -- JSON: conteo de efectivo al cierre
+  -- CONTEO OPERATIVO de cierre (no altera inventario; solo control de turno):
+  pollos_crudos_fin        INTEGER NOT NULL DEFAULT 0,
+  merma_pollos             INTEGER NOT NULL DEFAULT 0,
+  sacos_papas_fin          INTEGER NOT NULL DEFAULT 0,
+  obs_cierre               TEXT,
   -- COMPONENTES del teórico (para transparencia del cuadre):
   ventas_efectivo          REAL NOT NULL DEFAULT 0,
   gastos_efectivo          REAL NOT NULL DEFAULT 0,
@@ -270,6 +276,11 @@ CREATE TABLE IF NOT EXISTS cash_sessions (
   opened_by       TEXT NOT NULL,
   opening_float   REAL NOT NULL DEFAULT 0 CHECK (opening_float >= 0),
   opening_detail  TEXT,                            -- JSON: conteo por denominación
+  -- CONTEO OPERATIVO de apertura (no altera inventario; solo control de turno):
+  pollos_horno     INTEGER NOT NULL DEFAULT 0,
+  pollos_crudos_ini INTEGER NOT NULL DEFAULT 0,
+  sacos_papas_ini  INTEGER NOT NULL DEFAULT 0,
+  obs_apertura     TEXT,
   opened_at       TEXT NOT NULL DEFAULT (datetime('now')),
   closed_at       TEXT,
   closure_id      TEXT,                            -- cierre asociado

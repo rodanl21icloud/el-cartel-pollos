@@ -28,6 +28,7 @@ export const NAV = [
   {
     section: 'Finanzas', kind: 'OPERACION', items: [
       { key: 'resumen', label: 'Resumen', icon: '📋', perm: 'reports.view' },
+      { key: 'cuadre', label: 'Cuadre de turno', icon: '🐔', perm: 'reports.view' },
       { key: 'movimientos', label: 'Movimientos', icon: '💱', perm: 'reports.view' },
       { key: 'gastos', label: 'Gastos', icon: '💸', perm: 'expenses.manage' },
       { key: 'flujo', label: 'Flujo de caja', icon: '📈', perm: 'reports.view' },

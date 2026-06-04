@@ -13,6 +13,20 @@ import { hasPermission } from '../services/permissions.js';
 const TOLERANCE = 0.0;
 const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
+// Conteo operativo (pollos/papas): enteros ≥ 0. Ausente/vacío => 0.
+// Devuelve { out } o { error: <campo> } si un valor presente no es válido.
+function parseConteo(obj) {
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === undefined || v === null || v === '') { out[k] = 0; continue; }
+    const n = Number(v);
+    if (!Number.isInteger(n) || n < 0) return { error: k };
+    out[k] = n;
+  }
+  return { out };
+}
+const obsClean = (s) => (s && String(s).trim() ? String(s).trim().slice(0, 500) : null);
+
 async function findOpenSession(db) {
   const { rows } = await db.execute({
     sql: `SELECT id, opening_float, opened_at FROM cash_sessions WHERE status='OPEN' LIMIT 1`,
@@ -43,10 +57,13 @@ export async function getCurrentSession(req, res) {
 
 /** POST /api/cash-register/open  Body: { opening_float, detail? } */
 export async function openSession(req, res) {
-  const { opening_float, detail } = req.body || {};
+  const { opening_float, detail, pollos_horno, pollos_crudos_ini, sacos_papas_ini, obs_apertura } = req.body || {};
   if (typeof opening_float !== 'number' || !Number.isFinite(opening_float) || opening_float < 0) {
     return res.status(400).json({ error: 'FONDO_INVALIDO' });
   }
+  // Conteo operativo de apertura (no toca inventario).
+  const ap = parseConteo({ pollos_horno, pollos_crudos_ini, sacos_papas_ini });
+  if (ap.error) return res.status(400).json({ error: 'CONTEO_INVALIDO', field: ap.error });
   // Si viene el desglose por denominación, debe cuadrar con el fondo declarado.
   let detailJson = null;
   if (detail && typeof detail === 'object') {
@@ -67,12 +84,15 @@ export async function openSession(req, res) {
   // (formato con espacio) porque rompe los rangos del período.
   const openedAt = new Date().toISOString();
   await db.execute({
-    sql: `INSERT INTO cash_sessions (id, opened_by, opening_float, opening_detail, opened_at) VALUES (?,?,?,?,?)`,
-    args: [id, req.user.id, opening_float, detailJson, openedAt],
+    sql: `INSERT INTO cash_sessions (id, opened_by, opening_float, opening_detail, opened_at,
+                                     pollos_horno, pollos_crudos_ini, sacos_papas_ini, obs_apertura)
+          VALUES (?,?,?,?,?, ?,?,?,?)`,
+    args: [id, req.user.id, opening_float, detailJson, openedAt,
+           ap.out.pollos_horno, ap.out.pollos_crudos_ini, ap.out.sacos_papas_ini, obsClean(obs_apertura)],
   });
   await writeAudit({
     userId: req.user.id, action: 'CASH_OPEN', entity: 'cash_sessions', entityId: id,
-    severity: 'INFO', ip: req.ip, metadata: { opening_float },
+    severity: 'INFO', ip: req.ip, metadata: { opening_float, conteo: ap.out },
   });
   return res.status(201).json({ session_id: id, opening_float, opened_at: openedAt });
 }
@@ -105,13 +125,17 @@ export async function registerMovement(req, res) {
  * Body: { efectivo_declarado, pos_declarado, transferencias_declaradas }
  */
 export async function closeCashRegister(req, res) {
-  const { efectivo_declarado, pos_declarado, transferencias_declaradas, detail } = req.body || {};
+  const { efectivo_declarado, pos_declarado, transferencias_declaradas, detail,
+          pollos_crudos_fin, merma_pollos, sacos_papas_fin, obs_cierre } = req.body || {};
 
   for (const [k, v] of Object.entries({ efectivo_declarado, pos_declarado, transferencias_declaradas })) {
     if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) {
       return res.status(400).json({ error: 'MONTO_INVALIDO', field: k });
     }
   }
+  // Conteo operativo de cierre (no toca inventario).
+  const ci = parseConteo({ pollos_crudos_fin, merma_pollos, sacos_papas_fin });
+  if (ci.error) return res.status(400).json({ error: 'CONTEO_INVALIDO', field: ci.error });
 
   // Conteo de efectivo por denominación (opcional): debe cuadrar con lo declarado.
   let closingDetail = null;
@@ -189,14 +213,16 @@ export async function closeCashRegister(req, res) {
               efectivo_declarado, pos_declarado, transferencias_declarado, closing_detail,
               ventas_efectivo, gastos_efectivo, movimientos_efectivo,
               efectivo_teorico, pos_teorico, transferencias_teorico,
-              diff_efectivo, diff_pos, diff_transferencias, diff_total, has_descuadre
-            ) VALUES (?,?,?,?,?,?, ?,?,?,?, ?,?,?, ?,?,?, ?,?,?,?,?)`,
+              diff_efectivo, diff_pos, diff_transferencias, diff_total, has_descuadre,
+              pollos_crudos_fin, merma_pollos, sacos_papas_fin, obs_cierre
+            ) VALUES (?,?,?,?,?,?, ?,?,?,?, ?,?,?, ?,?,?, ?,?,?,?,?, ?,?,?,?)`,
       args: [
         id, req.user.id, session.id, periodStart, periodEnd, fondo,
         efectivo_declarado, pos_declarado, transferencias_declaradas, closingDetail,
         ventas.EFECTIVO, gastos.EFECTIVO, movimientos_efectivo,
         efectivo_teorico, pos_teorico, transferencias_teorico,
         diff_efectivo, diff_pos, diff_transferencias, diff_total, has_descuadre ? 1 : 0,
+        ci.out.pollos_crudos_fin, ci.out.merma_pollos, ci.out.sacos_papas_fin, obsClean(obs_cierre),
       ],
     },
     {
@@ -207,7 +233,7 @@ export async function closeCashRegister(req, res) {
       sql: `INSERT INTO audit_logs (id, user_id, action, entity, entity_id, severity, metadata, ip_address)
             VALUES (?,?, 'CASH_CLOSE', 'cash_register_closures', ?, ?, ?, ?)`,
       args: [randomUUID(), req.user.id, id, has_descuadre ? 'ALERT' : 'INFO',
-             JSON.stringify({ diff_total, has_descuadre, fondo }), req.ip || null],
+             JSON.stringify({ diff_total, has_descuadre, fondo, conteo_cierre: ci.out }), req.ip || null],
     },
   ], 'write');
 

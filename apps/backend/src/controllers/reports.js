@@ -53,6 +53,64 @@ export async function closuresHistory(_req, res) {
 }
 
 /**
+ * GET /api/reports/turnos — Cuadre operativo de turno (pollos/papas).
+ * Cruza el conteo de APERTURA (cash_sessions) y CIERRE (closures) SIN tocar el
+ * inventario real. Detecta descalces e indica merma excesiva según un umbral.
+ *   esperado_final = pollos_crudos_ini − pollos_horno − merma_pollos
+ *   descalce       = esperado_final − pollos_crudos_fin
+ * (reports.view)
+ */
+export async function turnos(_req, res) {
+  const db = getDb();
+  const umbral = Number((await db.execute(`SELECT conteo_umbral FROM business_settings WHERE id=1`)).rows[0]?.conteo_umbral ?? 3);
+  const { rows } = await db.execute({
+    sql: `SELECT s.id, s.opened_at, s.closed_at, u.name AS encargado,
+                 s.pollos_horno, s.pollos_crudos_ini, s.sacos_papas_ini, s.obs_apertura,
+                 c.pollos_crudos_fin, c.merma_pollos, c.sacos_papas_fin, c.obs_cierre
+          FROM cash_sessions s
+          JOIN cash_register_closures c ON c.session_id = s.id
+          LEFT JOIN users u ON u.id = s.opened_by
+          WHERE s.status='CLOSED'
+          ORDER BY s.closed_at DESC LIMIT 60`,
+    args: [],
+  });
+  const lista = rows.map((r) => {
+    const pollos_horno = Number(r.pollos_horno), crudos_ini = Number(r.pollos_crudos_ini);
+    const merma = Number(r.merma_pollos), crudos_fin = Number(r.pollos_crudos_fin);
+    const esperado_final = crudos_ini - pollos_horno - merma;
+    const descalce = esperado_final - crudos_fin;
+    let estado = 'OK';
+    if (merma >= umbral || Math.abs(descalce) >= umbral) estado = 'PERDIDA_EXCESIVA';
+    else if (descalce !== 0) estado = 'INCONSISTENCIA';
+    return {
+      id: r.id, opened_at: r.opened_at, closed_at: r.closed_at, encargado: r.encargado || '—',
+      pollos_horno, pollos_crudos_ini: crudos_ini, pollos_crudos_fin: crudos_fin, merma_pollos: merma,
+      sacos_papas_ini: Number(r.sacos_papas_ini), sacos_papas_fin: Number(r.sacos_papas_fin),
+      esperado_final, descalce, variacion_papas: Number(r.sacos_papas_ini) - Number(r.sacos_papas_fin),
+      estado, obs_apertura: r.obs_apertura || null, obs_cierre: r.obs_cierre || null,
+    };
+  });
+  const tMap = new Map();
+  for (const t of lista) {
+    const dia = String(t.closed_at).slice(0, 10);
+    const x = tMap.get(dia) || { dia, merma: 0, descalce_abs: 0, turnos: 0 };
+    x.merma += t.merma_pollos; x.descalce_abs += Math.abs(t.descalce); x.turnos += 1;
+    tMap.set(dia, x);
+  }
+  return res.json({
+    umbral,
+    resumen: {
+      turnos: lista.length,
+      con_alerta: lista.filter((t) => t.estado !== 'OK').length,
+      merma_total: lista.reduce((s, t) => s + t.merma_pollos, 0),
+      descalce_total: lista.reduce((s, t) => s + Math.abs(t.descalce), 0),
+    },
+    tendencia: [...tMap.values()].sort((a, b) => a.dia.localeCompare(b.dia)),
+    turnos: lista,
+  });
+}
+
+/**
  * GET /api/reports/cash-flow?from=&to=
  * Flujo de caja de TODO el dinero (efectivo + POS + transferencia):
  * ingresos (ventas) vs egresos (gastos) por día, con saldo acumulado.

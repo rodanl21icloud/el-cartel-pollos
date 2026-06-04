@@ -17,17 +17,25 @@ export default function AbrirCajaModal({ onOpened, onCancel, userName }) {
   const [counting, setCounting] = useState(false); // por defecto: ingreso manual del fondo
   const [counts, setCounts] = useState({});         // denom -> cantidad
   const [fondoManual, setFondoManual] = useState('');
+  const [conteo, setConteo] = useState({ pollos_horno: '', pollos_crudos_ini: '', sacos_papas_ini: '' });
+  const [obs, setObs] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
   const manualTrim = fondoManual.trim();
   const fondo = counting ? denomTotal(counts) : Number(manualTrim);
+  const setC = (k, v) => setConteo((c) => ({ ...c, [k]: v }));
 
   // ¿El fondo fue ingresado EXPLÍCITAMENTE? (no vacío, número válido ≥ 0)
   const fondoExplicito = counting
     ? denomTocado(counts)
     : manualTrim !== '' && Number.isFinite(Number(manualTrim));
-  const puedeAbrir = fondoExplicito && Number.isFinite(fondo) && fondo >= 0;
+  // El conteo de inicio de turno es obligatorio (enteros ≥ 0).
+  const conteoOk = ['pollos_horno', 'pollos_crudos_ini', 'sacos_papas_ini'].every((k) => {
+    const v = String(conteo[k]).trim(); const n = Number(v);
+    return v !== '' && Number.isInteger(n) && n >= 0;
+  });
+  const puedeAbrir = fondoExplicito && Number.isFinite(fondo) && fondo >= 0 && conteoOk;
 
   function setCount(v, val) {
     const n = Math.max(0, Math.floor(Number(val) || 0));
@@ -42,12 +50,20 @@ export default function AbrirCajaModal({ onOpened, onCancel, userName }) {
       if (counting) DENOMS.forEach((d) => { if (counts[d.v]) detail[d.v] = Number(counts[d.v]); });
       await api('/cash-register/open', {
         method: 'POST',
-        body: { opening_float: fondo, detail: counting ? detail : undefined },
+        body: {
+          opening_float: fondo,
+          detail: counting ? detail : undefined,
+          pollos_horno: Number(conteo.pollos_horno),
+          pollos_crudos_ini: Number(conteo.pollos_crudos_ini),
+          sacos_papas_ini: Number(conteo.sacos_papas_ini),
+          obs_apertura: obs.trim() || undefined,
+        },
       });
       onOpened && onOpened();
     } catch (e) {
       setError(e.message === 'CAJA_YA_ABIERTA' ? 'Ya hay una caja abierta'
         : e.message === 'CONTEO_NO_CUADRA' ? 'El conteo no cuadra con el fondo'
+        : e.message === 'CONTEO_INVALIDO' ? 'El conteo de inicio de turno no es válido'
         : e.message === 'FONDO_INVALIDO' ? 'El fondo de apertura no es válido'
         : 'No se pudo abrir la caja. Intenta nuevamente.');
     }
@@ -96,6 +112,32 @@ export default function AbrirCajaModal({ onOpened, onCancel, userName }) {
               Ingresa el fondo de apertura para continuar. Si no hay efectivo, escribe <b>0</b>.
             </p>
           )}
+
+          {/* Conteo de inicio de turno (no afecta el inventario). */}
+          <div className="border-t pt-3 mt-1 mb-1">
+            <p className="font-bold text-zinc-700 mb-2">Inicio de turno 🐔</p>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                ['pollos_horno', 'Pollos al horno'],
+                ['pollos_crudos_ini', 'Pollos crudos'],
+                ['sacos_papas_ini', 'Sacos de papa'],
+              ].map(([k, label]) => (
+                <label key={k} className="block">
+                  <span className="block text-xs font-semibold text-zinc-500 mb-1">{label}</span>
+                  <input type="number" min="0" step="1" inputMode="numeric" value={conteo[k]}
+                    onChange={(e) => setC(k, e.target.value)} placeholder="0"
+                    className="w-full px-2 py-2 text-lg text-center rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
+                </label>
+              ))}
+            </div>
+            <textarea value={obs} onChange={(e) => setObs(e.target.value)} rows={2}
+              placeholder="Observación (opcional)"
+              className="w-full mt-2 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none text-sm" />
+            {!conteoOk && (
+              <p className="text-amber-600 text-xs font-semibold mt-1">Completa el conteo de inicio (números enteros).</p>
+            )}
+          </div>
+
           {error && <p className="text-red-600 font-semibold mb-3">{error}</p>}
 
           <div className="flex gap-2 mt-3">

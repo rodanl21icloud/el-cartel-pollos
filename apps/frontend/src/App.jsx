@@ -15,6 +15,7 @@ import Estadisticas from './screens/Estadisticas.jsx';
 import Movimientos from './screens/Movimientos.jsx';
 import Prediccion from './screens/Prediccion.jsx';
 import Resumen from './screens/Resumen.jsx';
+import Cuadre from './screens/Cuadre.jsx';
 import Banco from './screens/Banco.jsx';
 import Ventas from './screens/Ventas.jsx';
 import VentaRetroactiva from './screens/VentaRetroactiva.jsx';
@@ -177,6 +178,7 @@ export default function App() {
           {screen === 'inventario' && <Inventario />}
           {screen === 'cash' && <CashClose userName={user.name} />}
           {screen === 'resumen' && <Resumen role={user.role} />}
+          {screen === 'cuadre' && <Cuadre />}
           {screen === 'movimientos' && <Movimientos />}
           {screen === 'estadisticas' && <Estadisticas />}
           {screen === 'banco' && <Banco role={user.role} />}
