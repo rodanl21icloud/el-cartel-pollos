@@ -118,6 +118,118 @@ export async function preciosInsumos(req, res) {
   return res.json({ period: { from, to }, insumos });
 }
 
+// ============================================================
+// ESTADÍSTICAS (dashboard analítico). Comparación contra período equivalente:
+// un día -> mismo día de la semana anterior; rangos -> ventana previa de igual largo.
+// ============================================================
+const diaSemana = (iso) => new Intl.DateTimeFormat('es-CL', { weekday: 'long', timeZone: 'America/Santiago' }).format(new Date(iso));
+function rangoComparativo(from, to) {
+  const f = new Date(from), t = new Date(to);
+  const len = t - f;
+  if (len <= 36 * 3600 * 1000) { // un día -> semana anterior (mismo día)
+    return { prevFrom: new Date(f - 7 * 86400000).toISOString(), prevTo: new Date(t - 7 * 86400000).toISOString(), sameWeekday: true };
+  }
+  return { prevFrom: new Date(f - len).toISOString(), prevTo: new Date(f.getTime()).toISOString(), sameWeekday: false };
+}
+const vpct = (a, b) => (b > 0 ? round2(((a - b) / b) * 100) : null);
+
+/** GET /api/reports/estadisticas/ventas?from=&to= — KPIs, serie horaria y ranking. (reports.view) */
+export async function estadisticasVentas(req, res) {
+  const db = getDb();
+  const to = req.query.to || new Date().toISOString();
+  const from = req.query.from || new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
+  const { prevFrom, prevTo, sameWeekday } = rangoComparativo(from, to);
+
+  const agg = async (a, b) => {
+    const r = (await db.execute({ sql: `SELECT COUNT(*) n, COALESCE(SUM(total),0) total, COALESCE(SUM(COALESCE(subtotal,total)),0) bruto, COALESCE(SUM(discount),0) descuentos FROM sales WHERE status='CONFIRMADA' AND sold_at>=? AND sold_at<=?`, args: [a, b] })).rows[0];
+    const cogs = Number((await db.execute({ sql: `SELECT COALESCE(SUM(ABS(qty_delta)*unit_cost),0) c FROM inventory_adjustments WHERE type='VENTA' AND datetime(created_at)>=datetime(?) AND datetime(created_at)<=datetime(?)`, args: [a, b] })).rows[0].c);
+    const total = Number(r.total);
+    return { n: Number(r.n), total, bruto: Number(r.bruto), descuentos: Number(r.descuentos), cogs, ganancia: round2(total - cogs) };
+  };
+  const cur = await agg(from, to), prev = await agg(prevFrom, prevTo);
+  const ticket = cur.n ? round2(cur.total / cur.n) : 0, ticketP = prev.n ? round2(prev.total / prev.n) : 0;
+
+  const bucket = (rows) => { const h = new Array(24).fill(0); const f = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Santiago', hour: '2-digit', hour12: false }); for (const x of rows) h[parseInt(f.format(new Date(x.sold_at)), 10) % 24] += Number(x.total); return h; };
+  const hc = bucket((await db.execute({ sql: `SELECT sold_at,total FROM sales WHERE status='CONFIRMADA' AND sold_at>=? AND sold_at<=?`, args: [from, to] })).rows);
+  const hp = bucket((await db.execute({ sql: `SELECT sold_at,total FROM sales WHERE status='CONFIRMADA' AND sold_at>=? AND sold_at<=?`, args: [prevFrom, prevTo] })).rows);
+  const serie = hc.map((v, i) => ({ hora: i, actual: round2(v), comparativo: round2(hp[i]) }));
+  const horaPico = hc.some((v) => v > 0) ? hc.indexOf(Math.max(...hc)) : null;
+
+  const rank = async (a, b) => (await db.execute({
+    sql: `SELECT p.id,p.name,p.category, SUM(si.qty) u, COALESCE(SUM(si.line_total),0) t,
+            COALESCE((SELECT SUM(pr.qty_per_unit*i.cost_unit) FROM product_recipes pr JOIN ingredients i ON i.id=pr.ingredient_id WHERE pr.product_id=p.id),0) costo_unit
+          FROM sale_items si JOIN sales s ON s.id=si.sale_id AND s.status='CONFIRMADA' AND s.sold_at>=? AND s.sold_at<=?
+          JOIN products p ON p.id=si.product_id GROUP BY p.id`, args: [a, b],
+  })).rows;
+  const curRank = await rank(from, to);
+  const prevMap = new Map((await rank(prevFrom, prevTo)).map((r) => [r.id, Number(r.t)]));
+  const totProd = curRank.reduce((s, r) => s + Number(r.t), 0) || 1;
+  let costosIncompletos = false;
+  const productos = curRank.map((r) => {
+    const t = Number(r.t), u = Number(r.u), cu = Number(r.costo_unit);
+    if (cu <= 0) costosIncompletos = true;
+    const costo = round2(cu * u), gan = round2(t - costo);
+    return { name: r.name, category: r.category, total_ventas: t, unidades: u, precio_prom: u ? round2(t / u) : 0, costo_total: costo, ganancia: gan, margen_pct: t > 0 ? round2(gan / t * 100) : null, participacion_pct: round2(t / totProd * 100), variacion_pct: vpct(t, prevMap.get(r.id) || 0) };
+  }).sort((a, b) => b.total_ventas - a.total_ventas);
+  const estrella = productos[0]?.name || null;
+
+  const insights = [];
+  const vv = vpct(cur.total, prev.total);
+  if (vv != null) insights.push(`Tus ventas ${cur.total >= prev.total ? 'subieron' : 'bajaron'} ${Math.abs(vv)}% vs ${sameWeekday ? 'el ' + diaSemana(from) + ' anterior' : 'el período anterior'}`);
+  if (estrella) insights.push(`Tu producto estrella fue ${estrella}`);
+  if (horaPico != null) insights.push(`Tu hora pico fue cerca de las ${String(horaPico).padStart(2, '0')}:00`);
+  const vg = vpct(cur.ganancia, prev.ganancia);
+  if (vg != null && vv != null && vg < vv) insights.push('Tu ganancia cayó más que tus ventas; revisa costos o mix de productos');
+  if (costosIncompletos) insights.push('Hay productos sin costo cargado: el margen es estimado');
+
+  return res.json({
+    period: { from, to },
+    comparativo: { from: prevFrom, to: prevTo, etiqueta: sameWeekday ? `Comparado con el ${diaSemana(from)} anterior` : 'Comparado con el período anterior' },
+    costos_incompletos: costosIncompletos,
+    kpis: {
+      total_ventas: { valor: cur.total, prev: prev.total, var: vv },
+      ganancia: { valor: cur.ganancia, prev: prev.ganancia, var: vg, nota: 'Se calcula según el costo de tus productos (recetas)' },
+      margen_pct: { valor: cur.total > 0 ? round2(cur.ganancia / cur.total * 100) : null },
+      ticket: { valor: ticket, prev: ticketP, var: vpct(ticket, ticketP) },
+      pedidos: { valor: cur.n, prev: prev.n, var: vpct(cur.n, prev.n) },
+      descuentos: { valor: cur.descuentos, prev: prev.descuentos, var: vpct(cur.descuentos, prev.descuentos) },
+    },
+    serie, hora_pico: horaPico, productos, producto_estrella: estrella, insights,
+  });
+}
+
+/** GET /api/reports/estadisticas/gastos?from=&to= — total, breakdown, serie y detalle. (reports.view) */
+export async function estadisticasGastos(req, res) {
+  const db = getDb();
+  const to = req.query.to || new Date().toISOString();
+  const from = req.query.from || new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
+  const { prevFrom, prevTo, sameWeekday } = rangoComparativo(from, to);
+
+  const sum = async (a, b) => { const r = (await db.execute({ sql: `SELECT COUNT(*) n, COALESCE(SUM(amount),0) t FROM expenses WHERE datetime(spent_at)>=datetime(?) AND datetime(spent_at)<=datetime(?)`, args: [a, b] })).rows[0]; return { n: Number(r.n), total: Number(r.t) }; };
+  const ventasRange = async (a, b) => Number((await db.execute({ sql: `SELECT COALESCE(SUM(total),0) t FROM sales WHERE status='CONFIRMADA' AND sold_at>=? AND sold_at<=?`, args: [a, b] })).rows[0].t);
+  const cur = await sum(from, to), prev = await sum(prevFrom, prevTo);
+  const ventas = await ventasRange(from, to);
+
+  const byCat = async (a, b) => (await db.execute({ sql: `SELECT c.name categoria, c.kind, COALESCE(SUM(e.amount),0) t FROM expenses e JOIN expense_categories c ON c.id=e.category_id WHERE datetime(e.spent_at)>=datetime(?) AND datetime(e.spent_at)<=datetime(?) GROUP BY c.id ORDER BY t DESC`, args: [a, b] })).rows;
+  const cats = await byCat(from, to);
+  const prevCat = new Map((await byCat(prevFrom, prevTo)).map((r) => [r.categoria, Number(r.t)]));
+  const breakdown = cats.map((r) => ({ categoria: r.categoria, kind: r.kind, total: Number(r.t), pct: cur.total > 0 ? round2(Number(r.t) / cur.total * 100) : 0, variacion_pct: vpct(Number(r.t), prevCat.get(r.categoria) || 0) }));
+  const serie = (await db.execute({ sql: `SELECT substr(spent_at,1,10) dia, COALESCE(SUM(amount),0) t FROM expenses WHERE datetime(spent_at)>=datetime(?) AND datetime(spent_at)<=datetime(?) GROUP BY dia ORDER BY dia`, args: [from, to] })).rows.map((r) => ({ dia: r.dia, total: Number(r.t) }));
+  const detalle = (await db.execute({ sql: `SELECT e.spent_at fecha, c.name categoria, e.supplier proveedor, e.description descripcion, e.payment_method, e.amount FROM expenses e JOIN expense_categories c ON c.id=e.category_id WHERE datetime(e.spent_at)>=datetime(?) AND datetime(e.spent_at)<=datetime(?) ORDER BY e.spent_at DESC LIMIT 100`, args: [from, to] })).rows.map((r) => ({ ...r, amount: Number(r.amount) }));
+
+  const insights = [];
+  if (breakdown[0]) insights.push(`Categoría dominante: ${breakdown[0].categoria} (${breakdown[0].pct}% del gasto)`);
+  const vGastos = vpct(cur.total, prev.total), vVentas = vpct(ventas, await ventasRange(prevFrom, prevTo));
+  if (vGastos != null && vVentas != null && vGastos > vVentas) insights.push('Tus gastos crecieron más rápido que tus ventas');
+
+  return res.json({
+    period: { from, to },
+    comparativo: { etiqueta: sameWeekday ? `Comparado con el ${diaSemana(from)} anterior` : 'Comparado con el período anterior' },
+    kpis: { total: { valor: cur.total, prev: prev.total, var: vGastos }, movimientos: cur.n, prom_diario: round2(cur.total / Math.max(1, serie.length || 1)), pct_sobre_ventas: ventas > 0 ? round2(cur.total / ventas * 100) : null },
+    breakdown, serie, detalle, insights,
+  });
+}
+
 /**
  * GET /api/reports/turnos — Cuadre operativo de turno (pollos/papas).
  * Cruza el conteo de APERTURA (cash_sessions) y CIERRE (closures) SIN tocar el

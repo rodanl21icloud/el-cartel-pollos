@@ -16,7 +16,7 @@ import { registerMerma, listIngredients, lowStockAlerts,
 import { createProduct, updateProduct, deleteProduct, updateIngredient, listCatalog } from './controllers/admin.js';
 import { getRecipe, setRecipe } from './controllers/recipes.js';
 import { listCategories, createExpense, listExpenses, updateExpense } from './controllers/expenses.js';
-import { turnSummary, closuresHistory, cashFlow, pnl, stats, dashboard, movements, exportReport, forecast, turnos, consumoInsumos, preciosInsumos } from './controllers/reports.js';
+import { turnSummary, closuresHistory, cashFlow, pnl, stats, dashboard, movements, exportReport, forecast, turnos, consumoInsumos, preciosInsumos, estadisticasVentas, estadisticasGastos } from './controllers/reports.js';
 import { getPermissions, myPermissions, updatePermission } from './controllers/permissions.js';
 import { listGroups, createGroup, deleteGroup, createOption, deleteOption, setGroupProducts, getProductModifiers } from './controllers/modifiers.js';
 import { listClients, createClient } from './controllers/clients.js';
@@ -141,6 +141,8 @@ app.get('/api/reports/closures', requirePermission('reports.view'), closuresHist
 app.get('/api/reports/turnos', requirePermission('reports.view'), turnos);
 app.get('/api/reports/consumo-insumos', requirePermission('reports.view'), consumoInsumos);
 app.get('/api/reports/precios-insumos', requirePermission('reports.view'), preciosInsumos);
+app.get('/api/reports/estadisticas/ventas', requirePermission('reports.view'), estadisticasVentas);
+app.get('/api/reports/estadisticas/gastos', requirePermission('reports.view'), estadisticasGastos);
 app.get('/api/reports/cash-flow', requirePermission('reports.view'), cashFlow);
 app.get('/api/reports/pnl', requirePermission('reports.view'), pnl);
 app.get('/api/reports/stats', requirePermission('reports.view'), stats);

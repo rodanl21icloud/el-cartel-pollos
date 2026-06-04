@@ -1,162 +1,233 @@
-import { useEffect, useState } from 'react';
-import { api, apiDownload } from '../lib/api.js';
-import PeriodNav from '../components/PeriodNav.jsx';
+import { useEffect, useMemo, useState } from 'react';
+import { api } from '../lib/api.js';
+import { Spinner, ErrorState, EmptyState } from '../components/ui/States.jsx';
 
 const money = (n) => '$' + Number(n || 0).toLocaleString('es-CL');
+const fechaCorta = (iso) => { try { return new Date(iso).toLocaleDateString('es-CL', { day: '2-digit', month: 'short' }); } catch { return ''; } };
+
+// Selector de período (mismo criterio que el resto de la app).
+const PERIODOS = [{ id: 'dia', label: 'Hoy' }, { id: 'semana', label: 'Semana' }, { id: 'mes', label: 'Mes' }, { id: 'anio', label: 'Año' }, { id: 'custom', label: 'Personalizado' }];
+function rango(id, cFrom, cTo) {
+  const to = new Date(); let from = new Date(); from.setHours(0, 0, 0, 0);
+  if (id === 'semana') from.setDate(from.getDate() - ((from.getDay() + 6) % 7));
+  else if (id === 'mes') from.setDate(1);
+  else if (id === 'anio') from.setMonth(0, 1);
+  else if (id === 'custom') { if (!cFrom || !cTo) return null; return { from: new Date(cFrom + 'T00:00:00').toISOString(), to: new Date(cTo + 'T23:59:59').toISOString() }; }
+  return { from: from.toISOString(), to: to.toISOString() };
+}
+const TABS = [{ id: 'ventas', label: 'Ventas' }, { id: 'gastos', label: 'Gastos' }, { id: 'propinas', label: 'Propinas' }, { id: 'empleados', label: 'Empleados' }];
 
 export default function Estadisticas() {
-  const [period, setPeriod] = useState(null);
+  const [tab, setTab] = useState('ventas');
+  const [per, setPer] = useState('dia');
+  const [cFrom, setCFrom] = useState(''); const [cTo, setCTo] = useState('');
   const [data, setData] = useState(null);
-  const [error, setError] = useState('');
-  const [downloading, setDownloading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const r = useMemo(() => rango(per, cFrom, cTo), [per, cFrom, cTo]);
+  const premium = tab === 'propinas' || tab === 'empleados';
 
   useEffect(() => {
-    if (!period) return;
-    setData(null); setError('');
-    const p = new URLSearchParams({ from: period.from, to: period.to });
-    api(`/reports/stats?${p}`).then(setData).catch((e) => setError(e.message));
-  }, [period]);
-
-  async function descargar(tipo) {
-    if (!period) return;
-    setDownloading(true);
-    try { await apiDownload(`/reports/export?type=${tipo}&from=${period.from}&to=${period.to}`, `${tipo}_${period.from.slice(0, 10)}.csv`); }
-    catch (e) { setError(e.message); } finally { setDownloading(false); }
-  }
-
-  if (error) return <p className="text-red-600 text-center mt-10">{error === 'PERMISO_DENEGADO' ? 'No tienes permiso para ver estadísticas.' : error}</p>;
-
-  const maxHora = data ? Math.max(1, ...data.por_hora.map((h) => h.monto)) : 1;
-  const horasActivas = data ? data.por_hora.filter((h) => h.monto > 0) : [];
-  const maxRankMonto = data ? Math.max(1, ...data.ranking.map((r) => r.monto)) : 1;
-  const cmp = data?.comparativo;
+    if (premium) return;
+    if (!r) { setData(null); return; }
+    setData(null); setError(null);
+    api(`/reports/estadisticas/${tab}?from=${encodeURIComponent(r.from)}&to=${encodeURIComponent(r.to)}`).then(setData).catch(setError);
+  }, [tab, r, premium]);
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="font-black text-xl">Estadísticas</h2>
-        <button onClick={() => descargar('productos')} disabled={downloading || !data}
-          className="px-4 py-2 rounded-xl bg-ink text-white font-bold text-sm flex items-center gap-1.5 disabled:opacity-50">
-          <span>⤓</span> {downloading ? 'Generando…' : 'Descargar reporte'}
-        </button>
-      </div>
-
-      <PeriodNav onChange={setPeriod} />
-
-      {!data ? <p className="text-zinc-500 text-center mt-10">Cargando estadísticas…</p> : (
-        <>
-          {/* Cards con comparación vs período anterior */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <BigCard label="Total ventas" value={money(data.total_ventas)} delta={cmp?.delta_total} />
-            <BigCard label="N° de ventas" value={data.n_ventas} delta={cmp?.delta_n} />
-            <BigCard label="Ticket promedio" value={money(data.ticket_promedio)} />
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex gap-1 bg-white rounded-xl p-1 shadow-card flex-wrap">
+            {PERIODOS.map((p) => <button key={p.id} onClick={() => setPer(p.id)} className={`px-3 py-1.5 rounded-lg font-bold text-sm ${per === p.id ? 'bg-cartel text-white' : 'text-ink-mute'}`}>{p.label}</button>)}
           </div>
-
-          {/* Comparativo de barras vs período anterior */}
-          <div className="bg-white rounded-2xl p-4 shadow">
-            <h3 className="font-black mb-3">Detalle de ventas</h3>
-            <CompareBars prev={cmp?.total_previo || 0} curr={data.total_ventas} />
-          </div>
-
-          {/* Ventas por hora */}
-          <div className="bg-white rounded-2xl p-4 shadow">
-            <h3 className="font-black mb-3">Ventas por hora</h3>
-            {horasActivas.length ? (
-              <div className="flex items-end gap-1 h-40">
-                {data.por_hora.map((h) => (
-                  <div key={h.hora} className="flex-1 flex flex-col items-center justify-end group">
-                    <div className="w-full bg-cartel/80 rounded-t hover:bg-cartel transition" style={{ height: `${(h.monto / maxHora) * 100}%` }}
-                      title={`${h.hora}:00 · ${money(h.monto)} (${h.ventas})`} />
-                    <span className="text-[9px] text-zinc-400 mt-1">{h.hora}</span>
-                  </div>
-                ))}
-              </div>
-            ) : <p className="text-zinc-400">Sin ventas en el período.</p>}
-            <p className="text-xs text-zinc-400 mt-2">Hora local (Chile). Pasa el cursor para ver el monto.</p>
-          </div>
-
-          {/* Detalle de productos vendidos */}
-          <div className="bg-white rounded-2xl p-4 shadow">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-black">Detalle de productos vendidos</h3>
-              <span className="text-xs text-ink-mute">{data.ranking.length} productos</span>
+          {per === 'custom' && (
+            <div className="flex gap-2">
+              <input type="date" value={cFrom} onChange={(e) => setCFrom(e.target.value)} className="px-2 py-1.5 rounded-lg border-2 border-slate-200 text-sm" />
+              <input type="date" value={cTo} onChange={(e) => setCTo(e.target.value)} className="px-2 py-1.5 rounded-lg border-2 border-slate-200 text-sm" />
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[480px]">
-                <thead><tr className="text-left text-ink-mute border-b">
-                  <th className="p-2">Producto</th><th className="text-right">Total ventas</th><th className="text-right">Unidades</th>
-                </tr></thead>
-                <tbody>
-                  {data.ranking.map((r, i) => (
-                    <tr key={r.name} className="border-b last:border-0">
-                      <td className="p-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold">{r.name}</span>
-                          {i === 0 && <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full whitespace-nowrap">⭐ Producto estrella</span>}
-                        </div>
-                        <div className="h-1.5 bg-zinc-100 rounded-full mt-1 max-w-[220px]"><div className="h-1.5 bg-cartel rounded-full" style={{ width: `${(r.monto / maxRankMonto) * 100}%` }} /></div>
-                      </td>
-                      <td className="text-right font-bold tabular-nums whitespace-nowrap">{money(r.monto)}</td>
-                      <td className="text-right tabular-nums text-zinc-600">{r.unidades}</td>
-                    </tr>
-                  ))}
-                  {!data.ranking.length && <tr><td colSpan="3" className="p-3 text-center text-zinc-400">Sin ventas en el período.</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Por método de pago */}
-          <div className="bg-white rounded-2xl p-4 shadow">
-            <h3 className="font-black mb-3">Por método de pago</h3>
-            <ul className="space-y-2">
-              {data.por_metodo.map((m) => (
-                <li key={m.metodo} className="flex justify-between">
-                  <span className="font-semibold">{m.metodo}</span>
-                  <span className="text-zinc-600">{m.ventas} vta · <b>{money(m.monto)}</b></span>
-                </li>
-              ))}
-              {!data.por_metodo.length && <li className="text-zinc-400">Sin datos.</li>}
-            </ul>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-// Dos barras: período anterior (claro) vs actual (oscuro), estilo Treinta.
-function CompareBars({ prev, curr }) {
-  const max = Math.max(1, prev, curr);
-  const Bar = ({ label, value, cls }) => (
-    <div className="flex-1 flex flex-col items-center justify-end">
-      <div className="text-xs font-bold text-ink-mute mb-1">{money(value)}</div>
-      <div className={`w-full rounded-t-lg ${cls}`} style={{ height: `${Math.max(4, (value / max) * 160)}px` }} />
-      <div className="text-xs text-ink-mute mt-2 text-center">{label}</div>
-    </div>
-  );
-  return (
-    <div>
-      <div className="flex items-end gap-6 h-52 px-4">
-        <Bar label="Período anterior" value={prev} cls="bg-emerald-200" />
-        <Bar label="Período actual" value={curr} cls="bg-emerald-600" />
-      </div>
-    </div>
-  );
-}
-
-function BigCard({ label, value, delta }) {
-  const has = delta != null;
-  const up = has && delta >= 0;
-  return (
-    <div className="bg-white rounded-2xl p-4 shadow">
-      <div className="text-xs text-zinc-500 uppercase tracking-wide">{label}</div>
-      <div className="text-2xl font-black text-cartel mt-0.5">{value}</div>
-      {has ? (
-        <div className={`text-xs font-bold mt-1 inline-flex items-center gap-1 ${up ? 'text-emerald-600' : 'text-red-500'}`}>
-          {up ? '▲' : '▼'} {Math.abs(delta)}% <span className="text-ink-mute font-normal">vs período anterior</span>
+          )}
         </div>
-      ) : <div className="text-xs text-ink-mute mt-1">Sin período anterior comparable</div>}
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-white rounded-xl p-1 shadow-card overflow-x-auto">
+        {TABS.map((t) => (
+          <button key={t.id} onClick={() => setTab(t.id)} className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap ${tab === t.id ? 'bg-cartel text-white' : 'text-ink-mute'}`}>
+            {t.label}{(t.id === 'propinas' || t.id === 'empleados') && ' ✨'}
+          </button>
+        ))}
+      </div>
+
+      {premium ? <Premium tab={tab} />
+        : per === 'custom' && !r ? <p className="text-ink-mute text-center mt-10">Elige las fechas.</p>
+          : error ? <ErrorState error={error} onRetry={() => setPer((p) => p)} />
+            : !data ? <Spinner label="Cargando estadísticas…" />
+              : tab === 'ventas' ? <Ventas d={data} /> : <Gastos d={data} />}
+    </div>
+  );
+}
+
+function Delta({ v, invert }) {
+  if (v == null) return <span className="text-[11px] text-ink-mute">sin base de comparación</span>;
+  const up = v >= 0, good = invert ? !up : up;
+  return <span className={`text-xs font-bold ${good ? 'text-emerald-600' : 'text-cartel'}`}>{up ? '▲' : '▼'} {Math.abs(v)}%</span>;
+}
+function Kpi({ label, value, v, invert, note, big }) {
+  return (
+    <div className="card p-4">
+      <div className="text-[11px] text-ink-mute uppercase tracking-wide">{label}</div>
+      <div className={`font-black text-ink ${big ? 'text-3xl' : 'text-2xl'}`}>{value}</div>
+      <div className="mt-0.5">{v !== undefined ? <Delta v={v} invert={invert} /> : note ? <span className="text-[11px] text-ink-mute">{note}</span> : null}</div>
+    </div>
+  );
+}
+function Chips({ items }) {
+  if (!items?.length) return null;
+  return <div className="flex flex-wrap gap-2">{items.map((t, i) => <span key={i} className="text-sm bg-cartel/5 border border-cartel/20 text-ink rounded-full px-3 py-1.5 font-semibold">💡 {t}</span>)}</div>;
+}
+function csv(name, header, rows) {
+  const esc = (s) => { s = String(s ?? ''); return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const blob = new Blob(['﻿' + [header, ...rows].map((r) => r.map(esc).join(';')).join('\r\n')], { type: 'text/csv' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name + '.csv'; a.click();
+}
+
+function Ventas({ d }) {
+  const k = d.kpis;
+  const horas = d.serie.filter((s) => s.actual > 0 || s.comparativo > 0);
+  const maxH = Math.max(1, ...d.serie.map((s) => Math.max(s.actual, s.comparativo)));
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-ink-mute">{d.comparativo.etiqueta}</p>
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+        <Kpi label="Total ventas" value={money(k.total_ventas.valor)} v={k.total_ventas.var} big />
+        <Kpi label="Ganancia de las ventas" value={money(k.ganancia.valor)} v={k.ganancia.var} note={k.ganancia.nota} big />
+        <Kpi label="Margen" value={k.margen_pct.valor != null ? k.margen_pct.valor + '%' : '—'} note={d.costos_incompletos ? 'estimado (faltan costos)' : 'ganancia / ventas'} />
+        <Kpi label="Ticket promedio" value={money(k.ticket.valor)} v={k.ticket.var} />
+        <Kpi label="N° pedidos" value={k.pedidos.valor} v={k.pedidos.var} />
+        <Kpi label="Descuentos" value={money(k.descuentos.valor)} v={k.descuentos.var} invert />
+      </div>
+
+      <Chips items={d.insights} />
+
+      {/* Detalle de ventas (hora actual vs comparativo) */}
+      <div className="card p-4">
+        <h3 className="font-black mb-1">Detalle de ventas</h3>
+        <div className="flex gap-4 text-xs text-ink-mute mb-3">
+          <span className="flex items-center gap-1"><span className="w-3 h-3 bg-cartel rounded-sm" /> Actual</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 bg-slate-300 rounded-sm" /> Período anterior</span>
+        </div>
+        {!horas.length ? <EmptyState icon="📊" title="Sin ventas en el período" /> : (
+          <div className="flex items-end gap-1 h-44 overflow-x-auto">
+            {horas.map((s) => (
+              <div key={s.hora} className="flex-1 min-w-[14px] h-full flex flex-col items-center justify-end" title={`${String(s.hora).padStart(2, '0')}:00 · Actual ${money(s.actual)} · Anterior ${money(s.comparativo)}`}>
+                <div className="w-full flex-1 flex items-end gap-0.5 justify-center">
+                  <div className="w-1/2 bg-cartel rounded-t" style={{ height: `${(s.actual / maxH) * 100}%` }} />
+                  <div className="w-1/2 bg-slate-300 rounded-t" style={{ height: `${(s.comparativo / maxH) * 100}%` }} />
+                </div>
+                <span className="text-[9px] text-ink-mute mt-1">{s.hora}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Ranking de productos */}
+      <div className="card p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-black">Detalle de productos vendidos</h3>
+          <button onClick={() => csv('productos', ['Producto', 'Categoría', 'Total ventas', 'Unidades', 'Margen %', 'Participación %'], d.productos.map((p) => [p.name, p.category, Math.round(p.total_ventas), p.unidades, p.margen_pct ?? '', p.participacion_pct]))}
+            className="text-xs font-bold px-3 py-1.5 rounded-lg bg-zinc-100 text-zinc-700">Exportar CSV</button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[560px]">
+            <thead><tr className="text-left text-ink-mute border-b"><th className="py-2">Producto</th><th className="text-right">Total ventas</th><th className="text-right">Unid.</th><th className="text-right">Margen</th><th className="text-right">Part.</th><th className="text-right">vs ant.</th></tr></thead>
+            <tbody>
+              {d.productos.map((p, i) => (
+                <tr key={p.name} className={`border-b last:border-0 ${i === 0 ? 'bg-amber-50' : ''}`}>
+                  <td className="py-2 font-semibold">{i === 0 && '⭐ '}{p.name}<span className="block text-[11px] text-ink-mute">{p.category}</span></td>
+                  <td className="text-right font-bold tabular-nums">{money(p.total_ventas)}</td>
+                  <td className="text-right tabular-nums">{p.unidades}</td>
+                  <td className={`text-right tabular-nums ${p.margen_pct != null && p.margen_pct < 25 ? 'text-cartel font-bold' : ''}`}>{p.margen_pct != null ? p.margen_pct + '%' : '—'}</td>
+                  <td className="text-right text-ink-mute tabular-nums">{p.participacion_pct}%</td>
+                  <td className="text-right tabular-nums"><Delta v={p.variacion_pct} /></td>
+                </tr>
+              ))}
+              {!d.productos.length && <tr><td colSpan="6" className="py-3 text-ink-mute">Sin productos vendidos.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        {d.productos.length > 0 && <p className="text-[11px] text-ink-mute mt-2">⭐ Producto estrella · margen rojo = baja rentabilidad. La ganancia se calcula según el costo de tus productos.</p>}
+      </div>
+    </div>
+  );
+}
+
+function Gastos({ d }) {
+  const k = d.kpis;
+  const maxC = Math.max(1, ...d.breakdown.map((b) => b.total));
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-ink-mute">{d.comparativo.etiqueta}</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Kpi label="Total gastos" value={money(k.total.valor)} v={k.total.var} invert big />
+        <Kpi label="Movimientos" value={k.movimientos} note="gastos registrados" />
+        <Kpi label="Promedio diario" value={money(k.prom_diario)} note="por día con gasto" />
+        <Kpi label="% sobre ventas" value={k.pct_sobre_ventas != null ? k.pct_sobre_ventas + '%' : '—'} note="gastos / ventas" />
+      </div>
+
+      <Chips items={d.insights} />
+
+      <div className="card p-4">
+        <h3 className="font-black mb-3">Detalle de gastos por categoría</h3>
+        {!d.breakdown.length ? <EmptyState icon="💸" title="Sin gastos en el período" /> : d.breakdown.map((b) => (
+          <div key={b.categoria} className="mb-2">
+            <div className="flex justify-between text-sm"><span className="font-semibold">{b.categoria}{b.kind === 'RETIRO' && <span className="text-[11px] text-ink-mute"> · retiro</span>}</span><span className="text-ink-mute">{b.pct}% · {money(b.total)} <Delta v={b.variacion_pct} invert /></span></div>
+            <div className="h-2 bg-slate-100 rounded-full mt-0.5"><div className="h-2 bg-cartel rounded-full" style={{ width: `${(b.total / maxC) * 100}%` }} /></div>
+          </div>
+        ))}
+      </div>
+
+      <div className="card p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-black">Detalle de gastos</h3>
+          <button onClick={() => csv('gastos', ['Fecha', 'Categoría', 'Proveedor', 'Descripción', 'Método', 'Monto'], d.detalle.map((g) => [fechaCorta(g.fecha), g.categoria, g.proveedor || '', g.descripcion, g.payment_method, Math.round(g.amount)]))}
+            className="text-xs font-bold px-3 py-1.5 rounded-lg bg-zinc-100 text-zinc-700">Exportar CSV</button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[520px]">
+            <thead><tr className="text-left text-ink-mute border-b"><th className="py-2">Fecha</th><th>Categoría</th><th>Descripción</th><th>Método</th><th className="text-right">Monto</th></tr></thead>
+            <tbody>
+              {d.detalle.map((g, i) => (
+                <tr key={i} className="border-b last:border-0">
+                  <td className="py-2 whitespace-nowrap">{fechaCorta(g.fecha)}</td>
+                  <td>{g.categoria}</td>
+                  <td className="max-w-[180px] truncate">{g.descripcion}{g.proveedor ? <span className="block text-[11px] text-ink-mute">{g.proveedor}</span> : null}</td>
+                  <td>{g.payment_method}</td>
+                  <td className="text-right font-bold tabular-nums">{money(g.amount)}</td>
+                </tr>
+              ))}
+              {!d.detalle.length && <tr><td colSpan="5" className="py-3 text-ink-mute">Sin gastos.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Premium({ tab }) {
+  const t = tab === 'propinas'
+    ? { icon: '💵', title: 'Propinas', hint: 'Análisis de propinas por turno, empleado y canal.' }
+    : { icon: '👥', title: 'Empleados', hint: 'Productividad, ticket promedio y desempeño por turno.' };
+  return (
+    <div className="card p-8 text-center">
+      <div className="inline-block text-xs font-black bg-amber-100 text-amber-700 border border-amber-300 rounded-full px-3 py-1 mb-3">✨ Función premium</div>
+      <div className="text-5xl mb-2">{t.icon}</div>
+      <h3 className="text-xl font-black mb-1">{t.title}</h3>
+      <p className="text-ink-mute max-w-md mx-auto">{t.hint}</p>
+      <p className="text-xs text-ink-mute mt-3">Requiere registrar propinas y turnos del equipo (próxima fase).</p>
     </div>
   );
 }
