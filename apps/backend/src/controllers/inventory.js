@@ -79,7 +79,7 @@ const ENTERAS = new Set(['unidad', 'empaque']);
  */
 export async function setIngredientStock(req, res) {
   const { id } = req.params;
-  const { new_qty, reason, pin, note, mode, cost_unit, name } = req.body || {};
+  const { new_qty, reason, pin, note, mode, cost_unit, name, unit } = req.body || {};
 
   if (typeof new_qty !== 'number' || !Number.isFinite(new_qty) || new_qty < 0) {
     return res.status(400).json({ error: 'CANTIDAD_INVALIDA' });
@@ -87,6 +87,10 @@ export async function setIngredientStock(req, res) {
   const costProvided = cost_unit !== undefined && cost_unit !== null && cost_unit !== '';
   if (costProvided && (typeof cost_unit !== 'number' || !Number.isFinite(cost_unit) || cost_unit < 0)) {
     return res.status(400).json({ error: 'COSTO_INVALIDO' });
+  }
+  const unitProvided = unit !== undefined && unit !== null && unit !== '';
+  if (unitProvided && !['unidad', 'gramo', 'mililitro', 'empaque'].includes(unit)) {
+    return res.status(400).json({ error: 'UNIDAD_INVALIDA' });
   }
   if (!reason || !String(reason).trim()) return res.status(400).json({ error: 'MOTIVO_OBLIGATORIO' });
   if (!pin) return res.status(400).json({ error: 'PIN_REQUERIDO' });
@@ -104,9 +108,10 @@ export async function setIngredientStock(req, res) {
   const ing = (await db.execute({ sql: `SELECT id, name, unit, stock_qty, cost_unit FROM ingredients WHERE id = ? AND is_active = 1`, args: [id] })).rows[0];
   if (!ing) return res.status(404).json({ error: 'INSUMO_NO_ENCONTRADO' });
 
-  // Validación de decimales según la unidad (unidad/empaque = enteros).
-  if (ENTERAS.has(ing.unit) && !Number.isInteger(new_qty)) {
-    return res.status(400).json({ error: 'DECIMAL_NO_PERMITIDO', detail: `La unidad "${ing.unit}" no admite decimales.` });
+  const unitNuevo = unitProvided ? unit : ing.unit;
+  // Validación de decimales según la unidad efectiva (unidad/empaque = enteros).
+  if (ENTERAS.has(unitNuevo) && !Number.isInteger(new_qty)) {
+    return res.status(400).json({ error: 'DECIMAL_NO_PERMITIDO', detail: `La unidad "${unitNuevo}" no admite decimales.` });
   }
 
   const stockAnterior = Number(ing.stock_qty);
@@ -124,7 +129,7 @@ export async function setIngredientStock(req, res) {
 
   try {
     await db.batch([
-      { sql: `UPDATE ingredients SET name = ?, stock_qty = ?, cost_unit = ?, updated_at = datetime('now') WHERE id = ?`, args: [nameNuevo, stockNuevo, costNuevo, id] },
+      { sql: `UPDATE ingredients SET name = ?, unit = ?, stock_qty = ?, cost_unit = ?, updated_at = datetime('now') WHERE id = ?`, args: [nameNuevo, unitNuevo, stockNuevo, costNuevo, id] },
       {
         sql: `INSERT INTO inventory_adjustments (id, ingredient_id, user_id, type, qty_delta, unit_cost, reason)
               VALUES (?,?,?, 'CONTEO', ?, ?, ?)`,
@@ -134,7 +139,7 @@ export async function setIngredientStock(req, res) {
         sql: `INSERT INTO audit_logs (id, user_id, action, entity, entity_id, severity, metadata, ip_address)
               VALUES (?,?, 'STOCK_AJUSTE', 'ingredients', ?, 'WARN', ?, ?)`,
         args: [randomUUID(), req.user.id, id,
-               JSON.stringify({ ingredient: nameNuevo, nombre_anterior: ing.name, unidad: ing.unit, tipo, stock_anterior: stockAnterior, stock_nuevo: stockNuevo, delta, costo_anterior: costAnterior, costo_nuevo: costNuevo, motivo, observacion: obs }), req.ip || null],
+               JSON.stringify({ ingredient: nameNuevo, nombre_anterior: ing.name, unidad: unitNuevo, unidad_anterior: ing.unit, tipo, stock_anterior: stockAnterior, stock_nuevo: stockNuevo, delta, costo_anterior: costAnterior, costo_nuevo: costNuevo, motivo, observacion: obs }), req.ip || null],
       },
     ], 'write');
   } catch (e) {
