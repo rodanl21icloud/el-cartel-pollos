@@ -15,7 +15,7 @@ import { registerMerma, listIngredients, lowStockAlerts,
          createIngredient, deleteIngredient, restockIngredient, setIngredientStock } from './controllers/inventory.js';
 import { createProduct, updateProduct, deleteProduct, updateIngredient, listCatalog } from './controllers/admin.js';
 import { getRecipe, setRecipe } from './controllers/recipes.js';
-import { listCategories, createExpense, listExpenses } from './controllers/expenses.js';
+import { listCategories, createExpense, listExpenses, updateExpense } from './controllers/expenses.js';
 import { turnSummary, closuresHistory, cashFlow, pnl, stats, dashboard, movements, exportReport, forecast, turnos, consumoInsumos, preciosInsumos } from './controllers/reports.js';
 import { getPermissions, myPermissions, updatePermission } from './controllers/permissions.js';
 import { listGroups, createGroup, deleteGroup, createOption, deleteOption, setGroupProducts, getProductModifiers } from './controllers/modifiers.js';
@@ -73,6 +73,7 @@ app.post('/api/cash-register/close', requirePermission('cash.operate'), closeCas
 app.get('/api/expenses/categories', listCategories);
 app.post('/api/expenses', requirePermission('expenses.manage'), createExpense);
 app.get('/api/expenses', requirePermission('reports.view'), listExpenses);
+app.put('/api/expenses/:id', requirePermission('expenses.manage'), updateExpense);
 
 // Clientes / domicilios (lookup por teléfono para autocompletar en la venta)
 app.get('/api/clients', listClients);
