@@ -276,18 +276,21 @@ function NewIngredient({ onDone, onError }) {
 function RestockForm({ ingredient, onDone, onError }) {
   const [qty, setQty] = useState('');
   const [cost, setCost] = useState(String(ingredient.cost_unit));
+  const [proveedor, setProveedor] = useState('');
   const [linkExpense, setLinkExpense] = useState(true);
   const [metodo, setMetodo] = useState('EFECTIVO');
   const monto = (Number(qty) || 0) * (Number(cost) || 0);
   async function save() {
     onError('');
     if (!(Number(qty) > 0)) return onError('Cantidad inválida');
+    if (!(Number(cost) > 0)) return onError('Ingresa el costo unitario de esta compra');
     try {
       const r = await api(`/inventory/ingredients/${ingredient.id}/restock`, {
         method: 'POST',
         body: {
           qty: Number(qty), unit_cost: Number(cost),
-          expense: linkExpense ? { payment_method: metodo } : undefined,
+          supplier: proveedor.trim() || undefined,
+          expense: linkExpense ? { payment_method: metodo, supplier: proveedor.trim() || undefined } : undefined,
         },
       });
       onDone(r);
@@ -298,9 +301,11 @@ function RestockForm({ ingredient, onDone, onError }) {
       <div className="grid grid-cols-2 gap-2">
         <input type="number" min="0" placeholder={`Cantidad (${ingredient.unit})`} value={qty} onChange={(e) => setQty(e.target.value)}
           className="px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
-        <input type="number" min="0" placeholder="Costo unitario" value={cost} onChange={(e) => setCost(e.target.value)}
+        <input type="number" min="0" placeholder="Costo unitario de esta compra" value={cost} onChange={(e) => setCost(e.target.value)}
           className="px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
       </div>
+      <input placeholder="Proveedor (opcional)" value={proveedor} onChange={(e) => setProveedor(e.target.value)}
+        className="w-full px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
       <label className="flex items-center gap-2 text-sm font-semibold">
         <input type="checkbox" checked={linkExpense} onChange={(e) => setLinkExpense(e.target.checked)} />
         Registrar como gasto ({money(monto)})

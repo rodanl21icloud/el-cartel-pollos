@@ -219,44 +219,54 @@ export async function deleteIngredient(req, res) {
  */
 export async function restockIngredient(req, res) {
   const { id } = req.params;
-  const { qty, unit_cost, expense } = req.body || {};
+  const { qty, unit_cost, supplier, note, expense } = req.body || {};
   if (typeof qty !== 'number' || !(qty > 0)) return res.status(400).json({ error: 'CANTIDAD_INVALIDA' });
-  if (unit_cost != null && (typeof unit_cost !== 'number' || unit_cost < 0)) return res.status(400).json({ error: 'COSTO_INVALIDO' });
+  // El costo de ESTA compra es obligatorio (>0): es lo que permite monitorear el precio.
+  if (typeof unit_cost !== 'number' || !(unit_cost > 0)) return res.status(400).json({ error: 'COSTO_INVALIDO' });
 
   const db = getDb();
-  const ing = await db.execute({ sql: `SELECT id, name, cost_unit FROM ingredients WHERE id = ? AND is_active = 1`, args: [id] });
+  const ing = await db.execute({ sql: `SELECT id, name, stock_qty, cost_unit FROM ingredients WHERE id = ? AND is_active = 1`, args: [id] });
   if (!ing.rows.length) return res.status(404).json({ error: 'INSUMO_NO_ENCONTRADO' });
 
-  const costo = unit_cost != null ? unit_cost : Number(ing.rows[0].cost_unit);
+  // Costo del insumo (BOM) = promedio ponderado móvil. La fila de ajuste guarda el
+  // costo REAL de la compra (unit_cost) para el historial de precios.
+  const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+  const stockAnt = Number(ing.rows[0].stock_qty), costAnt = Number(ing.rows[0].cost_unit);
+  const costoPromedio = stockAnt + qty > 0 ? round2((stockAnt * costAnt + qty * unit_cost) / (stockAnt + qty)) : unit_cost;
+  const prov = supplier || expense?.supplier || null;
+  const nota = note ? String(note).trim() : null;
+  const reason = `Reposición de ${ing.rows[0].name}${prov ? ` · ${prov}` : ''}${nota ? ` — ${nota}` : ''}`;
+
   const adjId = randomUUID();
   const stmts = [
-    { sql: `UPDATE ingredients SET stock_qty = stock_qty + ?, ${unit_cost != null ? 'cost_unit = ?, ' : ''} updated_at = datetime('now') WHERE id = ?`,
-      args: unit_cost != null ? [qty, unit_cost, id] : [qty, id] },
+    { sql: `UPDATE ingredients SET stock_qty = stock_qty + ?, cost_unit = ?, updated_at = datetime('now') WHERE id = ?`,
+      args: [qty, costoPromedio, id] },
     { sql: `INSERT INTO inventory_adjustments (id, ingredient_id, user_id, type, qty_delta, unit_cost, reason)
             VALUES (?,?,?, 'REPOSICION', ?, ?, ?)`,
-      args: [adjId, id, req.user.id, qty, costo, `Reposición de ${ing.rows[0].name}`] },
+      args: [adjId, id, req.user.id, qty, unit_cost, reason] },
   ];
 
   let expenseId = null;
   if (expense && expense.payment_method) {
     expenseId = randomUUID();
-    const monto = qty * costo;
+    const monto = qty * unit_cost;
     stmts.push({
       sql: `INSERT INTO expenses (id, category_id, user_id, amount, payment_method, supplier, description, spent_at)
             VALUES (?,?,?,?,?,?,?,?)`,
       args: [expenseId, expense.category_id || 'cat-proveedores', req.user.id, monto, expense.payment_method,
-             expense.supplier || null, `Compra de ${ing.rows[0].name} (${qty})`, new Date().toISOString()],
+             prov, `Compra de ${ing.rows[0].name} (${qty})`, new Date().toISOString()],
     });
   }
   stmts.push({
     sql: `INSERT INTO audit_logs (id, user_id, action, entity, entity_id, severity, metadata, ip_address)
           VALUES (?,?, 'INV_REPOSICION', 'inventory_adjustments', ?, 'INFO', ?, ?)`,
-    args: [randomUUID(), req.user.id, adjId, JSON.stringify({ qty, costo, expenseId }), req.ip || null],
+    args: [randomUUID(), req.user.id, adjId,
+           JSON.stringify({ qty, unit_cost, costo_anterior: costAnt, costo_promedio: costoPromedio, proveedor: prov, nota, expenseId }), req.ip || null],
   });
 
   await db.batch(stmts, 'write');
   const newStock = await db.execute({ sql: `SELECT stock_qty FROM ingredients WHERE id = ?`, args: [id] });
-  return res.status(201).json({ ingredient: ing.rows[0].name, new_stock: Number(newStock.rows[0].stock_qty), expense_id: expenseId });
+  return res.status(201).json({ ingredient: ing.rows[0].name, new_stock: Number(newStock.rows[0].stock_qty), unit_cost, cost_unit: costoPromedio, expense_id: expenseId });
 }
 
 /** GET /api/inventory/alerts — insumos en o bajo el umbral mínimo. */

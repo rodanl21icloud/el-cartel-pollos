@@ -21,6 +21,7 @@ import Ventas from './screens/Ventas.jsx';
 import VentaRetroactiva from './screens/VentaRetroactiva.jsx';
 import Permisos from './screens/Permisos.jsx';
 import Inventario from './screens/Inventario.jsx';
+import PreciosInsumos from './screens/PreciosInsumos.jsx';
 import Carta from './screens/Carta.jsx';
 import Cartelera from './screens/Cartelera.jsx';
 import Modificadores from './screens/Modificadores.jsx';
@@ -176,6 +177,7 @@ export default function App() {
           {screen === 'gastos' && <Gastos />}
           {screen === 'merma' && <Merma />}
           {screen === 'inventario' && <Inventario />}
+          {screen === 'precios' && <PreciosInsumos />}
           {screen === 'cash' && <CashClose userName={user.name} />}
           {screen === 'resumen' && <Resumen role={user.role} />}
           {screen === 'cuadre' && <Cuadre />}

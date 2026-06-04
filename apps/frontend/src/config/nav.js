@@ -23,6 +23,7 @@ export const NAV = [
       { key: 'cartelera', label: 'Cartelera', icon: '📋', perm: 'menu.manage' },
       { key: 'modificadores', label: 'Modificadores', icon: '✨', perm: 'menu.manage' },
       { key: 'inventario', label: 'Inventario', icon: '📦', perm: 'inventory.manage' },
+      { key: 'precios', label: 'Precios de compra', icon: '📈', perm: 'inventory.manage' },
     ],
   },
   {

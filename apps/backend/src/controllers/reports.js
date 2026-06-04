@@ -79,6 +79,46 @@ export async function consumoInsumos(req, res) {
 }
 
 /**
+ * GET /api/reports/precios-insumos?from=&to= — Variación de precio de compra por insumo.
+ * Lee las reposiciones (inventory_adjustments type='REPOSICION') y su unit_cost real.
+ * Identifica cuándo conviene comprar (último vs mín/máx histórico). (reports.view)
+ */
+export async function preciosInsumos(req, res) {
+  const db = getDb();
+  const to = req.query.to || new Date().toISOString();
+  const from = req.query.from || new Date(Date.now() - 365 * 86400000).toISOString();
+  const { rows } = await db.execute({
+    sql: `SELECT ia.ingredient_id, i.name, i.unit, ia.qty_delta qty, ia.unit_cost cost, ia.created_at fecha
+          FROM inventory_adjustments ia JOIN ingredients i ON i.id = ia.ingredient_id
+          WHERE ia.type='REPOSICION' AND ia.created_at >= ? AND ia.created_at <= ?
+          ORDER BY ia.created_at ASC`,
+    args: [from, to],
+  });
+
+  const byIng = new Map();
+  for (const r of rows) {
+    const m = byIng.get(r.ingredient_id) || { name: r.name, unit: r.unit, compras: [] };
+    m.compras.push({ fecha: r.fecha, qty: Number(r.qty), cost_unit: round2(Number(r.cost)) });
+    byIng.set(r.ingredient_id, m);
+  }
+
+  const insumos = [...byIng.values()].map((m) => {
+    const costos = m.compras.map((c) => c.cost_unit);
+    const min = Math.min(...costos), max = Math.max(...costos);
+    const ultimo = costos[costos.length - 1];
+    const anterior = costos.length > 1 ? costos[costos.length - 2] : null;
+    const qtyTot = m.compras.reduce((s, c) => s + c.qty, 0);
+    const gastoTot = m.compras.reduce((s, c) => s + c.qty * c.cost_unit, 0);
+    const promedio_ponderado = qtyTot > 0 ? round2(gastoTot / qtyTot) : ultimo;
+    const variacion_pct = anterior ? round2(((ultimo - anterior) / anterior) * 100) : null;
+    const estado = ultimo <= min ? 'barato' : ultimo >= max ? 'caro' : 'medio';
+    return { name: m.name, unit: m.unit, n_compras: m.compras.length, ultimo, min, max, promedio_ponderado, variacion_pct, estado, compras: m.compras };
+  }).sort((a, b) => a.name.localeCompare(b.name));
+
+  return res.json({ period: { from, to }, insumos });
+}
+
+/**
  * GET /api/reports/turnos — Cuadre operativo de turno (pollos/papas).
  * Cruza el conteo de APERTURA (cash_sessions) y CIERRE (closures) SIN tocar el
  * inventario real. Detecta descalces e indica merma excesiva según un umbral.
