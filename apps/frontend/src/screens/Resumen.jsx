@@ -2,37 +2,72 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 
 const money = (n) => '$' + Number(n || 0).toLocaleString('es-CL');
-const RANGES = [{ id: '7', label: '7 días', d: 7 }, { id: '30', label: '30 días', d: 30 }, { id: '90', label: '90 días', d: 90 }];
 
-export default function Resumen({ role }) {
+// Períodos compartidos (mismo criterio en todas las vistas).
+const PERIODOS = [{ id: 'dia', label: 'Día' }, { id: 'semana', label: 'Semana' }, { id: 'mes', label: 'Mes' }, { id: 'anio', label: 'Año' }, { id: 'custom', label: 'Personalizado' }];
+function rangoFechas(id, cFrom, cTo) {
+  const to = new Date();
+  let from = new Date(); from.setHours(0, 0, 0, 0);
+  if (id === 'semana') from.setDate(from.getDate() - ((from.getDay() + 6) % 7));
+  else if (id === 'mes') from.setDate(1);
+  else if (id === 'anio') from.setMonth(0, 1);
+  else if (id === 'custom') {
+    if (!cFrom || !cTo) return null;
+    return { from: new Date(cFrom + 'T00:00:00').toISOString(), to: new Date(cTo + 'T23:59:59').toISOString() };
+  }
+  return { from: from.toISOString(), to: to.toISOString() };
+}
+
+export default function Resumen() {
   const [data, setData] = useState(null);
-  const [range, setRange] = useState('30');
+  const [per, setPer] = useState('mes');
+  const [cFrom, setCFrom] = useState(''); const [cTo, setCTo] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const days = RANGES.find((r) => r.id === range).d;
-    const from = new Date(Date.now() - days * 86400000).toISOString();
+    const r = rangoFechas(per, cFrom, cTo);
     setData(null); setError('');
-    api(`/reports/dashboard?from=${encodeURIComponent(from)}`).then(setData).catch((e) => setError(e.message));
-  }, [range]);
+    if (!r) return;
+    api(`/reports/dashboard?from=${encodeURIComponent(r.from)}&to=${encodeURIComponent(r.to)}`).then(setData).catch((e) => setError(e.message));
+  }, [per, cFrom, cTo]);
 
-  if (error) return <p className="text-cartel text-center mt-10">{error === 'PERMISO_DENEGADO' ? 'Sin permiso para ver reportes.' : error}</p>;
-  if (!data) return <p className="text-ink-mute text-center mt-10">Cargando resumen…</p>;
+  const customIncompleto = per === 'custom' && (!cFrom || !cTo);
 
+  return (
+    <div className="max-w-5xl mx-auto space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h2 className="font-black text-xl">Resumen ejecutivo</h2>
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex gap-1 bg-white rounded-xl p-1 shadow-card flex-wrap">
+            {PERIODOS.map((p) => <button key={p.id} onClick={() => setPer(p.id)} className={`px-3 py-1.5 rounded-lg font-bold text-sm ${per === p.id ? 'bg-cartel text-white' : 'text-ink-mute'}`}>{p.label}</button>)}
+          </div>
+          {per === 'custom' && (
+            <div className="flex gap-2">
+              <input type="date" value={cFrom} onChange={(e) => setCFrom(e.target.value)} className="px-2 py-1.5 rounded-lg border-2 border-slate-200 text-sm" />
+              <input type="date" value={cTo} onChange={(e) => setCTo(e.target.value)} className="px-2 py-1.5 rounded-lg border-2 border-slate-200 text-sm" />
+            </div>
+          )}
+        </div>
+      </div>
+
+      <ConsumoCard />
+
+      {error ? <p className="text-cartel text-center mt-10">{error === 'PERMISO_DENEGADO' ? 'Sin permiso para ver reportes.' : error}</p>
+        : customIncompleto ? <p className="text-ink-mute text-center mt-10">Elige las fechas para ver el resumen.</p>
+          : !data ? <p className="text-ink-mute text-center mt-10">Cargando resumen…</p>
+            : <ResumenBody data={data} />}
+    </div>
+  );
+}
+
+function ResumenBody({ data }) {
   const k = data.kpis;
   const maxMes = Math.max(1, ...data.tendencia.map((m) => m.ventas));
   const maxDow = Math.max(1, ...data.dias_semana.map((d) => d.monto));
   const maxTop = Math.max(1, ...data.top_productos.map((p) => p.monto));
 
   return (
-    <div className="max-w-5xl mx-auto space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="font-black text-xl">Resumen ejecutivo</h2>
-        <div className="flex gap-1 bg-white rounded-xl p-1 shadow-card">
-          {RANGES.map((r) => <button key={r.id} onClick={() => setRange(r.id)} className={`px-3 py-1.5 rounded-lg font-bold text-sm ${range === r.id ? 'bg-cartel text-white' : 'text-ink-mute'}`}>{r.label}</button>)}
-        </div>
-      </div>
-
+    <>
       {/* KPIs con comparación */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KPI label="Ventas" value={money(k.ventas)} delta={k.ventas_delta} />
@@ -59,7 +94,7 @@ export default function Resumen({ role }) {
         <h3 className="font-black mb-3">Tendencia mensual (ventas vs utilidad)</h3>
         <div className="flex items-end gap-2 h-44">
           {data.tendencia.map((m) => (
-            <div key={m.mes} className="flex-1 flex flex-col items-center justify-end group">
+            <div key={m.mes} className="flex-1 h-full flex flex-col items-center justify-end group">
               <div className="w-full flex items-end gap-0.5 justify-center" style={{ height: '100%' }}>
                 <div className="w-1/2 bg-cartel/80 rounded-t" style={{ height: `${(m.ventas / maxMes) * 100}%` }} title={`Ventas ${money(m.ventas)}`} />
                 <div className="w-1/2 bg-emerald-500/80 rounded-t" style={{ height: `${(Math.max(0, m.utilidad) / maxMes) * 100}%` }} title={`Utilidad ${money(m.utilidad)}`} />
@@ -91,7 +126,7 @@ export default function Resumen({ role }) {
           <h3 className="font-black mb-3">Ventas por día de la semana</h3>
           <div className="flex items-end gap-2 h-32">
             {data.dias_semana.map((d) => (
-              <div key={d.dia} className="flex-1 flex flex-col items-center justify-end">
+              <div key={d.dia} className="flex-1 h-full flex flex-col items-center justify-end">
                 <div className="w-full bg-ink/80 rounded-t" style={{ height: `${(d.monto / maxDow) * 100}%` }} title={money(d.monto)} />
                 <span className="text-[10px] text-ink-mute mt-1">{d.dia}</span>
               </div>
@@ -121,25 +156,11 @@ export default function Resumen({ role }) {
           </table>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
 // Consumo del período (pollos vendidos por receta + papas en kg) con selector propio.
-const PERIODOS = [{ id: 'dia', label: 'Día' }, { id: 'semana', label: 'Semana' }, { id: 'mes', label: 'Mes' }, { id: 'anio', label: 'Año' }, { id: 'custom', label: 'Personalizado' }];
-function rangoFechas(id, cFrom, cTo) {
-  const to = new Date();
-  let from = new Date(); from.setHours(0, 0, 0, 0);
-  if (id === 'semana') from.setDate(from.getDate() - ((from.getDay() + 6) % 7));
-  else if (id === 'mes') from.setDate(1);
-  else if (id === 'anio') from.setMonth(0, 1);
-  else if (id === 'custom') {
-    if (!cFrom || !cTo) return null;
-    return { from: new Date(cFrom + 'T00:00:00').toISOString(), to: new Date(cTo + 'T23:59:59').toISOString() };
-  }
-  return { from: from.toISOString(), to: to.toISOString() };
-}
-
 function ConsumoCard() {
   const [per, setPer] = useState('dia');
   const [cFrom, setCFrom] = useState(''); const [cTo, setCTo] = useState('');
@@ -171,7 +192,7 @@ function ConsumoCard() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-xl bg-cartel/5 p-4 text-center">
                   <div className="text-4xl font-black text-cartel tabular-nums">🍗 {d.pollos}</div>
-                  <div className="text-xs text-ink-mute font-bold mt-1">pollos vendidos (según recetas)</div>
+                  <div className="text-xs text-ink-mute font-bold mt-1">pollos vendidos</div>
                 </div>
                 <div className="rounded-xl bg-amber-50 p-4 text-center">
                   <div className="text-4xl font-black tabular-nums" style={{ color: '#f5a623' }}>🥔 {d.papas_kg}</div>
