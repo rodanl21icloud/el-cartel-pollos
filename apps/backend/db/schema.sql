@@ -57,12 +57,12 @@ CREATE TABLE IF NOT EXISTS business_settings (
 
 -- ----------------------------------------------------------------
 -- INGREDIENTS — insumos descontables del inventario teórico.
--- unit: 'unidad' | 'gramo' | 'mililitro' | 'empaque'
+-- unit: 'unidad' | 'gramo' | 'mililitro' | 'litro' | 'empaque'
 -- ----------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS ingredients (
   id              TEXT PRIMARY KEY,
   name            TEXT NOT NULL UNIQUE,             -- ej. 'Pollo', 'Papas Scarsofy', 'Empaque Combo'
-  unit            TEXT NOT NULL CHECK (unit IN ('unidad','gramo','mililitro','empaque')),
+  unit            TEXT NOT NULL CHECK (unit IN ('unidad','gramo','mililitro','litro','empaque')),
   stock_qty       REAL NOT NULL DEFAULT 0,          -- stock teórico actual
   min_stock_qty   REAL NOT NULL DEFAULT 0,          -- umbral de alerta
   cost_unit       REAL NOT NULL DEFAULT 0,          -- costo por unidad de medida

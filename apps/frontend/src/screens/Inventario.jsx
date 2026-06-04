@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 
 const money = (n) => '$' + Number(n).toLocaleString('es-CL');
-const UNITS = ['unidad', 'gramo', 'mililitro', 'empaque'];
+const UNITS = ['unidad', 'gramo', 'mililitro', 'litro', 'empaque'];
 
 export default function Inventario() {
   const [items, setItems] = useState([]);
