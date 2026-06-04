@@ -53,6 +53,32 @@ export async function closuresHistory(_req, res) {
 }
 
 /**
+ * GET /api/reports/consumo-insumos?from=&to= — Consumo del período por receta.
+ * Lee el descuento real de insumos al vender (inventory_adjustments type='VENTA').
+ * Devuelve pollos (unidades) y papas en kg. (reports.view)
+ */
+export async function consumoInsumos(req, res) {
+  const db = getDb();
+  const to = req.query.to || new Date().toISOString();
+  const from = req.query.from || new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
+  const { rows } = await db.execute({
+    sql: `SELECT i.name, i.unit, COALESCE(SUM(ABS(ia.qty_delta)),0) qty
+          FROM inventory_adjustments ia JOIN ingredients i ON i.id = ia.ingredient_id
+          WHERE ia.type='VENTA' AND ia.created_at >= ? AND ia.created_at <= ?
+            AND (i.name LIKE '%ollo%' OR i.name LIKE '%apa%')
+          GROUP BY i.id`,
+    args: [from, to],
+  });
+  let pollos = 0, papasKg = 0;
+  for (const r of rows) {
+    const n = String(r.name).toLowerCase(), qty = Number(r.qty);
+    if (n.includes('ollo')) pollos += qty;
+    else if (n.includes('apa')) papasKg += r.unit === 'gramo' ? qty / 1000 : qty;
+  }
+  return res.json({ period: { from, to }, pollos: round2(pollos), papas_kg: Math.round(papasKg * 10) / 10 });
+}
+
+/**
  * GET /api/reports/turnos — Cuadre operativo de turno (pollos/papas).
  * Cruza el conteo de APERTURA (cash_sessions) y CIERRE (closures) SIN tocar el
  * inventario real. Detecta descalces e indica merma excesiva según un umbral.

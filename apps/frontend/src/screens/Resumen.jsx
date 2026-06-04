@@ -52,6 +52,8 @@ export default function Resumen({ role }) {
         </div>
       </div>
 
+      <ConsumoCard />
+
       {/* Tendencia mensual */}
       <div className="card p-4">
         <h3 className="font-black mb-3">Tendencia mensual (ventas vs utilidad)</h3>
@@ -119,6 +121,64 @@ export default function Resumen({ role }) {
           </table>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Consumo del período (pollos vendidos por receta + papas en kg) con selector propio.
+const PERIODOS = [{ id: 'dia', label: 'Día' }, { id: 'semana', label: 'Semana' }, { id: 'mes', label: 'Mes' }, { id: 'anio', label: 'Año' }, { id: 'custom', label: 'Personalizado' }];
+function rangoFechas(id, cFrom, cTo) {
+  const to = new Date();
+  let from = new Date(); from.setHours(0, 0, 0, 0);
+  if (id === 'semana') from.setDate(from.getDate() - ((from.getDay() + 6) % 7));
+  else if (id === 'mes') from.setDate(1);
+  else if (id === 'anio') from.setMonth(0, 1);
+  else if (id === 'custom') {
+    if (!cFrom || !cTo) return null;
+    return { from: new Date(cFrom + 'T00:00:00').toISOString(), to: new Date(cTo + 'T23:59:59').toISOString() };
+  }
+  return { from: from.toISOString(), to: to.toISOString() };
+}
+
+function ConsumoCard() {
+  const [per, setPer] = useState('dia');
+  const [cFrom, setCFrom] = useState(''); const [cTo, setCTo] = useState('');
+  const [d, setD] = useState(null); const [err, setErr] = useState('');
+  useEffect(() => {
+    const r = rangoFechas(per, cFrom, cTo);
+    setErr(''); setD(null);
+    if (!r) return;
+    api(`/reports/consumo-insumos?from=${encodeURIComponent(r.from)}&to=${encodeURIComponent(r.to)}`).then(setD).catch((e) => setErr(e.message));
+  }, [per, cFrom, cTo]);
+  return (
+    <div className="card p-4">
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+        <h3 className="font-black">Consumo del período</h3>
+        <div className="flex gap-1 bg-slate-100 rounded-xl p-1 flex-wrap">
+          {PERIODOS.map((p) => <button key={p.id} onClick={() => setPer(p.id)} className={`px-3 py-1.5 rounded-lg font-bold text-sm ${per === p.id ? 'bg-cartel text-white' : 'text-ink-mute'}`}>{p.label}</button>)}
+        </div>
+      </div>
+      {per === 'custom' && (
+        <div className="flex gap-2 mb-3">
+          <input type="date" value={cFrom} onChange={(e) => setCFrom(e.target.value)} className="px-2 py-1.5 rounded-lg border-2 border-slate-200 text-sm" />
+          <input type="date" value={cTo} onChange={(e) => setCTo(e.target.value)} className="px-2 py-1.5 rounded-lg border-2 border-slate-200 text-sm" />
+        </div>
+      )}
+      {err ? <p className="text-cartel text-sm">{err}</p>
+        : per === 'custom' && (!cFrom || !cTo) ? <p className="text-ink-mute text-sm">Elige las fechas.</p>
+          : !d ? <p className="text-ink-mute text-sm">Cargando…</p>
+            : (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl bg-cartel/5 p-4 text-center">
+                  <div className="text-4xl font-black text-cartel tabular-nums">🍗 {d.pollos}</div>
+                  <div className="text-xs text-ink-mute font-bold mt-1">pollos vendidos (según recetas)</div>
+                </div>
+                <div className="rounded-xl bg-amber-50 p-4 text-center">
+                  <div className="text-4xl font-black tabular-nums" style={{ color: '#f5a623' }}>🥔 {d.papas_kg}</div>
+                  <div className="text-xs text-ink-mute font-bold mt-1">kg de papa</div>
+                </div>
+              </div>
+            )}
     </div>
   );
 }
