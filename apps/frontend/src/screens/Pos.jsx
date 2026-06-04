@@ -196,9 +196,9 @@ function ProductSale({ onSold }) {
                 {qc > 0 && <span className="absolute top-1 right-1 z-10 bg-cartel text-white text-xs font-black rounded-full w-6 h-6 flex items-center justify-center">{qc}</span>}
                 {p.has_modifiers && <span className="absolute top-1 left-1 z-10 bg-amber-500 text-white text-[9px] font-bold rounded px-1">opciones</span>}
                 {invalido && <span title={aviso} className="absolute bottom-[58px] left-1 z-10 bg-amber-400 text-amber-900 text-[10px] font-black rounded px-1.5 py-0.5 shadow">⚠️ código</span>}
-                {p.image_url
-                  ? <img src={p.image_url} alt="" className="w-full h-20 object-cover bg-zinc-100" onError={(e) => { e.target.style.display = 'none'; }} />
-                  : <div className={`w-full h-20 bg-gradient-to-br ${asset.gradient} flex items-center justify-center text-3xl`}>🍗</div>}
+                {(p.image_url || asset.image)
+                  ? <img src={p.image_url || asset.image} alt="" className="w-full h-20 object-cover bg-zinc-100" onError={(e) => { e.target.outerHTML = `<div class="w-full h-20 bg-gradient-to-br ${asset.gradient} flex items-center justify-center text-3xl">${asset.emoji}</div>`; }} />
+                  : <div className={`w-full h-20 bg-gradient-to-br ${asset.gradient} flex items-center justify-center text-3xl`}>{asset.emoji}</div>}
                 <div className="p-2">
                   <div className={`text-xs font-black leading-tight line-clamp-2 ${invalido ? 'text-amber-900' : ''}`}>{invalido && <span aria-hidden>⚠️ </span>}{p.name}</div>
                   <div className="text-cartel mt-1 font-bold text-sm">{money(p.price)}</div>
