@@ -92,7 +92,8 @@
     font-family: 'Rye', cursive; line-height: 1.05; font-size: 3rem;
     color: var(--texto); text-shadow: 0 4px 24px rgba(0,0,0,.8); letter-spacing: .02em;
   }
-  .hero h1 .brand-logo { height: .92em; width: .92em; object-fit: cover; vertical-align: -.18em; border-radius: 50%; border: 3px solid var(--oro); box-shadow: 0 6px 22px rgba(0,0,0,.65); }
+  .hero .hero-emblem { display: block; width: 128px; height: 128px; object-fit: cover; object-position: center; border-radius: 50%; border: 3px solid var(--oro); box-shadow: 0 10px 30px rgba(0,0,0,.7); margin: 0 auto 22px; }
+  @media (max-width: 640px) { .hero .hero-emblem { width: 92px; height: 92px; margin-bottom: 16px; } }
   .hero .sub {
     font-family: 'Oswald', sans-serif; font-weight: 500; letter-spacing: .18em;
     text-transform: uppercase; color: var(--oro); margin-top: 1rem; font-size: 1rem;
@@ -189,7 +190,8 @@
 <!-- ===================== HERO ===================== -->
 <header class="hero">
   <div class="hero-inner">
-    <h1 class="rye"><img class="brand-logo" src="/logo.jpeg" alt="" /> EL CARTEL <img class="brand-logo" src="/logo.jpeg" alt="" /><br />DE LOS POLLOS</h1>
+    <img class="hero-emblem" src="/logo.jpeg" alt="El Cartel de los Pollos" />
+    <h1 class="rye">EL CARTEL<br />DE LOS POLLOS</h1>
     <p class="sub">Pollo a las brasas · San Bernardo</p>
     <div class="hero-cta">
       <a class="btn btn-rojo" href="https://cartel-pollos.onrender.com/carta/elcarteldelospollos" target="_blank" rel="noopener">Ver la carta</a>
