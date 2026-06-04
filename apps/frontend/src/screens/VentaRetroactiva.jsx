@@ -4,6 +4,7 @@ import { Spinner, EmptyState, humanizeError } from '../components/ui/States.jsx'
 
 const money = (n) => '$' + Number(n || 0).toLocaleString('es-CL');
 const PAYMENTS = [['EFECTIVO', '💵 Efectivo'], ['POS', '💳 Tarjeta'], ['TRANSFERENCIA', '📲 Transferencia']];
+const MOTIVOS = ['No ingresada por falla', 'Corte de luz / internet', 'Pedido telefónico', 'Error de caja', 'Otro'];
 // Fecha/hora local en formato de los inputs (YYYY-MM-DD y HH:MM).
 const pad = (n) => String(n).padStart(2, '0');
 const hoyFecha = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
@@ -19,16 +20,20 @@ export default function VentaRetroactiva({ user }) {
   const [fecha, setFecha] = useState(hoyFecha());
   const [hora, setHora] = useState(horaAhora());
   const [metodo, setMetodo] = useState('EFECTIVO');
-  const [reason, setReason] = useState('');
+  const [motivo, setMotivo] = useState('');
+  const [otro, setOtro] = useState('');
+  const [retro, setRetro] = useState(null);
   const [uuid, setUuid] = useState(() => crypto.randomUUID());
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(null);
 
   useEffect(() => { api('/products').then(setProducts).catch((e) => setError(e.message)); }, []);
+  useEffect(() => { api('/reports/retroactivas').then(setRetro).catch(() => {}); }, [done]);
 
   const items = useMemo(() => Object.entries(cart).filter(([, v]) => v.qty > 0), [cart]);
   const total = items.reduce((s, [, v]) => s + v.qty * v.price, 0);
   const add = (p, d) => setCart((c) => ({ ...c, [p.id]: { name: p.name, price: p.price, qty: Math.max(0, (c[p.id]?.qty || 0) + d) } }));
+  const reason = motivo === 'Otro' ? otro.trim() : motivo;
 
   // Fecha/hora declarada como Date (local) y validaciones.
   const soldAt = useMemo(() => (fecha && hora ? new Date(`${fecha}T${hora}`) : null), [fecha, hora]);
@@ -60,7 +65,7 @@ export default function VentaRetroactiva({ user }) {
         : humanizeError(e));
     } finally { setBusy(false); }
   }
-  function nueva() { setCart({}); setReason(''); setDone(null); setUuid(crypto.randomUUID()); setFecha(hoyFecha()); setHora(horaAhora()); }
+  function nueva() { setCart({}); setMotivo(''); setOtro(''); setDone(null); setUuid(crypto.randomUUID()); setFecha(hoyFecha()); setHora(horaAhora()); }
 
   if (error && !products) return <EmptyState icon="⚠️" title="No se pudo cargar" hint={humanizeError(error)} />;
   if (!products) return <Spinner label="Cargando productos…" />;
@@ -111,8 +116,14 @@ export default function VentaRetroactiva({ user }) {
 
           <div className="card p-4">
             <label className="text-xs font-bold text-ink-mute">Motivo / justificación *</label>
-            <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ej: venta no ingresada por falla operativa"
-              className="field mt-1" maxLength={200} />
+            <div className="grid grid-cols-2 gap-2 mt-1">
+              {MOTIVOS.map((m) => (
+                <button key={m} onClick={() => setMotivo(m)} className={`rounded-xl py-2 px-2 text-sm font-bold text-left ${motivo === m ? 'bg-cartel text-white' : 'bg-slate-100 text-zinc-700'}`}>{m}</button>
+              ))}
+            </div>
+            {motivo === 'Otro' && (
+              <input value={otro} onChange={(e) => setOtro(e.target.value)} placeholder="Especifica el motivo" className="field mt-2" maxLength={200} />
+            )}
           </div>
 
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar producto…" className="field" />
@@ -171,6 +182,28 @@ export default function VentaRetroactiva({ user }) {
           <p className="text-[11px] text-ink-mute text-center">No impacta la caja abierta actual: se refleja en el día/hora declarado.</p>
         </div>
       </div>
+
+      {retro && retro.detalle.length > 0 && (
+        <div className="card p-4">
+          <h3 className="font-black mb-2">Historial de retroactivas (90 días)</h3>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {retro.por_usuario.map((u) => (
+              <span key={u.usuario} className="text-sm bg-slate-100 rounded-full px-3 py-1 font-semibold">{u.usuario}: <b>{u.n}</b> · {money(u.total)}</span>
+            ))}
+          </div>
+          <details>
+            <summary className="cursor-pointer text-sm font-bold text-ink-mute">Ver detalle ({retro.detalle.length})</summary>
+            <ul className="mt-2 divide-y text-sm">
+              {retro.detalle.map((d, i) => (
+                <li key={i} className="py-1.5 flex justify-between gap-2">
+                  <span className="min-w-0">#{d.order_number} · {d.usuario}<span className="block text-xs text-ink-mute truncate">{d.reason}</span></span>
+                  <span className="text-right whitespace-nowrap">{money(d.total)}<span className="block text-[11px] text-ink-mute">{new Date(d.sold_at).toLocaleDateString('es-CL')}</span></span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        </div>
+      )}
     </div>
   );
 }

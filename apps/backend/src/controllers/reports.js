@@ -230,6 +230,28 @@ export async function estadisticasGastos(req, res) {
   });
 }
 
+/** GET /api/reports/retroactivas?from=&to= — ventas retroactivas por usuario y motivo. (reports.view) */
+export async function retroactivasReport(req, res) {
+  const db = getDb();
+  const to = req.query.to || new Date().toISOString();
+  const from = req.query.from || new Date(Date.now() - 90 * 86400000).toISOString();
+  const por_usuario = (await db.execute({
+    sql: `SELECT u.full_name usuario, COUNT(*) n, COALESCE(SUM(s.total),0) total
+          FROM sales s LEFT JOIN users u ON u.id = s.user_id
+          WHERE s.is_backdated=1 AND datetime(s.created_at) >= datetime(?) AND datetime(s.created_at) <= datetime(?)
+          GROUP BY s.user_id ORDER BY n DESC`,
+    args: [from, to],
+  })).rows.map((r) => ({ usuario: r.usuario || '—', n: Number(r.n), total: Number(r.total) }));
+  const detalle = (await db.execute({
+    sql: `SELECT s.order_number, s.sold_at, s.created_at, s.total, s.backdate_reason, u.full_name usuario
+          FROM sales s LEFT JOIN users u ON u.id = s.user_id
+          WHERE s.is_backdated=1 AND datetime(s.created_at) >= datetime(?) AND datetime(s.created_at) <= datetime(?)
+          ORDER BY s.created_at DESC LIMIT 60`,
+    args: [from, to],
+  })).rows.map((r) => ({ order_number: r.order_number, sold_at: r.sold_at, created_at: r.created_at, total: Number(r.total), reason: r.backdate_reason || '—', usuario: r.usuario || '—' }));
+  return res.json({ por_usuario, detalle });
+}
+
 /**
  * GET /api/reports/turnos — Cuadre operativo de turno (pollos/papas).
  * Cruza el conteo de APERTURA (cash_sessions) y CIERRE (closures) SIN tocar el

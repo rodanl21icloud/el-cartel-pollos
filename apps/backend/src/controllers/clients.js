@@ -45,6 +45,25 @@ export async function upsertClient(db, { phone, name, address, notes }) {
   return id;
 }
 
+/** GET /api/clients/:id/history — ficha + historial de compras del cliente. */
+export async function clientHistory(req, res) {
+  const db = getDb();
+  const { id } = req.params;
+  const client = (await db.execute({ sql: `SELECT * FROM clients WHERE id = ?`, args: [id] })).rows[0];
+  if (!client) return res.status(404).json({ error: 'CLIENTE_NO_ENCONTRADO' });
+  const st = (await db.execute({
+    sql: `SELECT COUNT(*) n, COALESCE(SUM(total),0) total, MAX(sold_at) last
+          FROM sales WHERE client_id = ? AND status='CONFIRMADA'`, args: [id],
+  })).rows[0];
+  const n = Number(st.n), tot = Number(st.total);
+  const ventas = (await db.execute({
+    sql: `SELECT s.order_number, s.sold_at, s.total, s.payment_method,
+                 (SELECT GROUP_CONCAT(p.name || ' x' || si.qty, ', ') FROM sale_items si JOIN products p ON p.id=si.product_id WHERE si.sale_id=s.id) detalle
+          FROM sales s WHERE s.client_id = ? AND s.status='CONFIRMADA' ORDER BY s.sold_at DESC LIMIT 30`, args: [id],
+  })).rows.map((r) => ({ order_number: r.order_number, sold_at: r.sold_at, total: Number(r.total), payment_method: r.payment_method, detalle: r.detalle || '' }));
+  return res.json({ client, stats: { n, total: tot, ticket_prom: n ? Math.round(tot / n) : 0, last: st.last }, ventas });
+}
+
 /** POST /api/clients */
 export async function createClient(req, res) {
   const { phone, name, address, notes } = req.body || {};
