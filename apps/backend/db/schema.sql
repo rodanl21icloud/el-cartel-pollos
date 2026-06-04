@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS business_settings (
   bank_balance_date TEXT,                           -- fecha del saldo
   catalog_slug  TEXT,                               -- identificador del catálogo público (URL)
   conteo_umbral INTEGER NOT NULL DEFAULT 3,         -- descalce/merma de pollos que dispara alerta de turno
+  cartelera_theme TEXT,                              -- plantilla de la cartelera TV (western/rojo/moderno/minimal)
   whatsapp      TEXT,                               -- número para pedidos por WhatsApp
   admin_pin_hash TEXT,                              -- PIN de administrador (bcrypt) para ajustes de stock
   pickup_enabled   INTEGER NOT NULL DEFAULT 1 CHECK (pickup_enabled IN (0,1)),   -- retiro en tienda

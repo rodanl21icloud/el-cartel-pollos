@@ -20,7 +20,7 @@ export default function Ajustes({ role }) {
     setError('');
     try {
       const saved = await api('/settings', { method: 'PUT', body: {
-        name: f.name, address: f.address, phone: f.phone, rut: f.rut, footer: f.footer, paper_width: Number(f.paper_width),
+        name: f.name, address: f.address, phone: f.phone, rut: f.rut, footer: f.footer, paper_width: Number(f.paper_width), cartelera_theme: f.cartelera_theme || 'western',
       }, otp: needsOtp && otp ? otp : undefined });
       setF(saved); setToast('Guardado'); setTimeout(() => setToast(''), 2000);
     } catch (e) {
@@ -59,6 +59,15 @@ export default function Ajustes({ role }) {
             className={`flex-1 rounded-xl py-2 font-bold ${Number(f.paper_width) === w ? 'bg-cartel text-white' : 'bg-zinc-100'}`}>{w} mm</button>
         ))}
       </div>
+
+      <label className="block font-bold text-zinc-700 mb-1">Plantilla de cartelera (TV)</label>
+      <select value={f.cartelera_theme || 'western'} onChange={(e) => setF({ ...f, cartelera_theme: e.target.value })}
+        className="w-full mb-3 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none">
+        <option value="western">Western (dorado · Rye)</option>
+        <option value="rojo">Rojo (Rye)</option>
+        <option value="moderno">Moderno (cian · sans)</option>
+        <option value="minimal">Minimal (claro · sans)</option>
+      </select>
 
       {needsOtp && (
         <input value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="OTP de gerencia" inputMode="numeric"

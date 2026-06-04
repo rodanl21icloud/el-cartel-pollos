@@ -39,10 +39,11 @@ function normSlug(s) {
 /** PUT /api/settings — permiso settings.manage. */
 export async function updateSettings(req, res) {
   const { name, address, phone, rut, footer, paper_width,
-          catalog_slug, whatsapp, pickup_enabled, delivery_enabled } = req.body || {};
+          catalog_slug, whatsapp, pickup_enabled, delivery_enabled, cartelera_theme } = req.body || {};
   if (name != null && !String(name).trim()) return res.status(400).json({ error: 'NOMBRE_REQUERIDO' });
   if (paper_width != null && ![58, 80].includes(Number(paper_width))) return res.status(400).json({ error: 'ANCHO_INVALIDO' });
   if (catalog_slug != null && normSlug(catalog_slug).length < 3) return res.status(400).json({ error: 'SLUG_INVALIDO' });
+  if (cartelera_theme != null && !['western', 'rojo', 'moderno', 'minimal'].includes(cartelera_theme)) return res.status(400).json({ error: 'PLANTILLA_INVALIDA' });
 
   const db = getDb();
   const cur = (await db.execute({ sql: `SELECT * FROM business_settings WHERE id = 1`, args: [] })).rows[0] || {};
@@ -58,19 +59,20 @@ export async function updateSettings(req, res) {
     whatsapp: whatsapp != null ? String(whatsapp).replace(/[^\d+]/g, '') || null : (cur.whatsapp || null),
     pickup_enabled: bool(pickup_enabled, cur.pickup_enabled),
     delivery_enabled: bool(delivery_enabled, cur.delivery_enabled),
+    cartelera_theme: cartelera_theme != null ? cartelera_theme : (cur.cartelera_theme || 'western'),
   };
   await db.execute({
     sql: `INSERT INTO business_settings
-            (id, name, address, phone, rut, footer, paper_width, catalog_slug, whatsapp, pickup_enabled, delivery_enabled, updated_at)
-          VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            (id, name, address, phone, rut, footer, paper_width, catalog_slug, whatsapp, pickup_enabled, delivery_enabled, cartelera_theme, updated_at)
+          VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
           ON CONFLICT(id) DO UPDATE SET
             name=excluded.name, address=excluded.address, phone=excluded.phone,
             rut=excluded.rut, footer=excluded.footer, paper_width=excluded.paper_width,
             catalog_slug=excluded.catalog_slug, whatsapp=excluded.whatsapp,
             pickup_enabled=excluded.pickup_enabled, delivery_enabled=excluded.delivery_enabled,
-            updated_at=excluded.updated_at`,
+            cartelera_theme=excluded.cartelera_theme, updated_at=excluded.updated_at`,
     args: [next.name, next.address, next.phone, next.rut, next.footer, next.paper_width,
-           next.catalog_slug, next.whatsapp, next.pickup_enabled, next.delivery_enabled],
+           next.catalog_slug, next.whatsapp, next.pickup_enabled, next.delivery_enabled, next.cartelera_theme],
   });
   await writeAudit({ userId: req.user.id, action: 'SETTINGS_UPDATE', entity: 'business_settings',
     severity: 'INFO', ip: req.ip });

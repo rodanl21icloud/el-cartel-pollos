@@ -51,6 +51,7 @@ export async function getPublicCatalog(req, res) {
       address: bs.address || null,
       whatsapp: bs.whatsapp || null,
       slug: bs.catalog_slug || slug,
+      cartelera_theme: bs.cartelera_theme || null,
     },
     delivery: {
       pickup: bs.pickup_enabled == null ? true : !!bs.pickup_enabled,

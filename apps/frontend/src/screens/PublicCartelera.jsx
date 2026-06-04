@@ -11,8 +11,14 @@ import { getCategoryAsset } from '../lib/categoryAssets.js';
 const money = (n) => '$' + Number(n || 0).toLocaleString('es-CL');
 const BASE_W = 1280, BASE_H = 720;
 const SLIDE_MS = 8000;
-const MAX_ITEMS = 5;                 // ≤5 ítems por slide (anti sobrecarga / Hick's law)
-const RYE = { fontFamily: "'Rye', serif" };
+// Plantillas configurables de la cartelera (color de acento, tipografía, densidad).
+const THEMES = {
+  western: { accent: '#f5a623', titlefont: "'Rye', serif", maxItems: 5 },
+  rojo:    { accent: '#dc2626', titlefont: "'Rye', serif", maxItems: 5 },
+  moderno: { accent: '#22d3ee', titlefont: 'system-ui, sans-serif', maxItems: 6 },
+  minimal: { accent: '#e5e7eb', titlefont: 'system-ui, sans-serif', maxItems: 4 },
+};
+const RYE = { fontFamily: 'var(--titlefont)' };
 // 👉 Promo opcional. Deja '' para ocultar la cinta. Ej: 'SOLO HOY 2x1 EN PAPAS'.
 const PROMO = '';
 
@@ -50,7 +56,7 @@ function crossSell(catName, min) {
 }
 
 // Construye la lista plana de slides (1 foco c/u).
-function construirSlides(categories) {
+function construirSlides(categories, maxItems = 5) {
   const cats = [...categories].filter((c) => c.items?.length).sort((a, b) => ordIdx(a.name) - ordIdx(b.name) || a.name.localeCompare(b.name));
   const min = {}; for (const c of cats) min[c.name.toUpperCase()] = Math.min(...c.items.map((i) => num(i.price)));
 
@@ -64,7 +70,7 @@ function construirSlides(categories) {
 
   // 2) Un slide por categoría, troceado a ≤5 ítems.
   for (const c of cats) {
-    const parts = chunk(c.items, MAX_ITEMS);
+    const parts = chunk(c.items, maxItems);
     parts.forEach((items, idx) => slides.push({ type: 'cat', cat: c, items, part: idx + 1, parts: parts.length, cs: crossSell(c.name, min) }));
   }
   return slides;
@@ -108,7 +114,7 @@ export default function PublicCartelera({ slug }) {
     return () => { alive = false; clearInterval(id); };
   }, [slug]);
 
-  const slides = useMemo(() => (data ? construirSlides(data.categories) : []), [data]);
+  const slides = useMemo(() => (data ? construirSlides(data.categories, (THEMES[data.business?.cartelera_theme] || THEMES.western).maxItems) : []), [data]);
 
   // Rotación automática cada 8s
   useEffect(() => {
@@ -135,6 +141,7 @@ export default function PublicCartelera({ slug }) {
   if (!slides.length) return <Pantalla>Sin productos publicados.</Pantalla>;
 
   const { business } = data;
+  const theme = THEMES[business?.cartelera_theme] || THEMES.western;
   const slide = slides[Math.min(current, slides.length - 1)];
   const innerStyle = innerScale < 1
     ? { transform: `scale(${innerScale})`, transformOrigin: 'top left', width: `${100 / innerScale}%`, height: `${100 / innerScale}%` }
@@ -147,7 +154,7 @@ export default function PublicCartelera({ slug }) {
     <div ref={wrapRef} className="w-screen h-screen bg-black overflow-hidden flex items-center justify-center">
       <style>{`@keyframes cartelFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}.cartel-fade{animation:cartelFade .55s ease-out both}@keyframes cartelBar{from{width:0}to{width:100%}}@keyframes ringPulse{0%,100%{box-shadow:0 0 0 0 rgba(74,222,128,.7)}50%{box-shadow:0 0 0 10px rgba(74,222,128,0)}}`}</style>
 
-      <div style={{ width: BASE_W, height: BASE_H, transform: `scale(${scale})`, transformOrigin: 'center center' }}
+      <div style={{ width: BASE_W, height: BASE_H, transform: `scale(${scale})`, transformOrigin: 'center center', '--acc': theme.accent, '--titlefont': theme.titlefont }}
         className="bg-zinc-900 text-white flex flex-col shrink-0 shadow-2xl overflow-hidden">
 
         {/* HEADER */}
@@ -165,7 +172,7 @@ export default function PublicCartelera({ slug }) {
 
         {/* BARRA DE PROGRESO del slide (ritmo predecible) */}
         <div className="h-1.5 bg-white/10 shrink-0">
-          <div key={current} className="h-full bg-amber-400" style={{ animation: `cartelBar ${SLIDE_MS}ms linear forwards` }} />
+          <div key={current} className="h-full bg-[var(--acc)]" style={{ animation: `cartelBar ${SLIDE_MS}ms linear forwards` }} />
         </div>
 
         {/* FOOTER: dirección | dots | CTA QR fuerte */}
@@ -173,7 +180,7 @@ export default function PublicCartelera({ slug }) {
           <span className="w-1/3 truncate text-white/70 text-base">{business.address || ''}</span>
           <span className="w-1/3 flex items-center justify-center gap-2">
             {slides.map((_, i) => (
-              <span key={i} className={`rounded-full transition-all ${i === current ? 'w-3 h-3 bg-amber-400' : 'w-2 h-2 bg-white/25'}`} />
+              <span key={i} className={`rounded-full transition-all ${i === current ? 'w-3 h-3 bg-[var(--acc)]' : 'w-2 h-2 bg-white/25'}`} />
             ))}
           </span>
           <span className="w-1/3 flex justify-end">
@@ -207,9 +214,9 @@ function SlideFeatured({ slide }) {
       <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/55 to-black/20" />
       <Ribbon />
       <div className="relative h-full flex flex-col justify-center px-14">
-        <span className="self-start inline-flex items-center gap-2 bg-amber-400 text-zinc-900 font-black text-2xl px-5 py-2 rounded-full mb-4 animate-pulse">🔥 COMBO DESTACADO</span>
+        <span className="self-start inline-flex items-center gap-2 bg-[var(--acc)] text-zinc-900 font-black text-2xl px-5 py-2 rounded-full mb-4 animate-pulse">🔥 COMBO DESTACADO</span>
         <div className="text-white font-black uppercase tracking-tight leading-[0.95] max-w-[60%] line-clamp-3 drop-shadow-lg" style={{ ...RYE, fontSize: 62 }}>{item.name}</div>
-        <div className="text-amber-400 font-black tabular-nums mt-2 drop-shadow-lg" style={{ ...RYE, fontSize: 128, lineHeight: 1 }}>{money(item.price)}</div>
+        <div className="text-[var(--acc)] font-black tabular-nums mt-2 drop-shadow-lg" style={{ ...RYE, fontSize: 128, lineHeight: 1 }}>{money(item.price)}</div>
         {cs && <div className="text-amber-200 font-bold text-3xl mt-4">{cs}</div>}
       </div>
     </div>
@@ -245,9 +252,9 @@ function SlideCategoria({ slide }) {
             const hot = num(p.price) === max && items.length > 1;
             return (
               <li key={i} className={`relative rounded-2xl px-4 py-3 flex items-center gap-3 ${hot ? 'bg-white/10 ring-2 ring-amber-400' : ''}`}>
-                {hot && <span className="absolute -top-3 left-4 bg-amber-400 text-zinc-900 font-black text-xs px-3 py-1 rounded-full shadow">⭐ EL MÁS PEDIDO</span>}
+                {hot && <span className="absolute -top-3 left-4 bg-[var(--acc)] text-zinc-900 font-black text-xs px-3 py-1 rounded-full shadow">⭐ EL MÁS PEDIDO</span>}
                 <span className="flex-1 min-w-0 font-bold text-white text-2xl leading-tight line-clamp-2">{p.name}</span>
-                <span className={`font-black text-amber-400 tabular-nums whitespace-nowrap ${hot ? 'text-5xl animate-pulse' : 'text-4xl'}`} style={RYE}>{money(p.price)}</span>
+                <span className={`font-black text-[var(--acc)] tabular-nums whitespace-nowrap ${hot ? 'text-5xl animate-pulse' : 'text-4xl'}`} style={RYE}>{money(p.price)}</span>
               </li>
             );
           })}
