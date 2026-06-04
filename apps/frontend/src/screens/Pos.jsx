@@ -200,7 +200,7 @@ function ProductSale({ onSold }) {
                   ? <img src={p.image_url || asset.image} alt="" className="w-full h-20 object-cover bg-zinc-100" onError={(e) => { e.target.outerHTML = `<div class="w-full h-20 bg-gradient-to-br ${asset.gradient} flex items-center justify-center text-3xl">${asset.emoji}</div>`; }} />
                   : <div className={`w-full h-20 bg-gradient-to-br ${asset.gradient} flex items-center justify-center text-3xl`}>{asset.emoji}</div>}
                 <div className="p-2">
-                  <div className={`text-xs font-black leading-tight line-clamp-2 ${invalido ? 'text-amber-900' : ''}`}>{invalido && <span aria-hidden>⚠️ </span>}{p.name}</div>
+                  <div title={p.name} className={`text-xs font-black leading-tight break-words ${invalido ? 'text-amber-900' : ''}`}>{invalido && <span aria-hidden>⚠️ </span>}{p.name}</div>
                   <div className="text-cartel mt-1 font-bold text-sm">{money(p.price)}</div>
                 </div>
               </button>

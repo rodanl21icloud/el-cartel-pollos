@@ -2,6 +2,22 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { Spinner, EmptyState, ErrorState } from '../components/ui/States.jsx';
 
+// Pitido (Web Audio, sin assets) al entrar un pedido nuevo. Singleton perezoso.
+let _actx;
+function beep() {
+  try {
+    _actx = _actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (_actx.state === 'suspended') _actx.resume();
+    const o = _actx.createOscillator(), g = _actx.createGain();
+    o.type = 'sine'; o.frequency.value = 880; o.connect(g); g.connect(_actx.destination);
+    const t = _actx.currentTime;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.35, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+    o.start(t); o.stop(t + 0.42);
+  } catch { /* sin audio disponible */ }
+}
+
 // Kitchen Display System (KDS): tablero de cocina por estado, polling cada 7s.
 const NEXT = { PENDIENTE: 'EN_PREPARACION', EN_PREPARACION: 'LISTO', LISTO: 'ENTREGADO' };
 const PREV = { EN_PREPARACION: 'PENDIENTE', LISTO: 'EN_PREPARACION' };
@@ -16,6 +32,11 @@ export default function Kds() {
   const [now, setNow] = useState(Date.now());
   const seen = useRef(new Set());
   const [fresh, setFresh] = useState({}); // sale_id -> timestamp (pedido nuevo)
+  const [sound, setSound] = useState(true);
+  const soundRef = useRef(true);
+  useEffect(() => { soundRef.current = sound; }, [sound]);
+  const rootRef = useRef(null);
+  const toggleFs = () => { const el = rootRef.current; if (!document.fullscreenElement) el?.requestFullscreen?.(); else document.exitFullscreen?.(); };
 
   const load = useCallback(() => {
     api('/dispatch')
@@ -24,7 +45,10 @@ export default function Kds() {
         const ids = (d.orders || []).filter((o) => o.status !== 'ENTREGADO').map((o) => o.sale_id);
         if (seen.current.size) {
           const nuevos = ids.filter((id) => !seen.current.has(id));
-          if (nuevos.length) setFresh((f) => { const n = { ...f }; nuevos.forEach((id) => (n[id] = Date.now())); return n; });
+          if (nuevos.length) {
+            if (soundRef.current) beep();
+            setFresh((f) => { const n = { ...f }; nuevos.forEach((id) => (n[id] = Date.now())); return n; });
+          }
         }
         ids.forEach((id) => seen.current.add(id));
       })
@@ -48,14 +72,16 @@ export default function Kds() {
   const activos = data.orders.filter((o) => o.status !== 'ENTREGADO');
 
   return (
-    <div className="bg-zinc-900 text-white rounded-2xl p-4 min-h-[80vh]">
+    <div ref={rootRef} className="bg-zinc-900 text-white rounded-2xl p-4 min-h-[80vh]">
       <style>{`@keyframes kdsNew{0%,100%{box-shadow:0 0 0 0 rgba(245,166,35,0)}50%{box-shadow:0 0 0 7px rgba(245,166,35,.6)}}.kds-new{animation:kdsNew 1.4s ease-in-out 3}`}</style>
 
       <header className="flex items-center justify-between mb-4 px-1">
         <h1 className="text-3xl font-black">👨‍🍳 Cocina <span className="text-amber-400">KDS</span></h1>
-        <div className="flex items-center gap-4 text-white/70 font-bold">
-          <span>{data.day}</span>
+        <div className="flex items-center gap-3 text-white/70 font-bold">
+          <span className="hidden sm:inline">{data.day}</span>
           <span className="px-3 py-1 rounded-full bg-amber-400 text-zinc-900">{activos.length} pedidos</span>
+          <button onClick={() => setSound((s) => !s)} title={sound ? 'Silenciar alertas' : 'Activar sonido'} className="px-3 py-1.5 rounded-lg bg-zinc-700 hover:bg-zinc-600">{sound ? '🔔' : '🔕'}</button>
+          <button onClick={toggleFs} title="Pantalla completa" className="px-3 py-1.5 rounded-lg bg-zinc-700 hover:bg-zinc-600">⛶</button>
           <button onClick={load} className="px-3 py-1.5 rounded-lg bg-zinc-700 hover:bg-zinc-600">↻</button>
         </div>
       </header>
