@@ -92,8 +92,9 @@
     font-family: 'Rye', cursive; line-height: 1.05; font-size: 3rem;
     color: var(--texto); text-shadow: 0 4px 24px rgba(0,0,0,.8); letter-spacing: .02em;
   }
-  .hero .hero-emblem { display: block; width: min(380px, 82%); height: auto; margin: 0 auto 22px; filter: drop-shadow(0 6px 18px rgba(0,0,0,.85)); }
-  @media (max-width: 640px) { .hero .hero-emblem { width: min(280px, 74%); margin-bottom: 16px; } }
+  .hero .hero-emblem { display: block; width: min(680px, 92%); height: auto; margin: 0 auto 18px; filter: drop-shadow(0 8px 22px rgba(0,0,0,.9)); }
+  @media (max-width: 640px) { .hero .hero-emblem { width: min(400px, 90%); margin-bottom: 12px; } }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
   .hero .sub {
     font-family: 'Oswald', sans-serif; font-weight: 500; letter-spacing: .18em;
     text-transform: uppercase; color: var(--oro); margin-top: 1rem; font-size: 1rem;
@@ -191,7 +192,7 @@
 <header class="hero">
   <div class="hero-inner">
     <img class="hero-emblem" src="/logo.png" alt="El Cartel de los Pollos" />
-    <h1 class="rye">EL CARTEL<br />DE LOS POLLOS</h1>
+    <h1 class="sr-only">El Cartel de los Pollos</h1>
     <p class="sub">Pollo a las brasas · San Bernardo</p>
     <div class="hero-cta">
       <a class="btn btn-rojo" href="https://cartel-pollos.onrender.com/carta/elcarteldelospollos" target="_blank" rel="noopener">Ver la carta</a>
@@ -327,7 +328,7 @@
 
 <!-- ===================== FOOTER ===================== -->
 <footer>
-  <div class="logo rye"><img src="/logo.jpeg" alt="" style="height:1.5em;width:1.5em;object-fit:cover;border-radius:50%;border:2px solid var(--oro);vertical-align:-.45em;margin-right:.5em" />El Cartel de los Pollos</div>
+  <div class="logo rye"><img src="/logo.png" alt="" style="height:1.7em;width:auto;vertical-align:-.5em;margin-right:.4em" />El Cartel de los Pollos</div>
   <div class="dir">Camino Padre Hurtado 18154, Local 14, San Bernardo</div>
   <div class="copy">© 2026 El Cartel de los Pollos</div>
 </footer>
