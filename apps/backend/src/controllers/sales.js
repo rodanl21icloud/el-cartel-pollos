@@ -156,13 +156,17 @@ export async function listSales(req, res) {
   if (from) { cl.push('s.sold_at >= ?'); args.push(from); }
   if (to) { cl.push('s.sold_at <= ?'); args.push(to); }
   if (method) { cl.push('s.payment_method = ?'); args.push(method); }
-  if (q && /^\d+$/.test(q.trim())) { cl.push('s.order_number = ?'); args.push(Number(q.trim())); }
+  if (q && q.trim()) {
+    const t = q.trim(); const like = `%${t}%`;
+    if (/^\d+$/.test(t)) { cl.push('(s.order_number = ? OR c.phone LIKE ? OR c.name LIKE ?)'); args.push(Number(t), like, like); }
+    else { cl.push('(c.name LIKE ? OR c.phone LIKE ?)'); args.push(like, like); }
+  }
   const where = `WHERE ${cl.join(' AND ')}`;
   const limit = Math.min(Number(req.query.limit) || 100, 500);
   const { rows } = await db.execute({
     sql: `SELECT s.id, s.order_number, s.sold_at, s.created_at, s.business_day, s.total, s.payment_method, s.kind, s.dispatch_status,
                  s.is_backdated, s.backdate_reason,
-                 c.name AS client_name,
+                 c.name AS client_name, c.phone AS client_phone,
                  (SELECT GROUP_CONCAT(p.name || ' x' || si.qty, ', ')
                   FROM sale_items si JOIN products p ON p.id = si.product_id WHERE si.sale_id = s.id) AS detalle
           FROM sales s LEFT JOIN clients c ON c.id = s.client_id
@@ -172,7 +176,7 @@ export async function listSales(req, res) {
   return res.json(rows.map((r) => ({
     id: r.id, order_number: r.order_number, sold_at: r.sold_at, created_at: r.created_at, business_day: r.business_day,
     total: Number(r.total), payment_method: r.payment_method, kind: r.kind,
-    dispatch_status: r.dispatch_status, client_name: r.client_name, detalle: r.detalle || '',
+    dispatch_status: r.dispatch_status, client_name: r.client_name, client_phone: r.client_phone || null, detalle: r.detalle || '',
     is_backdated: !!r.is_backdated, backdate_reason: r.backdate_reason || null,
   })));
 }

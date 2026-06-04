@@ -36,7 +36,12 @@ export default function Ventas({ canVoid }) {
       const r = await api(`/sales/${saleId}/receipt`);
       if (kind === 'cocina') openPrint(buildKitchenTicketHTML(r, settings));
       else if (kind === 'boleta') openPrint(buildCustomerReceiptHTML(r, settings));
-      else window.open(whatsappUrl(r, settings), '_blank');
+      else {
+        let phone = (r.client_phone || '').replace(/\D/g, '');
+        if (!phone) { const inp = window.prompt('Número de WhatsApp del cliente (con código país, ej: 56912345678):', '56'); if (inp === null) return; phone = inp.replace(/\D/g, ''); }
+        if (phone.length < 9) { setError('Número de WhatsApp inválido (revisa el código de país y los 9 dígitos).'); return; }
+        window.open(whatsappUrl(r, settings, phone), '_blank');
+      }
     } catch (e) { setError(e.message); }
   }
 
@@ -66,7 +71,7 @@ export default function Ventas({ canVoid }) {
             <option value="">Todos</option><option value="EFECTIVO">Efectivo</option><option value="POS">Tarjeta</option><option value="TRANSFERENCIA">Transferencia</option>
           </select>
         </label>
-        <label className="text-xs font-bold text-ink-mute flex flex-col gap-1 col-span-2 sm:col-span-1">N° orden<input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ej: 42" inputMode="numeric" className="field" /></label>
+        <label className="text-xs font-bold text-ink-mute flex flex-col gap-1 col-span-2 sm:col-span-1">Buscar<input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Orden, cliente o teléfono" className="field" /></label>
         <button onClick={() => { setFrom(''); setTo(''); setMethod(''); setQ(''); }} className="self-end px-3 py-2.5 rounded-xl bg-slate-200 font-bold text-sm">Limpiar</button>
       </div>
 
