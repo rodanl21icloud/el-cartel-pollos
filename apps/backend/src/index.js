@@ -11,7 +11,7 @@ import { login } from './controllers/auth.js';
 import { closeCashRegister, getCurrentSession, openSession, registerMovement } from './controllers/cashRegister.js';
 import { syncSale, listProducts, getReceipt, listSales, voidSale, backdateSale } from './controllers/sales.js';
 import { getSettings, updateSettings, setAdminPin } from './controllers/settings.js';
-import { registerMerma, listIngredients, lowStockAlerts,
+import { registerMerma, listIngredients, lowStockAlerts, mermasHistorial,
          createIngredient, deleteIngredient, restockIngredient, setIngredientStock } from './controllers/inventory.js';
 import { createProduct, updateProduct, deleteProduct, updateIngredient, listCatalog } from './controllers/admin.js';
 import { getRecipe, setRecipe } from './controllers/recipes.js';
@@ -102,6 +102,7 @@ app.put('/api/dispatch/:saleId/status', requirePermission('dispatch.manage'), up
 app.get('/api/inventory/ingredients', listIngredients);
 app.get('/api/inventory/alerts', lowStockAlerts);
 app.post('/api/inventory/merma', requirePermission('inventory.merma'), registerMerma);
+app.get('/api/inventory/mermas', requirePermission('inventory.merma'), mermasHistorial);
 
 // Gestión de insumos (CRUD + reposición). Editar/eliminar -> también OTP de gerencia.
 app.post('/api/inventory/ingredients', requirePermission('inventory.manage'), createIngredient);

@@ -269,15 +269,56 @@ export async function restockIngredient(req, res) {
   return res.status(201).json({ ingredient: ing.rows[0].name, new_stock: Number(newStock.rows[0].stock_qty), unit_cost, cost_unit: costoPromedio, expense_id: expenseId });
 }
 
-/** GET /api/inventory/alerts — insumos en o bajo el umbral mínimo. */
+/**
+ * GET /api/inventory/alerts — insumos en o bajo el umbral, con SEVERIDAD y días
+ * estimados a quiebre (según consumo diario por BOM de los últimos 30 días).
+ */
 export async function lowStockAlerts(_req, res) {
   const db = getDb();
+  const cons = new Map(); // ingredient_id -> consumo diario
+  const cr = (await db.execute({
+    sql: `SELECT ingredient_id, COALESCE(SUM(ABS(qty_delta)),0) q FROM inventory_adjustments
+          WHERE type='VENTA' AND datetime(created_at) >= datetime('now','-30 days') GROUP BY ingredient_id`,
+    args: [],
+  })).rows;
+  for (const r of cr) cons.set(r.ingredient_id, Number(r.q) / 30);
+
   const { rows } = await db.execute({
     sql: `SELECT id, name, unit, stock_qty, min_stock_qty
-          FROM ingredients
-          WHERE is_active = 1 AND stock_qty <= min_stock_qty
+          FROM ingredients WHERE is_active = 1 AND stock_qty <= min_stock_qty
           ORDER BY (stock_qty - min_stock_qty) ASC`,
     args: [],
   });
-  return res.json({ count: rows.length, alerts: rows });
+  const alerts = rows.map((r) => {
+    const stock = Number(r.stock_qty), min = Number(r.min_stock_qty);
+    const diario = cons.get(r.id) || 0;
+    const dias = diario > 0 ? Math.floor(stock / diario) : null;
+    const severidad = stock <= 0 ? 'AGOTADO'
+      : (dias != null && dias <= 2) || stock <= min * 0.5 ? 'CRITICO' : 'BAJO';
+    return { id: r.id, name: r.name, unit: r.unit, stock_qty: stock, min_stock_qty: min,
+      consumo_diario: Math.round(diario * 100) / 100, dias_a_quiebre: dias, severidad };
+  });
+  return res.json({ count: alerts.length, alerts });
+}
+
+/** GET /api/inventory/mermas?days=30 — historial de mermas por insumo + detalle. */
+export async function mermasHistorial(req, res) {
+  const db = getDb();
+  const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 365);
+  const since = `-${days} days`;
+  const por_insumo = (await db.execute({
+    sql: `SELECT i.name, i.unit, COUNT(*) n, COALESCE(SUM(ABS(ia.qty_delta)),0) qty, COALESCE(SUM(ABS(ia.qty_delta)*ia.unit_cost),0) costo
+          FROM inventory_adjustments ia JOIN ingredients i ON i.id = ia.ingredient_id
+          WHERE ia.type='MERMA' AND datetime(ia.created_at) >= datetime('now', ?)
+          GROUP BY i.id ORDER BY costo DESC`,
+    args: [since],
+  })).rows.map((r) => ({ name: r.name, unit: r.unit, n: Number(r.n), qty: Number(r.qty), costo: Math.round(Number(r.costo)) }));
+  const detalle = (await db.execute({
+    sql: `SELECT ia.created_at fecha, i.name, i.unit, ABS(ia.qty_delta) qty, ia.reason, u.full_name usuario
+          FROM inventory_adjustments ia JOIN ingredients i ON i.id = ia.ingredient_id LEFT JOIN users u ON u.id = ia.user_id
+          WHERE ia.type='MERMA' AND datetime(ia.created_at) >= datetime('now', ?)
+          ORDER BY ia.created_at DESC LIMIT 60`,
+    args: [since],
+  })).rows.map((r) => ({ fecha: r.fecha, name: r.name, unit: r.unit, qty: Number(r.qty), reason: r.reason, usuario: r.usuario || '—' }));
+  return res.json({ days, total_costo: por_insumo.reduce((s, r) => s + r.costo, 0), por_insumo, detalle });
 }
