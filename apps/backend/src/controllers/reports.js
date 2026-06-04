@@ -64,7 +64,7 @@ export async function turnos(_req, res) {
   const db = getDb();
   const umbral = Number((await db.execute(`SELECT conteo_umbral FROM business_settings WHERE id=1`)).rows[0]?.conteo_umbral ?? 3);
   const { rows } = await db.execute({
-    sql: `SELECT s.id, s.opened_at, s.closed_at, u.name AS encargado,
+    sql: `SELECT s.id, s.opened_at, s.closed_at, u.full_name AS encargado,
                  s.pollos_horno, s.pollos_crudos_ini, s.sacos_papas_ini, s.obs_apertura,
                  c.pollos_crudos_fin, c.merma_pollos, c.sacos_papas_fin, c.obs_cierre
           FROM cash_sessions s
