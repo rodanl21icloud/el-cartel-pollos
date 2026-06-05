@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, apiDownload } from '../lib/api.js';
+import { buildCustomerReceiptHTML } from '../lib/receipt.js';
 
 // ============================================================
 // Módulo "Movimientos" — clon visual de alta fidelidad (estilo Treinta):
@@ -197,15 +198,28 @@ function Drawer({ m, onClose, onGo, canVoid, onChanged }) {
     <div className="d-row"><span className="d-row-l">{ico}{label}</span><span className={`d-row-v ${red ? 'v-red' : ''}`}>{value ?? '—'}</span></div>
   );
 
-  function comprobante() {
-    const w = window.open('', '_blank', 'width=380,height=620'); if (!w) return;
+  const [printing, setPrinting] = useState(false);
+  async function comprobante() {
+    const w = window.open('', '_blank', 'width=400,height=640'); if (!w) return;
+    if (ingreso) {
+      // Comprobante térmico real del POS (58/80mm, logo, folio, auto-print + corte).
+      setPrinting(true);
+      try {
+        const [data, settings] = await Promise.all([api(`/sales/${m.id}/receipt`), api('/settings')]);
+        w.document.write(buildCustomerReceiptHTML(data, settings || {}));
+        w.document.close();
+      } catch (e) { w.close(); alert(e.message); } finally { setPrinting(false); }
+      return;
+    }
+    // Gasto: vale simple (no es una venta del POS).
     const r = (l, v) => `<tr><td style="color:#6B7280;padding:4px 0">${l}</td><td style="text-align:right;font-weight:700">${v}</td></tr>`;
-    w.document.write(`<html><head><title>Comprobante</title><style>body{font-family:ui-sans-serif,system-ui,Arial;padding:22px;color:#111}h1{font-size:15px;letter-spacing:1px;text-align:center;margin:0 0 2px}.s{text-align:center;color:#6B7280;font-size:12px;margin-bottom:14px}.tot{border-top:2px dashed #ccc;border-bottom:2px dashed #ccc;padding:10px 0;margin:10px 0;text-align:center}.tot b{font-size:22px}table{width:100%;font-size:12px;border-collapse:collapse}</style></head><body>
-      <h1>COMPROBANTE</h1><div class="s">${m.concepto}${m.ref ? ' · #' + m.ref : ''}</div>
-      <div class="tot"><div style="font-size:11px;color:#6B7280">VALOR TOTAL</div><b>${money(m.valor)}</b></div>
-      <table>${r('Fecha y hora', fmtLong(m.fecha))}${r('Método de pago', METODO[m.medio_pago] || m.medio_pago)}${r(ingreso ? 'Cliente' : 'Proveedor', m.cliente || '—')}${r('Empleado', m.empleado || 'Vendedor')}${ingreso ? r('Ganancia', m.ganancia != null ? money(m.ganancia) : '—') : ''}</table>
-      <div class="s" style="margin-top:20px">¡Gracias por tu compra!</div></body></html>`);
-    w.document.close(); w.focus(); setTimeout(() => w.print(), 250);
+    w.document.write(`<html><head><title>Vale de egreso</title><style>@page{size:80mm auto;margin:2mm}body{font-family:'Courier New',monospace;padding:8px;color:#111}h1{font-size:14px;letter-spacing:1px;text-align:center;margin:0 0 2px}.s{text-align:center;color:#555;font-size:12px;margin-bottom:12px}.tot{border-top:1px dashed #000;border-bottom:1px dashed #000;padding:8px 0;margin:8px 0;text-align:center}.tot b{font-size:20px}table{width:100%;font-size:12px;border-collapse:collapse}</style></head><body>
+      <h1>VALE DE EGRESO</h1><div class="s">${m.concepto}${m.ref ? ' · ' + m.ref : ''}</div>
+      <div class="tot"><div style="font-size:11px;color:#555">VALOR</div><b>${money(m.valor)}</b></div>
+      <table>${r('Fecha y hora', fmtLong(m.fecha))}${r('Método de pago', METODO[m.medio_pago] || m.medio_pago)}${r('Proveedor', m.cliente || '—')}${r('Registró', m.empleado || '—')}</table>
+      <div style="height:8mm"></div>
+      <script>window.onload=function(){window.print();setTimeout(function(){window.close()},300)}</script></body></html>`);
+    w.document.close();
   }
   function editar() { onGo?.(ingreso ? 'ventas' : 'gastos'); onClose(); }
   async function eliminar() {
@@ -243,7 +257,7 @@ function Drawer({ m, onClose, onGo, canVoid, onChanged }) {
         </div>
         <div className="d-foot">
           <button className="d-act" onClick={() => window.print()}>{I.print}<span>Imprimir</span></button>
-          <button className="d-act" onClick={comprobante}>{I.doc}<span>Comprobante</span></button>
+          <button className="d-act" onClick={comprobante} disabled={printing}>{I.doc}<span>{printing ? '…' : 'Comprobante'}</span></button>
           <button className="d-act" onClick={editar}>{I.edit}<span>Editar</span></button>
           <button className="d-act danger" onClick={eliminar} disabled={busy}>{I.trash}<span>{busy ? '…' : 'Eliminar'}</span></button>
         </div>

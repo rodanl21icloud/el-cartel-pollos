@@ -67,7 +67,10 @@ export function buildCustomerReceiptHTML(data, settings = {}) {
     </table>
     <hr>
     <div class="c">${esc(settings.footer || '¡Gracias por tu pedido!')}</div>
+    <div style="height:8mm"></div>
   `;
+  // El avance final ayuda a que el corte automático del driver (si la impresora
+  // lo soporta) caiga después del contenido. El corte físico lo hace la impresora.
   return docShell(w, inner);
 }
 
