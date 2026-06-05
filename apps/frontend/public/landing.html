@@ -390,28 +390,46 @@
     <h2 class="titulo">Lo que dicen nuestros clientes</h2>
 
     <div class="badge-google">
-      <div class="num rye">4.9</div>
+      <div class="num rye" id="rev-rating">4.9</div>
       <div class="stars">★★★★★</div>
-      <div class="meta">27 opiniones verificadas en Google</div>
+      <div class="meta" id="rev-meta">27 opiniones verificadas en Google</div>
     </div>
 
-    <div class="resenas-grid">
-      <div class="resena">
-        <div class="stars">★★★★★</div>
-        <p>"Excelente pollo, jugoso y bien condimentado. Las papas bastón riquísimas. ¡Volvemos pronto!"</p>
-        <div class="autor">— María G.</div>
-      </div>
-      <div class="resena">
-        <div class="stars">★★★★★</div>
-        <p>"El mejor pollo a las brasas de San Bernardo, sin dudas. Rápido y buen precio."</p>
-        <div class="autor">— Felipe R.</div>
-      </div>
-      <div class="resena">
-        <div class="stars">★★★★★</div>
-        <p>"Pedí delivery y llegó caliente y bien empacado. El combo con papas está para relamer los dedos."</p>
-        <div class="autor">— Carla M.</div>
-      </div>
+    <div id="rev-card" class="resena" style="max-width:560px;margin:0 auto;min-height:130px;transition:opacity .35s">
+      <div class="stars" id="rev-stars">★★★★★</div>
+      <p id="rev-text">"Excelente pollo, jugoso y bien condimentado. Las papas bastón riquísimas. ¡Volvemos pronto!"</p>
+      <div class="autor" id="rev-author">— María G.</div>
     </div>
+    <div id="rev-dots" class="center" style="margin-top:.8rem;display:flex;gap:.45rem;justify-content:center"></div>
+    <script>
+      (function () {
+        var fb = [
+          { rating: 5, text: 'Excelente pollo, jugoso y bien condimentado. Las papas bastón riquísimas. ¡Volvemos pronto!', author: 'María G.' },
+          { rating: 5, text: 'El mejor pollo a las brasas de San Bernardo, sin dudas. Rápido y buen precio.', author: 'Felipe R.' },
+          { rating: 5, text: 'Pedí delivery y llegó caliente y bien empacado. El combo con papas está para relamer los dedos.', author: 'Carla M.' }
+        ];
+        var list = fb, i = 0, card = document.getElementById('rev-card');
+        function render() {
+          var r = list[i % list.length];
+          document.getElementById('rev-stars').textContent = '★★★★★'.slice(0, r.rating);
+          document.getElementById('rev-text').textContent = '"' + r.text + '"';
+          document.getElementById('rev-author').textContent = '— ' + r.author + (r.when ? ' · ' + r.when : '');
+          var dots = document.getElementById('rev-dots'); dots.innerHTML = '';
+          for (var d = 0; d < list.length; d++) { var s = document.createElement('span'); s.style.cssText = 'width:7px;height:7px;border-radius:50%;background:' + (d === i % list.length ? 'var(--oro)' : '#444'); dots.appendChild(s); }
+        }
+        function rotate() { card.style.opacity = 0; setTimeout(function () { i++; render(); card.style.opacity = 1; }, 350); }
+        fetch('/api/public/reviews').then(function (r) { return r.json(); }).then(function (d) {
+          if (d && d.reviews && d.reviews.length) {
+            list = d.reviews; i = 0;
+            if (d.rating) document.getElementById('rev-rating').textContent = d.rating;
+            if (d.total) document.getElementById('rev-meta').textContent = d.total + ' opiniones verificadas en Google';
+            render();
+          }
+        }).catch(function () {});
+        render();
+        setInterval(rotate, 5000);
+      })();
+    </script>
 
     <div class="center">
       <a class="btn btn-blanco" href="https://share.google/lta5rGixCp2C3igM2" target="_blank" rel="noopener">Ver todas las reseñas en Google</a>

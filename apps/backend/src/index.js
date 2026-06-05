@@ -24,6 +24,7 @@ import { bankSummary, bankMovements, addBankMovement, reconcileMovement, reconci
 import { listUsers, createUser, updateUser, resetPassword } from './controllers/users.js';
 import { listDispatch, updateDispatchStatus } from './controllers/dispatch.js';
 import { getPublicCatalog } from './controllers/publicCatalog.js';
+import { getReviews } from './controllers/reviews.js';
 import { listAudit, auditActions } from './controllers/audit.js';
 
 const app = express();
@@ -49,6 +50,7 @@ app.post('/api/auth/login', rateLimit({ windowMs: 5 * 60_000, max: 30 }), login)
 
 // Catálogo público compartible (sin JWT). Solo datos de vitrina.
 app.get('/api/public/catalog/:slug', getPublicCatalog);
+app.get('/api/public/reviews', getReviews);
 
 // --- Protegido: JWT en todo /api. El OTP de gerencia se aplica de forma
 // SELECTIVA solo a operaciones sensibles del catálogo/permisos (no a las
