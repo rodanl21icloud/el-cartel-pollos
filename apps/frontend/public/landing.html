@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="description" content="El Cartel de los Pollos — Pollo a las brasas en San Bernardo. Delivery y retiro en local. Carta online, pedidos por WhatsApp. ⭐ 4.9 en Google." />
+<meta name="description" content="El Cartel de los Pollos — Pollo al spiedo en San Bernardo. Delivery y retiro en local. Carta online, pedidos por WhatsApp. ⭐ 4.9 en Google." />
 <meta name="theme-color" content="#0a0a0a" />
-<title>El Cartel de los Pollos · Pollo a las brasas · San Bernardo</title>
+<title>El Cartel de los Pollos · Pollo al spiedo · San Bernardo</title>
 
 <!-- Open Graph (para que el link se vea bien al compartir) -->
 <meta property="og:type" content="website" />
-<meta property="og:title" content="El Cartel de los Pollos · Pollo a las brasas" />
+<meta property="og:title" content="El Cartel de los Pollos · Pollo al spiedo" />
 <meta property="og:description" content="Pollo asado al spiedo en San Bernardo. Delivery y retiro. ⭐ 4.9 en Google." />
 <meta property="og:image" content="https://cartel-pollos.onrender.com/hero-pollo.jpg" />
 
@@ -220,6 +220,12 @@
   .oper p { color: var(--sec); font-size: .95rem; }
   .oper a.maplink { color: var(--oro); }
   @media (min-width: 768px) { .pasos, .combos { grid-template-columns: repeat(3, 1fr); } .oper { grid-template-columns: repeat(2, 1fr); } }
+
+  /* ---------- Imágenes (food porn) + botones bifurcados ---------- */
+  .card .foto { width: 100%; height: 160px; object-fit: cover; border-radius: 10px; margin-bottom: .9rem; display: block; background: #1a1a1a; }
+  .combo .foto { height: 150px; border-radius: 10px; margin: -.2rem 0 .2rem; }
+  .combo-cta { display: flex; gap: .5rem; margin-top: .4rem; }
+  .combo-cta .btn { flex: 1; justify-content: center; padding: .7rem .4rem; font-size: .78rem; }
 </style>
 </head>
 <body>
@@ -229,14 +235,15 @@
   <div class="hero-inner">
     <img class="hero-emblem" src="/logo.png" alt="El Cartel de los Pollos" />
     <p class="eyebrow">📍 San Bernardo</p>
-    <h1 class="headline">El mejor pollo a las brasas de San Bernardo</h1>
+    <h1 class="headline">El mejor pollo al spiedo de San Bernardo</h1>
     <p class="sub">Pídelo por WhatsApp · Retiro en local o delivery</p>
     <p class="proof"><span class="st">★★★★★</span> 4.9 · 27 opiniones verificadas en Google</p>
     <div class="hero-cta">
-      <a class="btn btn-rojo" href="https://wa.me/56937209677?text=Hola%2C%20quiero%20hacer%20un%20pedido%20%F0%9F%8D%97" target="_blank" rel="noopener">Pedir por WhatsApp</a>
-      <a class="btn btn-oro" href="https://cartel-pollos.onrender.com/carta/elcarteldelospollos" target="_blank" rel="noopener">Ver carta y combos</a>
+      <!-- CTA principal: módulo de pedido online (Vite). href configurable al sistema de caja. -->
+      <a class="btn btn-rojo" href="https://cartel-pollos.onrender.com/carta/elcarteldelospollos" target="_blank" rel="noopener">Armar mi Pedido Online</a>
+      <a class="btn btn-oro" href="https://wa.me/56937209677?text=Hola%2C%20quiero%20hacer%20un%20pedido%20%F0%9F%8D%97" target="_blank" rel="noopener">Pedir por WhatsApp</a>
     </div>
-    <div class="trust"><span>🔥 Al spiedo</span><span>🛵 Delivery</span><span>⚡ Precios actualizados</span></div>
+    <div class="trust"><span>Al spiedo</span><span>Retiro en local</span><span>Delivery en San Bernardo</span></div>
   </div>
   <a class="arrow" href="#valor" aria-label="Bajar">▼</a>
 </header>
@@ -252,19 +259,19 @@
   <div class="wrap">
     <div class="cards">
       <div class="card">
-        <div class="ico">🔥</div>
-        <h3>Al spiedo</h3>
-        <p>Asado lento al fuego: piel crocante y carne jugosa. El que prueba, repite.</p>
+        <img class="foto" loading="lazy" src="/hero-pollo.jpg" alt="Pollo entero al spiedo, dorado y jugoso" />
+        <h3>Pollo al spiedo</h3>
+        <p>Entero, dorado y jugoso. Piel crocante y mucha carne para compartir.</p>
       </div>
       <div class="card">
-        <div class="ico">🛵</div>
-        <h3>Delivery</h3>
-        <p>Te lo llevamos caliente y bien empacado a tu casa en San Bernardo.</p>
+        <img class="foto" loading="lazy" src="/hero-papas.jpg" alt="Papas fritas doradas y crocantes" />
+        <h3>Papas que rinden</h3>
+        <p>Doradas y crocantes. Desde 150 g hasta 1 kilo para la mesa.</p>
       </div>
       <div class="card">
-        <div class="ico">⚡</div>
-        <h3>Pedido rápido</h3>
-        <p>Escribes por WhatsApp, confirmas y lo retiras sin esperas. Así de simple.</p>
+        <img class="foto" loading="lazy" src="/hero-combos.jpg" alt="Combo familiar de pollo al spiedo con papas" />
+        <h3>Combo Familiar</h3>
+        <p>Pollo + papas + bebida. La opción que más rinde para la familia.</p>
       </div>
     </div>
   </div>
@@ -294,7 +301,10 @@
         <h3>Combo Pollo + Papas 1 kilo + Bebida 1,5 L</h3>
         <p class="desc">Pollo entero al spiedo, 1 kilo de papas y bebida de 1,5 litros. Ideal para la familia.</p>
         <div class="precio">$23.500</div>
-        <a class="btn btn-rojo" href="https://wa.me/56937209677?text=Hola%2C%20quiero%20pedir%20el%20combo%20pollo%20%2B%20papas%201%20kilo%20%2B%20bebida%201%2C5lt" target="_blank" rel="noopener">Pedir este combo</a>
+        <div class="combo-cta">
+          <a class="btn btn-rojo" href="https://wa.me/56937209677?text=Hola%2C%20voy%20en%20camino%20al%20local.%20Quiero%20pedir%20Combo%20Pollo%20%2B%20Papas%201%20kilo%20%2B%20Bebida%201%2C5%20L%20para%20retiro%20r%C3%A1pido." target="_blank" rel="noopener">Retiro sin filas</a>
+          <a class="btn btn-oro" href="https://wa.me/56937209677?text=Hola%2C%20quiero%20pedir%20Combo%20Pollo%20%2B%20Papas%201%20kilo%20%2B%20Bebida%201%2C5%20L%20con%20env%C3%ADo%20a%20domicilio.%20Mi%20direcci%C3%B3n%20es%3A" target="_blank" rel="noopener">Pedir Delivery</a>
+        </div>
       </div>
 
       <div class="combo">
@@ -302,7 +312,10 @@
         <h3>Combo 1/2 Pollo + Papas 400</h3>
         <p class="desc">Medio pollo al spiedo con papas (400 g). Justo para compartir entre dos.</p>
         <div class="precio">$11.500</div>
-        <a class="btn btn-rojo" href="https://wa.me/56937209677?text=Hola%2C%20quiero%20pedir%20el%20combo%201%2F2%20pollo%20%2B%20papas%20400" target="_blank" rel="noopener">Pedir este combo</a>
+        <div class="combo-cta">
+          <a class="btn btn-rojo" href="https://wa.me/56937209677?text=Hola%2C%20voy%20en%20camino%20al%20local.%20Quiero%20pedir%20Combo%201%2F2%20Pollo%20%2B%20Papas%20400%20para%20retiro%20r%C3%A1pido." target="_blank" rel="noopener">Retiro sin filas</a>
+          <a class="btn btn-oro" href="https://wa.me/56937209677?text=Hola%2C%20quiero%20pedir%20Combo%201%2F2%20Pollo%20%2B%20Papas%20400%20con%20env%C3%ADo%20a%20domicilio.%20Mi%20direcci%C3%B3n%20es%3A" target="_blank" rel="noopener">Pedir Delivery</a>
+        </div>
       </div>
 
       <div class="combo">
@@ -310,7 +323,10 @@
         <h3>Combo Pollo + Papas 500 + Bebida 1,5 L</h3>
         <p class="desc">Pollo entero al spiedo, papas (500 g) y bebida de 1,5 litros.</p>
         <div class="precio">$20.500</div>
-        <a class="btn btn-rojo" href="https://wa.me/56937209677?text=Hola%2C%20quiero%20pedir%20el%20combo%20pollo%20%2B%20papas%20500g%20%2B%20bebida%201%2C5lt" target="_blank" rel="noopener">Pedir este combo</a>
+        <div class="combo-cta">
+          <a class="btn btn-rojo" href="https://wa.me/56937209677?text=Hola%2C%20voy%20en%20camino%20al%20local.%20Quiero%20pedir%20Combo%20Pollo%20%2B%20Papas%20500%20%2B%20Bebida%201%2C5%20L%20para%20retiro%20r%C3%A1pido." target="_blank" rel="noopener">Retiro sin filas</a>
+          <a class="btn btn-oro" href="https://wa.me/56937209677?text=Hola%2C%20quiero%20pedir%20Combo%20Pollo%20%2B%20Papas%20500%20%2B%20Bebida%201%2C5%20L%20con%20env%C3%ADo%20a%20domicilio.%20Mi%20direcci%C3%B3n%20es%3A" target="_blank" rel="noopener">Pedir Delivery</a>
+        </div>
       </div>
 
       <div class="combo">
@@ -350,17 +366,17 @@
     <p class="subtitulo">Estamos en San Bernardo</p>
     <div class="oper">
       <div class="box">
-        <h3>🏠 Retiro en local</h3>
-        <p>Camino Padre Hurtado 18154, Local 14, San Bernardo.</p>
-        <p style="margin-top:.6rem"><a class="maplink" href="https://share.google/lta5rGixCp2C3igM2" target="_blank" rel="noopener">📍 Cómo llegar (Google Maps)</a></p>
+        <h3>Retiro en local</h3>
+        <p><a class="maplink" href="https://www.google.com/maps/dir/?api=1&destination=Camino%20Padre%20Hurtado%2018154%2C%20San%20Bernardo" target="_blank" rel="noopener">Camino Padre Hurtado 18154, Local 14, San Bernardo</a></p>
+        <p style="margin-top:.6rem"><a class="maplink" href="https://waze.com/ul?q=Camino%20Padre%20Hurtado%2018154%20San%20Bernardo&navigate=yes" target="_blank" rel="noopener">Abrir ruta en Waze →</a></p>
       </div>
       <div class="box">
-        <h3>🛵 Delivery en San Bernardo</h3>
+        <h3>Delivery en San Bernardo</h3>
         <p>Haz tu pedido por WhatsApp y coordinamos la entrega.</p>
         <p style="margin-top:.6rem"><a class="maplink" href="https://wa.me/56937209677?text=Hola%2C%20quiero%20revisar%20opciones%20de%20delivery" target="_blank" rel="noopener">Consultar delivery por WhatsApp →</a></p>
       </div>
       <div class="box">
-        <h3>🕒 Horario</h3>
+        <h3>Horario</h3>
         <p>Domingo a jueves y festivos · 11:00 a 16:00</p>
         <p>Viernes y sábado · 11:00 a 20:00</p>
       </div>
@@ -387,7 +403,7 @@
       </div>
       <div class="resena">
         <div class="stars">★★★★★</div>
-        <p>"El mejor pollo a las brasas de San Bernardo, sin dudas. Rápido y buen precio."</p>
+        <p>"El mejor pollo al spiedo de San Bernardo, sin dudas. Rápido y buen precio."</p>
         <div class="autor">— Felipe R.</div>
       </div>
       <div class="resena">
@@ -451,7 +467,7 @@
 <footer>
   <div class="logo rye"><img src="/logo.png" alt="" style="height:1.7em;width:auto;vertical-align:-.5em;margin-right:.4em" />El Cartel de los Pollos</div>
   <div class="dir">Camino Padre Hurtado 18154, Local 14, San Bernardo</div>
-  <div class="dir"><a href="https://wa.me/56937209677?text=Hola%2C%20quiero%20hacer%20un%20pedido%20%F0%9F%8D%97" target="_blank" rel="noopener" style="color:var(--oro)">WhatsApp</a> · <a href="https://cartel-pollos.onrender.com/carta/elcarteldelospollos" target="_blank" rel="noopener" style="color:var(--oro)">Carta</a> · <a href="https://share.google/lta5rGixCp2C3igM2" target="_blank" rel="noopener" style="color:var(--oro)">Cómo llegar</a></div>
+  <div class="dir"><a href="https://wa.me/56937209677?text=Hola%2C%20quiero%20hacer%20un%20pedido%20%F0%9F%8D%97" target="_blank" rel="noopener" style="color:var(--oro)">WhatsApp</a> · <a href="https://cartel-pollos.onrender.com/carta/elcarteldelospollos" target="_blank" rel="noopener" style="color:var(--oro)">Carta</a> · <a href="https://www.google.com/maps/dir/?api=1&destination=Camino%20Padre%20Hurtado%2018154%2C%20San%20Bernardo" target="_blank" rel="noopener" style="color:var(--oro)">Cómo llegar</a></div>
   <div class="copy">© 2026 El Cartel de los Pollos</div>
 </footer>
 
