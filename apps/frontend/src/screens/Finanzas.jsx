@@ -7,6 +7,7 @@ import Flujo from './Flujo.jsx';
 import Banco from './Banco.jsx';
 import Movimientos from './Movimientos.jsx';
 import Pnl from './Pnl.jsx';
+import Costos from './finance/Costos.jsx';
 
 // Hub de Finanzas (Fase 1): una sola entrada con pestañas. Reúne las antiguas
 // 8 secciones financieras (Resumen, Estadísticas, Gastos, Flujo, Banco,
@@ -14,6 +15,7 @@ import Pnl from './Pnl.jsx';
 const TABS = [
   { id: 'resumen', label: 'Resumen' },
   { id: 'ventas', label: 'Ventas' },
+  { id: 'costos', label: 'Costos' },
   { id: 'gastos', label: 'Gastos' },
   { id: 'flujo', label: 'Flujo y banco' },
   { id: 'detalle', label: 'Detalle' },
@@ -21,7 +23,7 @@ const TABS = [
 ];
 
 // Pestañas gobernadas por el período global del hub.
-const PERIOD_TABS = new Set(['resumen', 'ventas', 'flujo', 'detalle', 'resultado']);
+const PERIOD_TABS = new Set(['resumen', 'ventas', 'costos', 'flujo', 'detalle', 'resultado']);
 
 export default function Finanzas({ role }) {
   const [tab, setTab] = useState('resumen');
@@ -45,6 +47,7 @@ export default function Finanzas({ role }) {
 
       {tab === 'resumen' && period && <Resumen period={period} />}
       {tab === 'ventas' && period && <Estadisticas period={period} />}
+      {tab === 'costos' && period && <Costos period={period} />}
       {tab === 'gastos' && <Gastos />}
       {tab === 'flujo' && period && <div className="space-y-4"><Flujo period={period} /><Banco role={role} /></div>}
       {tab === 'detalle' && period && <Movimientos period={period} />}

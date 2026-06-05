@@ -17,6 +17,7 @@ import { createProduct, updateProduct, deleteProduct, updateIngredient, listCata
 import { getRecipe, setRecipe } from './controllers/recipes.js';
 import { listCategories, createExpense, listExpenses, updateExpense } from './controllers/expenses.js';
 import { turnSummary, closuresHistory, cashFlow, pnl, stats, dashboard, movements, exportReport, forecast, turnos, consumoInsumos, preciosInsumos, estadisticasVentas, estadisticasGastos, retroactivasReport } from './controllers/reports.js';
+import { costsSummary, costDeviations, productCost } from './controllers/financeCosts.js';
 import { getPermissions, myPermissions, updatePermission } from './controllers/permissions.js';
 import { listGroups, createGroup, deleteGroup, createOption, deleteOption, setGroupProducts, getProductModifiers } from './controllers/modifiers.js';
 import { listClients, createClient, clientHistory } from './controllers/clients.js';
@@ -157,6 +158,11 @@ app.get('/api/reports/dashboard', requirePermission('reports.view'), dashboard);
 app.get('/api/reports/movements', requirePermission('reports.view'), movements);
 app.get('/api/reports/export', requirePermission('reports.view'), exportReport);
 app.get('/api/reports/forecast', requirePermission('forecast.view'), forecast);
+
+// --- Finanzas / Ingeniería de Costos (Fase 1) ---
+app.get('/api/finance/costs/summary',     requirePermission('reports.view'), costsSummary);
+app.get('/api/finance/costs/deviations',  requirePermission('reports.view'), costDeviations);
+app.get('/api/finance/costs/product/:id', requirePermission('reports.view'), productCost);
 
 // Conciliación bancaria
 app.get('/api/bank/summary', requirePermission('reports.view'), bankSummary);
