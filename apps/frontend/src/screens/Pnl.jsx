@@ -13,8 +13,9 @@ const sinActividad = (d) =>
     (!d.gastos_por_categoria || d.gastos_por_categoria.length === 0) && !d.banco);
 
 // Estado de Resultados (P&L). Acceso por permiso `reports.view` (lo gobierna App.jsx).
-export default function Pnl() {
-  const [period, setPeriod] = useState(null);
+export default function Pnl({ period: extPeriod } = {}) {
+  const [localPeriod, setPeriod] = useState(null);
+  const period = extPeriod || localPeriod;
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -55,7 +56,7 @@ export default function Pnl() {
         </div>
       </div>
 
-      <PeriodNav onChange={setPeriod} />
+      {!extPeriod && <PeriodNav onChange={setPeriod} />}
 
       {error ? (
         <ErrorState error={error} onRetry={load} />

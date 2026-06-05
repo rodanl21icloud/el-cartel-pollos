@@ -11,8 +11,9 @@ const sinMovimientos = (d) =>
 
 // Flujo de caja de TODO el dinero (efectivo + POS + transferencia).
 // Acceso por permiso `reports.view` (lo gobierna App.jsx).
-export default function Flujo() {
-  const [period, setPeriod] = useState(null);
+export default function Flujo({ period: extPeriod } = {}) {
+  const [localPeriod, setPeriod] = useState(null);
+  const period = extPeriod || localPeriod;
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -53,7 +54,7 @@ export default function Flujo() {
         </div>
       </div>
 
-      <PeriodNav onChange={setPeriod} />
+      {!extPeriod && <PeriodNav onChange={setPeriod} />}
 
       {error ? (
         <ErrorState error={error} onRetry={load} />

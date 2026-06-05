@@ -9,8 +9,9 @@ const TABS = [['', 'Todos'], ['INGRESO', 'Ingresos'], ['EGRESO', 'Egresos']];
 
 // Vista de Movimientos: libro unificado de ingresos (ventas) y egresos (gastos)
 // con KPIs de balance/ventas/gastos, filtro de periodo, búsqueda y descarga.
-export default function Movimientos() {
-  const [period, setPeriod] = useState(null);
+export default function Movimientos({ period: extPeriod } = {}) {
+  const [localPeriod, setPeriod] = useState(null);
+  const period = extPeriod || localPeriod;
   const [tab, setTab] = useState('');
   const [q, setQ] = useState('');
   const [data, setData] = useState(null);
@@ -52,7 +53,7 @@ export default function Movimientos() {
       </div>
       {error && <p className="text-cartel font-semibold">{error}</p>}
 
-      <PeriodNav onChange={setPeriod} />
+      {!extPeriod && <PeriodNav onChange={setPeriod} />}
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

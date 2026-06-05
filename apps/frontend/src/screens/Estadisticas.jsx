@@ -17,14 +17,14 @@ function rango(id, cFrom, cTo) {
 }
 const TABS = [{ id: 'ventas', label: 'Ventas' }, { id: 'gastos', label: 'Gastos' }, { id: 'propinas', label: 'Propinas' }, { id: 'empleados', label: 'Empleados' }];
 
-export default function Estadisticas() {
+export default function Estadisticas({ period: extPeriod } = {}) {
   const [tab, setTab] = useState('ventas');
   const [per, setPer] = useState('dia');
   const [cFrom, setCFrom] = useState(''); const [cTo, setCTo] = useState('');
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
 
-  const r = useMemo(() => rango(per, cFrom, cTo), [per, cFrom, cTo]);
+  const r = useMemo(() => extPeriod || rango(per, cFrom, cTo), [per, cFrom, cTo, extPeriod]);
   const premium = tab === 'propinas' || tab === 'empleados';
 
   useEffect(() => {
@@ -38,7 +38,7 @@ export default function Estadisticas() {
     <div className="max-w-4xl mx-auto space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="font-black text-xl">Estadísticas</h2>
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex flex-col items-end gap-2" style={extPeriod ? { display: 'none' } : undefined}>
           <div className="flex gap-1 bg-white rounded-xl p-1 shadow-card flex-wrap">
             {PERIODOS.map((p) => <button key={p.id} onClick={() => setPer(p.id)} className={`px-3 py-1.5 rounded-lg font-bold text-sm ${per === p.id ? 'bg-cartel text-white' : 'text-ink-mute'}`}>{p.label}</button>)}
           </div>

@@ -18,18 +18,18 @@ function rangoFechas(id, cFrom, cTo) {
   return { from: from.toISOString(), to: to.toISOString() };
 }
 
-export default function Resumen() {
+export default function Resumen({ period: extPeriod } = {}) {
   const [data, setData] = useState(null);
   const [per, setPer] = useState('mes');
   const [cFrom, setCFrom] = useState(''); const [cTo, setCTo] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const r = rangoFechas(per, cFrom, cTo);
+    const r = extPeriod || rangoFechas(per, cFrom, cTo);
     setData(null); setError('');
     if (!r) return;
     api(`/reports/dashboard?from=${encodeURIComponent(r.from)}&to=${encodeURIComponent(r.to)}`).then(setData).catch((e) => setError(e.message));
-  }, [per, cFrom, cTo]);
+  }, [per, cFrom, cTo, extPeriod]);
 
   const customIncompleto = per === 'custom' && (!cFrom || !cTo);
 
@@ -37,7 +37,7 @@ export default function Resumen() {
     <div className="max-w-5xl mx-auto space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="font-black text-xl">Resumen ejecutivo</h2>
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex flex-col items-end gap-2" style={extPeriod ? { display: 'none' } : undefined}>
           <div className="flex gap-1 bg-white rounded-xl p-1 shadow-card flex-wrap">
             {PERIODOS.map((p) => <button key={p.id} onClick={() => setPer(p.id)} className={`px-3 py-1.5 rounded-lg font-bold text-sm ${per === p.id ? 'bg-cartel text-white' : 'text-ink-mute'}`}>{p.label}</button>)}
           </div>
