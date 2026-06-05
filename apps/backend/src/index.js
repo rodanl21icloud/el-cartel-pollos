@@ -19,6 +19,7 @@ import { listCategories, createExpense, listExpenses, updateExpense } from './co
 import { turnSummary, closuresHistory, cashFlow, pnl, stats, dashboard, movements, exportReport, forecast, turnos, consumoInsumos, preciosInsumos, estadisticasVentas, estadisticasGastos, retroactivasReport } from './controllers/reports.js';
 import { costsSummary, costDeviations, productCost } from './controllers/financeCosts.js';
 import { expensesAudit, expenseAuditReview } from './controllers/financeExpenseAudit.js';
+import { taxForecast, createSimulation, readSimulation, readTaxConfig, updateTaxConfig } from './controllers/financeTax.js';
 import { getPermissions, myPermissions, updatePermission } from './controllers/permissions.js';
 import { listGroups, createGroup, deleteGroup, createOption, deleteOption, setGroupProducts, getProductModifiers } from './controllers/modifiers.js';
 import { listClients, createClient, clientHistory } from './controllers/clients.js';
@@ -168,6 +169,13 @@ app.get('/api/finance/costs/product/:id', requirePermission('reports.view'), pro
 // --- Finanzas / Auditoría de Gastos (Fase 2) ---
 app.get('/api/finance/expenses/audit',       requirePermission('reports.view'), expensesAudit);
 app.post('/api/finance/expenses/:id/audit',  requirePermission('expenses.manage'), expenseAuditReview);
+
+// --- Finanzas / Tax Forecaster (Fase 3) ---
+app.get('/api/finance/tax/forecast',        requirePermission('reports.view'), taxForecast);
+app.post('/api/finance/tax/simulations',    requirePermission('reports.view'), createSimulation);
+app.get('/api/finance/tax/simulations/:id', requirePermission('reports.view'), readSimulation);
+app.get('/api/finance/tax/config',          requirePermission('reports.view'), readTaxConfig);
+app.put('/api/finance/tax/config',          requirePermission('expenses.manage'), updateTaxConfig);
 
 // Conciliación bancaria
 app.get('/api/bank/summary', requirePermission('reports.view'), bankSummary);

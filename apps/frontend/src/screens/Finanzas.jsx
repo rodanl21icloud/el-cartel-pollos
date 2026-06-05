@@ -9,6 +9,7 @@ import Movimientos from './Movimientos.jsx';
 import Pnl from './Pnl.jsx';
 import Costos from './finance/Costos.jsx';
 import AuditoriaGastos from './finance/AuditoriaGastos.jsx';
+import TaxForecaster from './finance/TaxForecaster.jsx';
 
 // Hub de Finanzas (Fase 1): una sola entrada con pestañas. Reúne las antiguas
 // 8 secciones financieras (Resumen, Estadísticas, Gastos, Flujo, Banco,
@@ -19,6 +20,7 @@ const TABS = [
   { id: 'costos', label: 'Costos' },
   { id: 'gastos', label: 'Gastos' },
   { id: 'auditoria', label: 'Auditoría' },
+  { id: 'impuestos', label: 'Impuestos' },
   { id: 'flujo', label: 'Flujo y banco' },
   { id: 'detalle', label: 'Detalle' },
   { id: 'resultado', label: 'Resultado' },
@@ -52,6 +54,7 @@ export default function Finanzas({ role }) {
       {tab === 'costos' && period && <Costos period={period} />}
       {tab === 'gastos' && <Gastos />}
       {tab === 'auditoria' && period && <AuditoriaGastos period={period} />}
+      {tab === 'impuestos' && <TaxForecaster />}
       {tab === 'flujo' && period && <div className="space-y-4"><Flujo period={period} /><Banco role={role} /></div>}
       {tab === 'detalle' && period && <Movimientos period={period} />}
       {tab === 'resultado' && period && <Pnl period={period} />}
