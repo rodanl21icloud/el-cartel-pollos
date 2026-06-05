@@ -8,6 +8,7 @@
 export const NAV = [
   {
     section: 'Vender', kind: 'OPERACION', items: [
+      { key: 'operaciones', label: 'Centro de Operaciones', icon: 'clipboard', perm: 'cash.operate' },
       { key: 'pos', label: 'Punto de venta', icon: 'cart', perm: 'pos.sell' },
       { key: 'ventas', label: 'Pedidos', icon: 'receipt', perm: 'pos.sell' },
       { key: 'retroactiva', label: 'Venta pasada', icon: 'clock', perm: 'sales.backdate' },

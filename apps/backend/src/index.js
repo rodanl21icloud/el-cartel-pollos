@@ -21,6 +21,7 @@ import { costsSummary, costDeviations, productCost } from './controllers/finance
 import { expensesAudit, expenseAuditReview } from './controllers/financeExpenseAudit.js';
 import { taxForecast, createSimulation, readSimulation, readTaxConfig, updateTaxConfig } from './controllers/financeTax.js';
 import { liquidity, liquidityScenario, liquidityPolicy } from './controllers/financeLiquidity.js';
+import { opsToday, opsEvaluate, opsChecklist, opsChecklistUpdate, opsCriticalInventory, opsOpenDay, opsCloseDay, opsTasks, opsCreateTask, opsUpdateTask, opsGetConfig, opsSetConfig } from './controllers/ops.js';
 import { getPermissions, myPermissions, updatePermission } from './controllers/permissions.js';
 import { listGroups, createGroup, deleteGroup, createOption, deleteOption, setGroupProducts, getProductModifiers } from './controllers/modifiers.js';
 import { listClients, createClient, clientHistory } from './controllers/clients.js';
@@ -182,6 +183,20 @@ app.put('/api/finance/tax/config',          requirePermission('expenses.manage')
 app.get('/api/finance/liquidity/summary',   requirePermission('reports.view'), liquidity);
 app.post('/api/finance/liquidity/scenarios', requirePermission('reports.view'), liquidityScenario);
 app.put('/api/finance/liquidity/policy',    requirePermission('expenses.manage'), liquidityPolicy);
+
+// --- Centro de Operaciones Diario ---
+app.get('/api/ops/today',                 requirePermission('cash.operate'), opsToday);
+app.post('/api/ops/today/evaluate',       requirePermission('cash.operate'), opsEvaluate);
+app.get('/api/ops/checklist',             requirePermission('cash.operate'), opsChecklist);
+app.post('/api/ops/checklist/:id',        requirePermission('cash.operate'), opsChecklistUpdate);
+app.get('/api/ops/critical-inventory',    requirePermission('cash.operate'), opsCriticalInventory);
+app.post('/api/ops/day/open',             requirePermission('cash.operate'), opsOpenDay);
+app.post('/api/ops/day/close',            requirePermission('cash.operate'), opsCloseDay);
+app.get('/api/ops/tasks',                 requirePermission('cash.operate'), opsTasks);
+app.post('/api/ops/tasks',                requirePermission('cash.operate'), opsCreateTask);
+app.patch('/api/ops/tasks/:id',           requirePermission('cash.operate'), opsUpdateTask);
+app.get('/api/ops/config',                requirePermission('cash.operate'), opsGetConfig);
+app.put('/api/ops/config',                requirePermission('settings.manage'), opsSetConfig);
 
 // Conciliación bancaria
 app.get('/api/bank/summary', requirePermission('reports.view'), bankSummary);

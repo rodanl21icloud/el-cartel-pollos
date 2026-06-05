@@ -19,6 +19,7 @@ import Resumen from './screens/Resumen.jsx';
 import Cuadre from './screens/Cuadre.jsx';
 import Finanzas from './screens/Finanzas.jsx';
 import Home from './screens/Home.jsx';
+import CentroOperaciones from './screens/CentroOperaciones.jsx';
 import Banco from './screens/Banco.jsx';
 import Ventas from './screens/Ventas.jsx';
 import VentaRetroactiva from './screens/VentaRetroactiva.jsx';
@@ -171,6 +172,7 @@ export default function App() {
           {/* Guard de permiso por pantalla (defensa además del filtro de menú). */}
           {current && !perms[current.perm] ? <Forbidden module={current.label.toLowerCase()} /> : <>
           {screen === 'home' && <Home role={user.role} onGo={go} userName={user.name} />}
+          {screen === 'operaciones' && <CentroOperaciones />}
           {screen === 'pos' && <Pos onNavigate={go} />}
           {screen === 'ventas' && <Ventas canVoid={!!perms['sales.void']} />}
           {screen === 'retroactiva' && <VentaRetroactiva user={user} />}
