@@ -23,6 +23,13 @@ export default function PublicCatalog({ slug }) {
   const count = items.reduce((s, [, v]) => s + v.qty, 0);
   const add = (name, price, d) => setCart((c) => ({ ...c, [name]: { price, qty: Math.max(0, (c[name]?.qty || 0) + d) } }));
 
+  // Combo destacado ("el más pedido") y su upsell con bebida 1.5L (matching por nombre).
+  const [showUpsell, setShowUpsell] = useState(false);
+  const featured = useMemo(() => data?.categories.flatMap((c) => c.items)
+    .find((p) => { const s = p.name.toUpperCase(); return s.includes('PAPAS 500') && !s.includes('BEBIDA') && !s.includes('400'); }) || null, [data]);
+  const upsellTarget = useMemo(() => data?.categories.flatMap((c) => c.items)
+    .find((p) => { const s = p.name.toUpperCase(); return s.includes('PAPAS 500') && s.includes('BEBIDA'); }) || null, [data]);
+
   if (error) return <Centered>{error}</Centered>;
   if (!data) return <Centered><span className="animate-pulse">Cargando catálogo…</span></Centered>;
 
@@ -58,14 +65,21 @@ export default function PublicCatalog({ slug }) {
       {/* Productos por categoría */}
       <main className="max-w-2xl mx-auto px-4 py-5 space-y-7">
         {categories.length === 0 && <p className="text-center text-slate-400 mt-10">Aún no hay productos publicados.</p>}
-        {categories.map((cat) => (
+        {categories.map((cat) => {
+          // En "Combos", el destacado va primero para máxima visibilidad.
+          const list = cat.name === 'COMBOS' && featured
+            ? [featured, ...cat.items.filter((p) => p.name !== featured.name)]
+            : cat.items;
+          return (
           <section key={cat.name}>
             <h2 className="font-black text-lg text-slate-800 mb-2">{cat.name.charAt(0) + cat.name.slice(1).toLowerCase()}</h2>
             <div className="space-y-2">
-              {cat.items.map((p) => {
+              {list.map((p) => {
                 const qty = cart[p.name]?.qty || 0;
+                const star = featured && p.name === featured.name;
                 return (
-                  <div key={p.name} className="bg-white rounded-2xl shadow-sm p-3 flex items-center gap-3">
+                  <div key={p.name} className={`bg-white rounded-2xl shadow-sm p-3 flex items-center gap-3 ${star ? 'ring-2 ring-cartel relative mt-3' : ''}`}>
+                    {star && <span className="absolute -top-2.5 left-3 bg-cartel text-white text-[10px] font-black px-2.5 py-0.5 rounded-full shadow">🔥 EL MÁS PEDIDO</span>}
                     {p.image_url
                       ? <img src={p.image_url} alt="" className="w-16 h-16 rounded-xl object-cover bg-slate-100 shrink-0" onError={(e) => { e.target.style.display = 'none'; }} />
                       : <div className="w-16 h-16 rounded-xl bg-slate-100 grid place-items-center text-2xl shrink-0">🍗</div>}
@@ -81,7 +95,7 @@ export default function PublicCatalog({ slug }) {
                         <Stepper onClick={() => add(p.name, p.price, +1)}>+</Stepper>
                       </div>
                     ) : (
-                      <button onClick={() => add(p.name, p.price, +1)}
+                      <button onClick={() => { add(p.name, p.price, +1); if (star && upsellTarget) setShowUpsell(true); }}
                         className="shrink-0 px-4 py-2 rounded-xl bg-cartel text-white font-bold text-sm">Agregar</button>
                     )}
                   </div>
@@ -89,7 +103,8 @@ export default function PublicCatalog({ slug }) {
               })}
             </div>
           </section>
-        ))}
+          );
+        })}
         <p className="text-center text-xs text-slate-400 pt-2">
           {business.phone && <>📞 {business.phone} · </>}Catálogo de {business.name}
         </p>
@@ -111,6 +126,27 @@ export default function PublicCatalog({ slug }) {
           </div>
         </div>
       )}
+
+      {/* Upsell: al agregar el combo destacado, sugerir el combo con bebida 1.5L */}
+      {showUpsell && featured && upsellTarget && (
+        <div className="fixed inset-0 z-50 bg-black/50 grid place-items-center p-4" onClick={() => setShowUpsell(false)}>
+          <div className="bg-white rounded-3xl max-w-sm w-full p-5 text-center" onClick={(e) => e.stopPropagation()}>
+            <div className="text-5xl">🥤</div>
+            <h3 className="font-black text-xl mt-2 text-slate-800">¿Con sed?</h3>
+            <p className="text-slate-600 mt-1">Por solo <b className="text-cartel">{money(upsellTarget.price - featured.price)} adicionales</b> llévate el combo <b>con bebida de 1.5L</b>.</p>
+            <button onClick={() => { add(featured.name, featured.price, -1); add(upsellTarget.name, upsellTarget.price, +1); setShowUpsell(false); }}
+              className="w-full mt-4 py-3 rounded-2xl bg-cartel text-white font-black active:scale-95">Sí, agregar bebida 🍻</button>
+            <button onClick={() => setShowUpsell(false)} className="w-full mt-2 py-2 text-slate-500 font-bold text-sm">No, gracias</button>
+          </div>
+        </div>
+      )}
+
+      {/* WhatsApp flotante persistente (siempre visible en el scroll) */}
+      <a href={`https://wa.me/${(business.whatsapp || '').replace(/\D/g, '')}`} target="_blank" rel="noreferrer"
+        aria-label="Escríbenos por WhatsApp"
+        className={`fixed right-4 z-40 w-14 h-14 rounded-full bg-green-500 text-white grid place-items-center shadow-lg active:scale-95 transition-all ${count > 0 ? 'bottom-32' : 'bottom-5'}`}>
+        <Wa />
+      </a>
     </div>
   );
 }
