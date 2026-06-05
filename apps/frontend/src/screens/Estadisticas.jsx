@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api.js';
 import { Spinner, ErrorState, EmptyState } from '../components/ui/States.jsx';
+import { KpiCard, Delta as KitDelta } from '../components/ui/kit.jsx';
 
 const money = (n) => '$' + Number(n || 0).toLocaleString('es-CL');
 const fechaCorta = (iso) => { try { return new Date(iso).toLocaleDateString('es-CL', { day: '2-digit', month: 'short' }); } catch { return ''; } };
@@ -69,19 +70,10 @@ export default function Estadisticas({ period: extPeriod } = {}) {
   );
 }
 
-function Delta({ v, invert }) {
-  if (v == null) return <span className="text-[11px] text-ink-mute">sin base de comparación</span>;
-  const up = v >= 0, good = invert ? !up : up;
-  return <span className={`text-xs font-bold ${good ? 'text-emerald-600' : 'text-cartel'}`}>{up ? '▲' : '▼'} {Math.abs(v)}%</span>;
-}
+// Wrappers que delegan al kit canónico (consistencia visual del sistema).
+function Delta({ v, invert }) { return <KitDelta value={v} invert={invert} />; }
 function Kpi({ label, value, v, invert, note, big }) {
-  return (
-    <div className="card p-4">
-      <div className="text-[11px] text-ink-mute uppercase tracking-wide">{label}</div>
-      <div className={`font-black text-ink ${big ? 'text-3xl' : 'text-2xl'}`}>{value}</div>
-      <div className="mt-0.5">{v !== undefined ? <Delta v={v} invert={invert} /> : note ? <span className="text-[11px] text-ink-mute">{note}</span> : null}</div>
-    </div>
-  );
+  return <KpiCard label={label} value={value} delta={v} invert={invert} hint={note} big={big} />;
 }
 function Chips({ items }) {
   if (!items?.length) return null;

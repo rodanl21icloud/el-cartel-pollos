@@ -12,6 +12,7 @@ export const NAV = [
       { key: 'ventas', label: 'Pedidos', icon: 'receipt', perm: 'pos.sell' },
       { key: 'retroactiva', label: 'Venta pasada', icon: 'clock', perm: 'sales.backdate' },
       { key: 'cash', label: 'Caja', icon: 'cash', perm: 'cash.operate' },
+      { key: 'cuadre', label: 'Cuadre de turno', icon: 'clock', perm: 'reports.view' },
       { key: 'clientes', label: 'Clientes', icon: 'users', perm: 'pos.sell' },
     ],
   },

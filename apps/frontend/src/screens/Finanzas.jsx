@@ -7,7 +7,6 @@ import Flujo from './Flujo.jsx';
 import Banco from './Banco.jsx';
 import Movimientos from './Movimientos.jsx';
 import Pnl from './Pnl.jsx';
-import Cuadre from './Cuadre.jsx';
 
 // Hub de Finanzas (Fase 1): una sola entrada con pestañas. Reúne las antiguas
 // 8 secciones financieras (Resumen, Estadísticas, Gastos, Flujo, Banco,
@@ -19,7 +18,6 @@ const TABS = [
   { id: 'flujo', label: 'Flujo y banco' },
   { id: 'detalle', label: 'Detalle' },
   { id: 'resultado', label: 'Resultado' },
-  { id: 'turno', label: 'Cuadre de turno' },
 ];
 
 // Pestañas gobernadas por el período global del hub.
@@ -51,7 +49,6 @@ export default function Finanzas({ role }) {
       {tab === 'flujo' && period && <div className="space-y-4"><Flujo period={period} /><Banco role={role} /></div>}
       {tab === 'detalle' && period && <Movimientos period={period} />}
       {tab === 'resultado' && period && <Pnl period={period} />}
-      {tab === 'turno' && <Cuadre />}
     </div>
   );
 }

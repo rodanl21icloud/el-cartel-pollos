@@ -80,22 +80,24 @@ export default function Pos({ onNavigate }) {
 
 // --- Elegir tipo de venta (estilo "Nueva venta" de Treinta) ---
 function SaleChooser({ onPick }) {
-  const Card = ({ icon, title, desc, onClick }) => (
-    <button onClick={onClick}
-      className="bg-white rounded-2xl p-6 shadow text-left hover:border-cartel border-2 border-transparent transition flex gap-4 items-start">
-      <div className="text-4xl">{icon}</div>
-      <div>
-        <div className="text-xl font-black">{title}</div>
-        <div className="text-zinc-500 text-sm mt-1">{desc}</div>
-      </div>
-    </button>
-  );
   return (
-    <div className="max-w-2xl mx-auto grid sm:grid-cols-2 gap-4 mt-4">
-      <Card icon="🛒" title="Venta de productos" onClick={() => onPick('productos')}
-        desc="Registra una venta seleccionando los productos de tu carta." />
-      <Card icon="🧾" title="Venta libre" onClick={() => onPick('libre')}
-        desc="Registra un ingreso por un monto, sin seleccionar productos." />
+    <div className="max-w-2xl mx-auto mt-4 space-y-3">
+      {/* Acción dominante */}
+      <button onClick={() => onPick('productos')}
+        className="w-full bg-cartel text-white rounded-2xl p-6 shadow-card text-left flex items-center gap-4 hover:opacity-95 transition">
+        <div className="text-4xl">🛒</div>
+        <div className="min-w-0">
+          <div className="text-2xl font-black">Venta de productos</div>
+          <div className="text-white/80 text-sm mt-0.5">Selecciona productos de tu carta y cobra.</div>
+        </div>
+        <span className="ml-auto text-2xl">→</span>
+      </button>
+      {/* Acción secundaria */}
+      <button onClick={() => onPick('libre')}
+        className="w-full bg-white rounded-xl p-3 shadow-card text-left flex items-center gap-3 text-zinc-600 hover:bg-slate-50 transition">
+        <span className="text-xl">🧾</span>
+        <div><div className="font-bold text-sm">Venta libre</div><div className="text-xs text-zinc-400">Ingreso por un monto, sin seleccionar productos.</div></div>
+      </button>
     </div>
   );
 }
@@ -212,7 +214,7 @@ function ProductSale({ onSold }) {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl p-4 shadow flex flex-col">
+      <div className="bg-white rounded-2xl p-4 shadow flex flex-col lg:sticky lg:top-4 lg:max-h-[calc(100vh-7rem)]">
         <h2 className="font-black text-lg mb-2">Pedido {totalUnidades > 0 && <span className="text-sm text-zinc-400">({totalUnidades})</span>}</h2>
         <div className="flex-1 space-y-2 overflow-auto">
           {lines.map((l) => (
@@ -237,7 +239,7 @@ function ProductSale({ onSold }) {
         <div className="border-t mt-3 pt-3">
           <div className="flex justify-between text-2xl font-black mb-3"><span>Total</span><span>{money(total)}</span></div>
           <button disabled={!lines.length} onClick={() => setConfirming(true)}
-            className="btn-pos w-full bg-cartel text-white disabled:opacity-40">Cobrar →</button>
+            className="btn-pos w-full bg-cartel text-white disabled:opacity-40 text-xl py-4 font-black">Cobrar →</button>
         </div>
       </div>
 
