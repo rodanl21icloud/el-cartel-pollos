@@ -1,46 +1,49 @@
 // ============================================================
-// Arquitectura de información (fuente ÚNICA). Orientada a tareas:
-// Operación → Catálogo → Finanzas → Clientes → Administración.
+// Arquitectura de información (fuente ÚNICA) — Fase 1 (versión ambiciosa).
+// Navegación por MOMENTOS DE TRABAJO, no por estructura del negocio:
+//   Vender · Cocina · Inventario · Finanzas · Administración.
 // Cada ítem declara el permiso que lo habilita; la UI filtra por permiso.
 // `kind` separa visualmente operación de administración.
+// NOTA: las claves (key) y permisos NO cambian -> el ruteo de App.jsx sigue igual;
+// esta capa solo reorganiza, reordena y renombra.
 // ============================================================
 export const NAV = [
   {
-    section: 'Operación', kind: 'OPERACION', items: [
-      { key: 'pos', label: 'Vender', icon: '🛒', perm: 'pos.sell' },
-      { key: 'ventas', label: 'Ventas', icon: '🧾', perm: 'pos.sell' },
-      { key: 'retroactiva', label: 'Venta retroactiva', icon: '🕓', perm: 'sales.backdate' },
+    section: 'Vender', kind: 'OPERACION', items: [
+      { key: 'pos', label: 'Punto de venta', icon: '🛒', perm: 'pos.sell' },
+      { key: 'ventas', label: 'Pedidos', icon: '🧾', perm: 'pos.sell' },
+      { key: 'retroactiva', label: 'Venta pasada', icon: '🕓', perm: 'sales.backdate' },
       { key: 'cash', label: 'Caja', icon: '💵', perm: 'cash.operate' },
+      { key: 'clientes', label: 'Clientes', icon: '👥', perm: 'pos.sell' },
+    ],
+  },
+  {
+    section: 'Cocina', kind: 'OPERACION', items: [
+      { key: 'kds', label: 'Tablero de cocina', icon: '👨‍🍳', perm: 'dispatch.manage' },
       { key: 'despacho', label: 'Despacho', icon: '🛵', perm: 'dispatch.manage' },
-      { key: 'kds', label: 'Cocina (KDS)', icon: '👨‍🍳', perm: 'dispatch.manage' },
-      { key: 'prediccion', label: 'Predicción horno', icon: '🔮', perm: 'forecast.view' },
+      { key: 'prediccion', label: 'Plan de horno', icon: '🔮', perm: 'forecast.view' },
       { key: 'merma', label: 'Mermas', icon: '🗑️', perm: 'inventory.merma' },
     ],
   },
   {
-    section: 'Catálogo', kind: 'OPERACION', items: [
+    section: 'Inventario', kind: 'OPERACION', items: [
+      { key: 'inventario', label: 'Stock', icon: '📦', perm: 'inventory.manage' },
       { key: 'carta', label: 'Carta', icon: '🍗', perm: 'menu.manage' },
-      { key: 'cartelera', label: 'Cartelera', icon: '📋', perm: 'menu.manage' },
       { key: 'modificadores', label: 'Modificadores', icon: '✨', perm: 'menu.manage' },
-      { key: 'inventario', label: 'Inventario', icon: '📦', perm: 'inventory.manage' },
-      { key: 'precios', label: 'Precios de compra', icon: '📈', perm: 'inventory.manage' },
+      { key: 'cartelera', label: 'Cartelera', icon: '📋', perm: 'menu.manage' },
+      { key: 'precios', label: 'Compras', icon: '📈', perm: 'inventory.manage' },
     ],
   },
   {
     section: 'Finanzas', kind: 'OPERACION', items: [
-      { key: 'resumen', label: 'Resumen', icon: '📋', perm: 'reports.view' },
-      { key: 'cuadre', label: 'Cuadre de turno', icon: '🐔', perm: 'reports.view' },
-      { key: 'movimientos', label: 'Movimientos', icon: '💱', perm: 'reports.view' },
+      { key: 'resumen', label: 'Resumen', icon: '📊', perm: 'reports.view' },
+      { key: 'estadisticas', label: 'Ventas', icon: '📈', perm: 'reports.view' },
       { key: 'gastos', label: 'Gastos', icon: '💸', perm: 'expenses.manage' },
-      { key: 'flujo', label: 'Flujo de caja', icon: '📈', perm: 'reports.view' },
+      { key: 'flujo', label: 'Flujo y banco', icon: '💱', perm: 'reports.view' },
       { key: 'banco', label: 'Banco', icon: '🏦', perm: 'reports.view' },
-      { key: 'pnl', label: 'P&L', icon: '🧮', perm: 'reports.view' },
-      { key: 'estadisticas', label: 'Estadísticas', icon: '📊', perm: 'reports.view' },
-    ],
-  },
-  {
-    section: 'Clientes', kind: 'OPERACION', items: [
-      { key: 'clientes', label: 'Clientes', icon: '👥', perm: 'pos.sell' },
+      { key: 'movimientos', label: 'Detalle', icon: '🧾', perm: 'reports.view' },
+      { key: 'pnl', label: 'Resultado', icon: '🧮', perm: 'reports.view' },
+      { key: 'cuadre', label: 'Cuadre de turno', icon: '🐔', perm: 'reports.view' },
     ],
   },
   {
