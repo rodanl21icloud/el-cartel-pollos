@@ -190,7 +190,7 @@ export default function App() {
           {screen === 'comercial' && <Comercial />}
           {screen === 'resumen' && <Resumen role={user.role} />}
           {screen === 'cuadre' && <Cuadre />}
-          {screen === 'movimientos' && <Movimientos onGo={go} />}
+          {screen === 'movimientos' && <Movimientos onGo={go} canVoid={!!perms['sales.void']} />}
           {screen === 'estadisticas' && <Estadisticas />}
           {screen === 'banco' && <Banco role={user.role} />}
           {screen === 'flujo' && <Flujo role={user.role} />}

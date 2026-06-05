@@ -24,7 +24,7 @@ function rangeOf(mode, anchor) {
 
 const QF = [['', 'Todos'], ['INGRESO', 'Ingresos'], ['EGRESO', 'Egresos'], ['COBRAR', 'Por cobrar'], ['PAGAR', 'Por pagar']];
 
-export default function Movimientos({ period: extPeriod, onGo } = {}) {
+export default function Movimientos({ period: extPeriod, onGo, canVoid } = {}) {
   const embedded = !!extPeriod;
   const [mode, setMode] = useState('Mensual');
   const [anchor, setAnchor] = useState(() => new Date().toISOString().slice(0, mode === 'Mensual' ? 7 : 10));
@@ -114,7 +114,7 @@ export default function Movimientos({ period: extPeriod, onGo } = {}) {
           {/* KPIs */}
           <div className="kpis">
             <Kpi icon={I.trend} tint="g" label="Balance" value={money(k?.balance)} valClass={k && k.balance < 0 ? 'v-red' : 'v-dark'} />
-            <Kpi icon={I.cash} tint="g" label="Ventas totales" value={money(k?.ventas?.total)} valClass="v-green" />
+            <Kpi icon={I.cash} tint="g" label="Ventas totales" value={money(k?.ventas?.total)} valClass="v-dark" />
             <Kpi icon={I.cash} tint="r" label="Gastos totales" value={money(k?.gastos?.total)} valClass="v-red" />
           </div>
 
@@ -176,7 +176,7 @@ export default function Movimientos({ period: extPeriod, onGo } = {}) {
       )}
 
       {/* Drawer detalle */}
-      {sel && <Drawer m={sel} onClose={() => setSel(null)} />}
+      {sel && <Drawer m={sel} onClose={() => setSel(null)} onGo={onGo} canVoid={canVoid} onChanged={() => { loadTx(); }} />}
     </div>
   );
 }
@@ -190,11 +190,33 @@ function Kpi({ icon, tint, label, value, valClass }) {
   );
 }
 
-function Drawer({ m, onClose }) {
+function Drawer({ m, onClose, onGo, canVoid, onChanged }) {
   const ingreso = m.tipo === 'INGRESO';
+  const [busy, setBusy] = useState(false);
   const Row = ({ ico, label, value, red }) => (
     <div className="d-row"><span className="d-row-l">{ico}{label}</span><span className={`d-row-v ${red ? 'v-red' : ''}`}>{value ?? '—'}</span></div>
   );
+
+  function comprobante() {
+    const w = window.open('', '_blank', 'width=380,height=620'); if (!w) return;
+    const r = (l, v) => `<tr><td style="color:#6B7280;padding:4px 0">${l}</td><td style="text-align:right;font-weight:700">${v}</td></tr>`;
+    w.document.write(`<html><head><title>Comprobante</title><style>body{font-family:ui-sans-serif,system-ui,Arial;padding:22px;color:#111}h1{font-size:15px;letter-spacing:1px;text-align:center;margin:0 0 2px}.s{text-align:center;color:#6B7280;font-size:12px;margin-bottom:14px}.tot{border-top:2px dashed #ccc;border-bottom:2px dashed #ccc;padding:10px 0;margin:10px 0;text-align:center}.tot b{font-size:22px}table{width:100%;font-size:12px;border-collapse:collapse}</style></head><body>
+      <h1>COMPROBANTE</h1><div class="s">${m.concepto}${m.ref ? ' · #' + m.ref : ''}</div>
+      <div class="tot"><div style="font-size:11px;color:#6B7280">VALOR TOTAL</div><b>${money(m.valor)}</b></div>
+      <table>${r('Fecha y hora', fmtLong(m.fecha))}${r('Método de pago', METODO[m.medio_pago] || m.medio_pago)}${r(ingreso ? 'Cliente' : 'Proveedor', m.cliente || '—')}${r('Empleado', m.empleado || 'Vendedor')}${ingreso ? r('Ganancia', m.ganancia != null ? money(m.ganancia) : '—') : ''}</table>
+      <div class="s" style="margin-top:20px">¡Gracias por tu compra!</div></body></html>`);
+    w.document.close(); w.focus(); setTimeout(() => w.print(), 250);
+  }
+  function editar() { onGo?.(ingreso ? 'ventas' : 'gastos'); onClose(); }
+  async function eliminar() {
+    if (!ingreso) { alert('Los gastos se editan o eliminan en la sección Gastos.'); onGo?.('gastos'); onClose(); return; }
+    if (!canVoid) { alert('No tienes permiso para anular ventas.'); return; }
+    if (!window.confirm('¿Anular esta venta? Se restaurará el inventario consumido.')) return;
+    setBusy(true);
+    try { await api(`/sales/${m.id}/void`, { method: 'POST', body: { reason: 'Anulada desde Movimientos' } }); onChanged?.(); onClose(); }
+    catch (e) { alert(e.message); setBusy(false); }
+  }
+
   return (
     <>
       <div className="d-overlay" onClick={onClose} />
@@ -214,16 +236,16 @@ function Drawer({ m, onClose }) {
             </div>
             <Row ico={I.cal} label="Fecha y hora" value={fmtLong(m.fecha)} />
             <Row ico={I.card} label="Método de pago" value={METODO[m.medio_pago] || m.medio_pago} />
-            <Row ico={I.user} label="Cliente" value={m.cliente || '—'} />
+            <Row ico={I.user} label={ingreso ? 'Cliente' : 'Proveedor'} value={m.cliente || '—'} />
             <Row ico={I.emp} label="Empleado" value={m.empleado || m.usuario || 'Vendedor'} />
             <Row ico={I.trend} label="Ganancia" value={ingreso ? (m.ganancia != null ? money(m.ganancia) : '—') : money(0)} red={!ingreso || m.ganancia === 0} />
           </div>
         </div>
         <div className="d-foot">
           <button className="d-act" onClick={() => window.print()}>{I.print}<span>Imprimir</span></button>
-          <button className="d-act" onClick={onClose}>{I.doc}<span>Comprobante</span></button>
-          <button className="d-act" onClick={onClose}>{I.edit}<span>Editar</span></button>
-          <button className="d-act danger" onClick={onClose}>{I.trash}<span>Eliminar</span></button>
+          <button className="d-act" onClick={comprobante}>{I.doc}<span>Comprobante</span></button>
+          <button className="d-act" onClick={editar}>{I.edit}<span>Editar</span></button>
+          <button className="d-act danger" onClick={eliminar} disabled={busy}>{I.trash}<span>{busy ? '…' : 'Eliminar'}</span></button>
         </div>
       </aside>
     </>
@@ -256,17 +278,18 @@ const I = {
 };
 
 const CSS = `
-.mov{--bg:#F6F7F6;--surface:#fff;--bd:#E7E8E7;--tx:#1F2937;--mut:#6B7280;--accent:#19A06A;--soft:#E7F4EC;--soft-r:#FBEAEA;--dark:#13312B;--green:#16A34A;--danger:#C62828;--paid-bg:#DCFCE7;--paid-tx:#15803D;color:var(--tx);font-feature-settings:'tnum';max-width:72rem;margin:0 auto}
+/* PALETA POLLERÍA (negro/amarillo/rojo). Cambiar solo estas variables para rebrandear. */
+.mov{--bg:#F7F7F5;--surface:#fff;--bd:#E5E5E5;--tx:#111111;--mut:#6B7280;--accent:#F5C400;--accent-h:#E0B200;--soft:#FFF3C4;--soft-r:#FBEAEA;--dark:#111111;--green:#16A34A;--danger:#C62828;--paid-bg:#E9F7EF;--paid-tx:#15803D;color:var(--tx);font-feature-settings:'tnum';max-width:72rem;margin:0 auto}
 .mov svg{display:inline-block;vertical-align:-2px}
 .mov .mov-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap}
 .mov h2{font-size:1.7rem;font-weight:800;color:#0f1b16}
 .mov .btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--bd);background:var(--surface);color:var(--tx);padding:.55rem .9rem;border-radius:.7rem;font-weight:700;font-size:.85rem;cursor:pointer;transition:.15s;white-space:nowrap}
 .mov .btn:hover{background:#fafafa}.mov .btn:active{transform:translateY(1px)}.mov .btn:disabled{opacity:.5}
-.mov .btn-dark{background:var(--dark);border-color:var(--dark);color:#fff}.mov .btn-dark:hover{background:#0d241f}
+.mov .btn-dark{background:var(--accent);border-color:var(--accent);color:#111}.mov .btn-dark:hover{background:var(--accent-h);border-color:var(--accent-h)}
 .mov .btn-icon{padding:.55rem .65rem;color:var(--mut)}
 .mov .seg{display:flex;gap:8px;background:#ECEEEC;border-radius:.8rem;padding:5px;margin-bottom:14px}
 .mov .seg-b{flex:1;padding:.6rem;border:none;border-radius:.6rem;background:none;color:var(--mut);font-weight:800;font-size:.92rem;cursor:pointer;transition:.15s}
-.mov .seg-b.on{background:var(--dark);color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.mov .seg-b.on{background:var(--accent);color:#111;box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .mov .filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
 .mov .select-wrap{position:relative}.mov .select-wrap svg{position:absolute;right:8px;top:50%;transform:translateY(-50%);color:var(--mut);pointer-events:none}
 .mov select,.mov input{border:1px solid var(--bd);border-radius:.7rem;padding:.6rem .8rem;font-size:.85rem;background:var(--surface);color:var(--tx);font-weight:600}
@@ -280,14 +303,14 @@ const CSS = `
 @media(max-width:640px){.mov .kpis{grid-template-columns:1fr}}
 .mov .kpi{background:var(--surface);border:1px solid var(--bd);border-radius:1rem;padding:16px 18px;display:flex;align-items:center;gap:14px}
 .mov .kpi-ico{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;flex-shrink:0}
-.mov .kpi-ico.tint-g{background:var(--soft);color:var(--accent)}.mov .kpi-ico.tint-r{background:var(--soft-r);color:var(--danger)}
+.mov .kpi-ico.tint-g{background:var(--soft);color:#111}.mov .kpi-ico.tint-r{background:var(--soft-r);color:var(--danger)}
 .mov .kpi-ico svg{width:20px;height:20px}
 .mov .kpi-lbl{color:var(--mut);font-size:.82rem;font-weight:600}
 .mov .kpi-val{font-size:1.55rem;font-weight:800;line-height:1.15}
 .mov .v-dark{color:#0f1b16}.mov .v-green{color:var(--green)}.mov .v-red{color:var(--danger)}
 .mov .subtabs{display:flex;gap:26px;border-bottom:1px solid var(--bd);margin-bottom:0;padding:0 6px}
 .mov .subtab{background:none;border:none;padding:.7rem 0;color:var(--mut);font-weight:700;font-size:.9rem;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px}
-.mov .subtab:hover{color:var(--tx)}.mov .subtab.on{color:#0f1b16;border-color:#0f1b16}
+.mov .subtab:hover{color:var(--tx)}.mov .subtab.on{color:#111;border-color:var(--accent)}
 .mov .card{background:var(--surface);border:1px solid var(--bd);border-top:none;border-radius:0 0 1rem 1rem;overflow-x:auto}
 .mov table{width:100%;border-collapse:collapse;font-size:.88rem;min-width:640px}
 .mov thead th{text-align:left;color:var(--mut);font-weight:600;padding:.8rem 1rem;border-bottom:1px solid var(--bd);background:#FBFBFB}
@@ -297,7 +320,7 @@ const CSS = `
 .mov tr.row{cursor:pointer;transition:.12s}.mov tr.row:hover{background:#F7FAF8}
 .mov .concepto{display:flex;align-items:center;gap:12px}
 .mov .chip{width:36px;height:36px;border-radius:.7rem;display:grid;place-items:center;flex-shrink:0}
-.mov .chip-g{background:var(--soft);color:var(--accent)}.mov .chip-r{background:var(--soft-r);color:var(--danger)}
+.mov .chip-g{background:var(--soft);color:#111}.mov .chip-r{background:var(--soft-r);color:var(--danger)}
 .mov .chip svg{width:18px;height:18px}
 .mov .c-name{font-weight:600;color:#0f1b16}.mov .c-sub{font-size:.74rem;color:var(--mut)}
 .mov .val{font-weight:800;white-space:nowrap}
@@ -315,7 +338,7 @@ const CSS = `
 @keyframes slide{from{transform:translateX(100%)}to{transform:translateX(0)}}
 .mov .d-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--bd)}
 .mov .d-head-l{display:flex;align-items:center;gap:10px;font-size:1.05rem;color:#0f1b16}
-.mov .d-ico{width:38px;height:38px;border-radius:50%;background:var(--soft);color:var(--accent);display:grid;place-items:center}
+.mov .d-ico{width:38px;height:38px;border-radius:50%;background:var(--soft);color:#111;display:grid;place-items:center}
 .mov .d-close{width:30px;height:30px;border-radius:50%;background:#0f1b16;color:#fff;border:none;display:grid;place-items:center;cursor:pointer}
 .mov .d-body{flex:1;overflow-y:auto;padding:22px 20px;text-align:center}
 .mov .d-title{font-size:1.15rem;font-weight:800;color:#0f1b16}
@@ -325,7 +348,7 @@ const CSS = `
 .mov .d-card-lbl{color:var(--mut);font-size:.82rem}.mov .d-card-val{font-size:1.5rem;font-weight:800;color:#0f1b16}
 .mov .d-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-top:1px solid rgba(0,0,0,.06)}
 .mov .d-row-l{display:flex;align-items:center;gap:9px;color:var(--mut);font-size:.86rem}
-.mov .d-row-l svg{color:var(--accent)}
+.mov .d-row-l svg{color:#111}
 .mov .d-row-v{font-weight:700;color:#0f1b16;font-size:.86rem}
 .mov .d-foot{display:flex;justify-content:space-around;padding:14px 10px;border-top:1px solid var(--bd);gap:6px}
 .mov .d-act{display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:none;cursor:pointer;color:var(--tx);font-size:.72rem;font-weight:700}

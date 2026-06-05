@@ -559,29 +559,43 @@ export async function movements(req, res) {
   const items = [];
   if (type !== 'EGRESO') {
     const rows = (await db.execute({
-      sql: `SELECT s.id, s.sold_at AS fecha, s.payment_method, s.total, s.kind,
-                   (SELECT GROUP_CONCAT(p.name || ' x' || si.qty, ', ') FROM sale_items si JOIN products p ON p.id=si.product_id WHERE si.sale_id=s.id) detalle
-            FROM sales s WHERE s.status='CONFIRMADA' AND s.sold_at>=? AND s.sold_at<=?
+      sql: `SELECT s.id, s.sold_at AS fecha, s.payment_method, s.total, s.kind, s.order_number,
+                   u.full_name AS empleado, cl.name AS cliente,
+                   (SELECT GROUP_CONCAT(p.name || ' x' || si.qty, ', ') FROM sale_items si JOIN products p ON p.id=si.product_id WHERE si.sale_id=s.id) detalle,
+                   COALESCE((SELECT SUM(ABS(ia.qty_delta)*ia.unit_cost) FROM inventory_adjustments ia WHERE ia.type='VENTA' AND ia.sale_id=s.id),0) cogs
+            FROM sales s
+            LEFT JOIN users u ON u.id = s.user_id
+            LEFT JOIN clients cl ON cl.id = s.client_id
+            WHERE s.status='CONFIRMADA' AND s.sold_at>=? AND s.sold_at<=?
             ORDER BY s.sold_at DESC LIMIT ?`,
       args: [from, to, limit],
     })).rows;
     for (const r of rows) {
       const concepto = r.kind === 'LIBRE' ? 'Venta libre' : (r.detalle || 'Venta');
       if (q && !concepto.toLowerCase().includes(q)) continue;
-      items.push({ id: r.id, fecha: r.fecha, concepto, tipo: 'INGRESO', medio_pago: r.payment_method, valor: Number(r.total) });
+      items.push({
+        id: r.id, fecha: r.fecha, concepto, tipo: 'INGRESO', medio_pago: r.payment_method, valor: Number(r.total),
+        ref: r.order_number ?? null, cliente: r.cliente || null, empleado: r.empleado || null,
+        ganancia: round2(Number(r.total) - Number(r.cogs)),
+      });
     }
   }
   if (type !== 'INGRESO') {
     const rows = (await db.execute({
-      sql: `SELECT e.id, e.spent_at AS fecha, e.payment_method, e.amount, e.description, c.name cat
+      sql: `SELECT e.id, e.spent_at AS fecha, e.payment_method, e.amount, e.description, e.document_ref, e.supplier, c.name cat,
+                   u.full_name AS empleado
             FROM expenses e JOIN expense_categories c ON c.id=e.category_id
+            LEFT JOIN users u ON u.id = e.user_id
             WHERE e.spent_at>=? AND e.spent_at<=? ORDER BY e.spent_at DESC LIMIT ?`,
       args: [from, to, limit],
     })).rows;
     for (const r of rows) {
       const concepto = r.description || r.cat;
       if (q && !concepto.toLowerCase().includes(q)) continue;
-      items.push({ id: r.id, fecha: r.fecha, concepto, tipo: 'EGRESO', medio_pago: r.payment_method, valor: Number(r.amount), categoria: r.cat });
+      items.push({
+        id: r.id, fecha: r.fecha, concepto, tipo: 'EGRESO', medio_pago: r.payment_method, valor: Number(r.amount),
+        categoria: r.cat, ref: r.document_ref || null, cliente: r.supplier || null, empleado: r.empleado || null, ganancia: null,
+      });
     }
   }
   items.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));

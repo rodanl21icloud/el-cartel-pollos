@@ -44,6 +44,14 @@ describe('Movimientos y exportación de reportes', () => {
     expect(res.body.items.every((m) => /egreso/i.test(m.concepto || m.categoria || ''))).toBe(true);
   });
 
+  it('la venta incluye empleado y ganancia (detalle del drawer)', async () => {
+    const res = await request(app).get('/api/reports/movements').query({ from: FROM, to: TO, type: 'INGRESO' }).set('Authorization', bearer());
+    const venta = res.body.items.find((m) => m.tipo === 'INGRESO');
+    expect(venta).toBeTruthy();
+    expect(venta).toHaveProperty('empleado');
+    expect(venta).toHaveProperty('ganancia');
+  });
+
   it('lista los cierres de caja (tab Cierres de caja)', async () => {
     const res = await request(app).get('/api/reports/closures').set('Authorization', bearer());
     expect(res.status).toBe(200);
