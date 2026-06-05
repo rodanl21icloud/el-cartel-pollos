@@ -20,6 +20,7 @@ import { turnSummary, closuresHistory, cashFlow, pnl, stats, dashboard, movement
 import { costsSummary, costDeviations, productCost } from './controllers/financeCosts.js';
 import { expensesAudit, expenseAuditReview } from './controllers/financeExpenseAudit.js';
 import { taxForecast, createSimulation, readSimulation, readTaxConfig, updateTaxConfig } from './controllers/financeTax.js';
+import { liquidity, liquidityScenario, liquidityPolicy } from './controllers/financeLiquidity.js';
 import { getPermissions, myPermissions, updatePermission } from './controllers/permissions.js';
 import { listGroups, createGroup, deleteGroup, createOption, deleteOption, setGroupProducts, getProductModifiers } from './controllers/modifiers.js';
 import { listClients, createClient, clientHistory } from './controllers/clients.js';
@@ -176,6 +177,11 @@ app.post('/api/finance/tax/simulations',    requirePermission('reports.view'), c
 app.get('/api/finance/tax/simulations/:id', requirePermission('reports.view'), readSimulation);
 app.get('/api/finance/tax/config',          requirePermission('reports.view'), readTaxConfig);
 app.put('/api/finance/tax/config',          requirePermission('expenses.manage'), updateTaxConfig);
+
+// --- Finanzas / Liquidez (Fase 4) ---
+app.get('/api/finance/liquidity/summary',   requirePermission('reports.view'), liquidity);
+app.post('/api/finance/liquidity/scenarios', requirePermission('reports.view'), liquidityScenario);
+app.put('/api/finance/liquidity/policy',    requirePermission('expenses.manage'), liquidityPolicy);
 
 // Conciliación bancaria
 app.get('/api/bank/summary', requirePermission('reports.view'), bankSummary);
