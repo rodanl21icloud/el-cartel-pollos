@@ -36,14 +36,7 @@ export const NAV = [
   },
   {
     section: 'Finanzas', kind: 'OPERACION', items: [
-      { key: 'resumen', label: 'Resumen', icon: '📊', perm: 'reports.view' },
-      { key: 'estadisticas', label: 'Ventas', icon: '📈', perm: 'reports.view' },
-      { key: 'gastos', label: 'Gastos', icon: '💸', perm: 'expenses.manage' },
-      { key: 'flujo', label: 'Flujo y banco', icon: '💱', perm: 'reports.view' },
-      { key: 'banco', label: 'Banco', icon: '🏦', perm: 'reports.view' },
-      { key: 'movimientos', label: 'Detalle', icon: '🧾', perm: 'reports.view' },
-      { key: 'pnl', label: 'Resultado', icon: '🧮', perm: 'reports.view' },
-      { key: 'cuadre', label: 'Cuadre de turno', icon: '🐔', perm: 'reports.view' },
+      { key: 'finanzas', label: 'Finanzas', icon: '📊', perm: 'reports.view' },
     ],
   },
   {
