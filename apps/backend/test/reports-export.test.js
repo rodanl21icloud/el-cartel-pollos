@@ -37,6 +37,19 @@ describe('Movimientos y exportación de reportes', () => {
     expect(res.body.items.every((m) => m.tipo === 'EGRESO')).toBe(true);
   });
 
+  it('busca por concepto (q) en el libro de movimientos', async () => {
+    const res = await request(app).get('/api/reports/movements').query({ from: FROM, to: TO, q: 'egreso' }).set('Authorization', bearer());
+    expect(res.status).toBe(200);
+    expect(res.body.items.length).toBeGreaterThan(0);
+    expect(res.body.items.every((m) => /egreso/i.test(m.concepto || m.categoria || ''))).toBe(true);
+  });
+
+  it('lista los cierres de caja (tab Cierres de caja)', async () => {
+    const res = await request(app).get('/api/reports/closures').set('Authorization', bearer());
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+  });
+
   it('stats incluye comparativo vs período anterior', async () => {
     const res = await request(app).get('/api/reports/stats').query({ from: FROM, to: TO }).set('Authorization', bearer());
     expect(res.body).toHaveProperty('comparativo');

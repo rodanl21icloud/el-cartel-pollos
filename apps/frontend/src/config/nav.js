@@ -37,6 +37,7 @@ export const NAV = [
   {
     section: 'Finanzas', kind: 'OPERACION', items: [
       { key: 'finanzas', label: 'Finanzas', icon: 'pie', perm: 'reports.view' },
+      { key: 'movimientos', label: 'Movimientos', icon: 'receipt', perm: 'reports.view' },
     ],
   },
   {
