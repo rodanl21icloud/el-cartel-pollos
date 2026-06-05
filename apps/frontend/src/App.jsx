@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { api, setToken, clearToken, getToken } from './lib/api.js';
 import { setSessionKey } from './lib/crypto.js';
 import { NAV, ALL_ITEMS, itemByKey } from './config/nav.js';
+import { Icon } from './config/icons.jsx';
 import { roleLabel } from './config/roles.js';
 import { Forbidden } from './components/ui/States.jsx';
 import Login from './screens/Login.jsx';
@@ -143,7 +144,7 @@ export default function App() {
             <Bars />
           </button>
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-xl">{current?.icon}</span>
+            <span className="text-cartel"><Icon name={current?.icon} size={20} /></span>
             <div className="min-w-0">
               {currentSection && <div className="text-[10px] font-bold uppercase tracking-wider text-ink-mute leading-none">{currentSection}</div>}
               <h1 className="text-lg font-extrabold tracking-tight truncate leading-tight">{current?.label || 'Inicio'}</h1>
@@ -217,13 +218,13 @@ function NavList({ groups, screen, onGo }) {
       {groups.map((g) => (
         <div key={g.section} className={g.kind === 'ADMIN' ? 'pt-4 mt-2 border-t border-white/10' : ''}>
           <div className="px-3 mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-            {g.kind === 'ADMIN' && <span className="text-amber-400">🔒</span>}{g.section}
+            {g.kind === 'ADMIN' && <Icon name="lock" size={13} className="text-amber-400" />}{g.section}
           </div>
           <div className="space-y-0.5">
             {g.items.map((i) => (
               <button key={i.key} onClick={() => onGo(i.key)}
                 className={`nav-item w-full text-left ${screen === i.key ? 'nav-item-active' : ''}`}>
-                <span className="text-lg w-5 text-center">{i.icon}</span>
+                <span className="w-5 grid place-items-center shrink-0"><Icon name={i.icon} size={18} /></span>
                 <span className="text-sm">{i.label}</span>
               </button>
             ))}
