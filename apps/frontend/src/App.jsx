@@ -20,6 +20,7 @@ import Cuadre from './screens/Cuadre.jsx';
 import Finanzas from './screens/Finanzas.jsx';
 import Home from './screens/Home.jsx';
 import CentroOperaciones from './screens/CentroOperaciones.jsx';
+import Comercial from './screens/Comercial.jsx';
 import Banco from './screens/Banco.jsx';
 import Ventas from './screens/Ventas.jsx';
 import VentaRetroactiva from './screens/VentaRetroactiva.jsx';
@@ -186,6 +187,7 @@ export default function App() {
           {screen === 'precios' && <PreciosInsumos />}
           {screen === 'cash' && <CashClose userName={user.name} />}
           {screen === 'finanzas' && <Finanzas role={user.role} />}
+          {screen === 'comercial' && <Comercial />}
           {screen === 'resumen' && <Resumen role={user.role} />}
           {screen === 'cuadre' && <Cuadre />}
           {screen === 'movimientos' && <Movimientos />}

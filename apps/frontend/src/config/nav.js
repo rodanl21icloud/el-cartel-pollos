@@ -40,6 +40,11 @@ export const NAV = [
     ],
   },
   {
+    section: 'Comercial', kind: 'OPERACION', items: [
+      { key: 'comercial', label: 'Comercial', icon: 'sparkles', perm: 'reports.view' },
+    ],
+  },
+  {
     section: 'Administración', kind: 'ADMIN', items: [
       { key: 'ajustes', label: 'Negocio', icon: 'store', perm: 'settings.manage' },
       { key: 'usuarios', label: 'Usuarios', icon: 'user', perm: 'permissions.manage' },

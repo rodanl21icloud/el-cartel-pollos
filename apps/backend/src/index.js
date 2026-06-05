@@ -22,6 +22,7 @@ import { expensesAudit, expenseAuditReview } from './controllers/financeExpenseA
 import { taxForecast, createSimulation, readSimulation, readTaxConfig, updateTaxConfig } from './controllers/financeTax.js';
 import { liquidity, liquidityScenario, liquidityPolicy } from './controllers/financeLiquidity.js';
 import { opsToday, opsEvaluate, opsChecklist, opsChecklistUpdate, opsCriticalInventory, opsOpenDay, opsCloseDay, opsTasks, opsCreateTask, opsUpdateTask, opsGetConfig, opsSetConfig } from './controllers/ops.js';
+import { mktDashboard, mktCustomers, mktReports, mktCampaigns, mktCreateCampaign, mktUpdateCampaign, mktLoyalty, mktLoyaltyMove } from './controllers/marketing.js';
 import { getPermissions, myPermissions, updatePermission } from './controllers/permissions.js';
 import { listGroups, createGroup, deleteGroup, createOption, deleteOption, setGroupProducts, getProductModifiers } from './controllers/modifiers.js';
 import { listClients, createClient, clientHistory } from './controllers/clients.js';
@@ -197,6 +198,16 @@ app.post('/api/ops/tasks',                requirePermission('cash.operate'), ops
 app.patch('/api/ops/tasks/:id',           requirePermission('cash.operate'), opsUpdateTask);
 app.get('/api/ops/config',                requirePermission('cash.operate'), opsGetConfig);
 app.put('/api/ops/config',                requirePermission('settings.manage'), opsSetConfig);
+
+// --- Módulo Comercial / Marketing (reutiliza clients, sales, products) ---
+app.get('/api/marketing/dashboard',       requirePermission('reports.view'), mktDashboard);
+app.get('/api/marketing/customers',       requirePermission('reports.view'), mktCustomers);
+app.get('/api/marketing/reports',         requirePermission('reports.view'), mktReports);
+app.get('/api/marketing/campaigns',       requirePermission('reports.view'), mktCampaigns);
+app.post('/api/marketing/campaigns',      requirePermission('settings.manage'), mktCreateCampaign);
+app.patch('/api/marketing/campaigns/:id', requirePermission('settings.manage'), mktUpdateCampaign);
+app.get('/api/marketing/loyalty',         requirePermission('reports.view'), mktLoyalty);
+app.post('/api/marketing/loyalty/:clientId', requirePermission('settings.manage'), mktLoyaltyMove);
 
 // Conciliación bancaria
 app.get('/api/bank/summary', requirePermission('reports.view'), bankSummary);
