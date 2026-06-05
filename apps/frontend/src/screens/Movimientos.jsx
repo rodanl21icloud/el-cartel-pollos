@@ -199,6 +199,8 @@ function Drawer({ m, onClose, onGo, canVoid, onChanged }) {
   );
 
   const [printing, setPrinting] = useState(false);
+  const [det, setDet] = useState(null); // ítems del recibo (ventas)
+  useEffect(() => { if (ingreso) api(`/sales/${m.id}/receipt`).then(setDet).catch(() => setDet(null)); /* eslint-disable-next-line */ }, [m.id]);
   async function comprobante() {
     const w = window.open('', '_blank', 'width=400,height=640'); if (!w) return;
     if (ingreso) {
@@ -254,6 +256,20 @@ function Drawer({ m, onClose, onGo, canVoid, onChanged }) {
             <Row ico={I.emp} label="Empleado" value={m.empleado || m.usuario || 'Vendedor'} />
             <Row ico={I.trend} label="Ganancia" value={ingreso ? (m.ganancia != null ? money(m.ganancia) : '—') : money(0)} red={!ingreso || m.ganancia === 0} />
           </div>
+
+          {/* Recibo: ítems de la venta en pantalla */}
+          {ingreso && det?.items?.length > 0 && (
+            <div className="d-receipt">
+              <div className="d-rec-h">{I.reg}<span>Recibo</span></div>
+              {det.items.map((it, i) => (
+                <div className="d-rec-row" key={i}>
+                  <span className="d-rec-n">{it.qty} × {it.name}</span>
+                  <b>{money(it.line_total)}</b>
+                </div>
+              ))}
+              <div className="d-rec-tot"><span>Total</span><b>{money(m.valor)}</b></div>
+            </div>
+          )}
         </div>
         <div className="d-foot">
           <button className="d-act" onClick={() => window.print()}>{I.print}<span>Imprimir</span></button>
@@ -364,6 +380,13 @@ const CSS = `
 .mov .d-row-l{display:flex;align-items:center;gap:9px;color:var(--mut);font-size:.86rem}
 .mov .d-row-l svg{color:#111}
 .mov .d-row-v{font-weight:700;color:#0f1b16;font-size:.86rem}
+.mov .d-receipt{margin-top:16px;text-align:left;border:1px dashed var(--bd);border-radius:1rem;padding:14px 16px}
+.mov .d-rec-h{display:flex;align-items:center;gap:8px;font-weight:800;color:#0f1b16;margin-bottom:8px;font-size:.9rem}
+.mov .d-rec-h svg{color:#111}
+.mov .d-rec-row{display:flex;justify-content:space-between;gap:10px;padding:5px 0;font-size:.85rem;color:#111;border-top:1px solid #F1F2F1}
+.mov .d-rec-row:first-of-type{border-top:none}
+.mov .d-rec-n{color:#374151}
+.mov .d-rec-tot{display:flex;justify-content:space-between;border-top:2px solid #ECECEC;margin-top:6px;padding-top:8px;font-weight:800;color:#0f1b16}
 .mov .d-foot{display:flex;justify-content:space-around;padding:14px 10px;border-top:1px solid var(--bd);gap:6px}
 .mov .d-act{display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:none;cursor:pointer;color:var(--tx);font-size:.72rem;font-weight:700}
 .mov .d-act svg{width:20px;height:20px;color:#0f1b16;border:1.5px solid var(--bd);border-radius:50%;padding:8px;width:38px;height:38px}
