@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { Spinner, ErrorState, EmptyState } from '../components/ui/States.jsx';
+import { Badge } from '../components/ui/kit.jsx';
 
 // Monitor de variación de precio de compra por insumo (cuándo conviene comprar).
 const money = (n) => '$' + Number(n || 0).toLocaleString('es-CL');
 const fecha = (iso) => { try { return new Date(iso).toLocaleDateString('es-CL', { day: '2-digit', month: 'short' }); } catch { return iso; } };
 const BADGE = {
-  barato: { txt: '✓ Más barato', cls: 'bg-green-100 text-green-700 border-green-300' },
-  caro: { txt: '▲ Más caro', cls: 'bg-red-100 text-red-700 border-red-300' },
-  medio: { txt: 'En rango', cls: 'bg-zinc-100 text-zinc-600 border-zinc-300' },
+  barato: { txt: '✓ Más barato', tone: 'ok' },
+  caro: { txt: '▲ Más caro', tone: 'bad' },
+  medio: { txt: 'En rango', tone: 'neutral' },
 };
 const RANGOS = [{ id: 90, label: '90 días' }, { id: 180, label: '6 meses' }, { id: 365, label: '1 año' }];
 
@@ -49,7 +50,7 @@ export default function PreciosInsumos() {
           <div key={it.name} className={`bg-white rounded-2xl shadow p-4 ${pollo ? 'ring-2 ring-amber-300' : ''}`}>
             <div className="flex items-center justify-between mb-2">
               <div className="font-black text-lg">{pollo ? '🍗 ' : ''}{it.name} <span className="text-zinc-400 text-sm font-normal">/ {it.unit}</span></div>
-              <span className={`text-xs font-bold px-3 py-1 rounded-full border ${b.cls}`}>{b.txt}</span>
+              <Badge tone={b.tone}>{b.txt}</Badge>
             </div>
             <div className="grid grid-cols-4 gap-2 text-center text-sm mb-3">
               <Stat label="Último" v={money(it.ultimo)} strong />

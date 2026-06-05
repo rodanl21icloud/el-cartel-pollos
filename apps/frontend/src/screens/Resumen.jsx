@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
+import { KpiCard } from '../components/ui/kit.jsx';
 
 const money = (n) => '$' + Number(n || 0).toLocaleString('es-CL');
 
@@ -205,15 +206,5 @@ function ConsumoCard() {
 }
 
 function KPI({ label, value, delta, hint, invert }) {
-  const up = delta != null && delta >= 0;
-  const good = invert ? !up : up;
-  return (
-    <div className="card p-4">
-      <div className="text-[11px] text-ink-mute uppercase tracking-wide">{label}</div>
-      <div className="text-2xl font-black text-ink">{value}</div>
-      {delta != null ? (
-        <div className={`text-xs font-bold ${good ? 'text-emerald-600' : 'text-cartel'}`}>{up ? '▲' : '▼'} {Math.abs(delta)}% vs período anterior</div>
-      ) : hint ? <div className="text-[11px] text-ink-mute">{hint}</div> : <div className="text-[11px] text-ink-mute">—</div>}
-    </div>
-  );
+  return <KpiCard label={label} value={value} delta={delta} invert={invert} hint={hint} />;
 }
