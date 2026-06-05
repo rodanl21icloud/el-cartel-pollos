@@ -18,6 +18,7 @@ import Prediccion from './screens/Prediccion.jsx';
 import Resumen from './screens/Resumen.jsx';
 import Cuadre from './screens/Cuadre.jsx';
 import Finanzas from './screens/Finanzas.jsx';
+import Home from './screens/Home.jsx';
 import Banco from './screens/Banco.jsx';
 import Ventas from './screens/Ventas.jsx';
 import VentaRetroactiva from './screens/VentaRetroactiva.jsx';
@@ -66,7 +67,7 @@ export default function App() {
           await setSessionKey(ss.id, ss.key);       // restaura clave HMAC
           setPerms(me.permissions); setUser(su);
           const first = ALL_ITEMS.find((n) => me.permissions[n.perm]);
-          setScreen(first ? first.key : null);
+          setScreen('home');
         }
       } catch { clearToken(); localStorage.removeItem('user'); localStorage.removeItem('session'); }
       finally { setBooting(false); }
@@ -144,7 +145,7 @@ export default function App() {
             <Bars />
           </button>
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-cartel"><Icon name={current?.icon} size={20} /></span>
+            <span className="text-cartel"><Icon name={screen === 'home' ? 'home' : current?.icon} size={20} /></span>
             <div className="min-w-0">
               {currentSection && <div className="text-[10px] font-bold uppercase tracking-wider text-ink-mute leading-none">{currentSection}</div>}
               <h1 className="text-lg font-extrabold tracking-tight truncate leading-tight">{current?.label || 'Inicio'}</h1>
@@ -169,6 +170,7 @@ export default function App() {
           {!screen && <p className="text-center text-ink-mute mt-12">No tienes módulos habilitados. Contacta a un administrador.</p>}
           {/* Guard de permiso por pantalla (defensa además del filtro de menú). */}
           {current && !perms[current.perm] ? <Forbidden module={current.label.toLowerCase()} /> : <>
+          {screen === 'home' && <Home role={user.role} onGo={go} userName={user.name} />}
           {screen === 'pos' && <Pos onNavigate={go} />}
           {screen === 'ventas' && <Ventas canVoid={!!perms['sales.void']} />}
           {screen === 'retroactiva' && <VentaRetroactiva user={user} />}
@@ -215,6 +217,10 @@ function Brand({ onClose }) {
 function NavList({ groups, screen, onGo }) {
   return (
     <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-5">
+      <button onClick={() => onGo('home')} className={`nav-item w-full text-left ${screen === 'home' ? 'nav-item-active' : ''}`}>
+        <span className="w-5 grid place-items-center shrink-0"><Icon name="home" size={18} /></span>
+        <span className="text-sm">Inicio</span>
+      </button>
       {groups.map((g) => (
         <div key={g.section} className={g.kind === 'ADMIN' ? 'pt-4 mt-2 border-t border-white/10' : ''}>
           <div className="px-3 mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
