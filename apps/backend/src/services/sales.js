@@ -222,6 +222,14 @@ export async function registerSale(payload, ctx) {
 
   await db.batch(stmts, 'write'); // rollback automático si algo falla.
 
+  // Devengo de puntos de fidelización (efecto secundario NO crítico: nunca rompe la venta).
+  if (clientId && total > 0) {
+    try {
+      const { accrueForSale } = await import('./marketing/commercial.js');
+      await accrueForSale({ clientId, saleId, total });
+    } catch { /* loyalty es best-effort; la venta ya quedó registrada */ }
+  }
+
   return { status: 'CREATED', saleId, total, subtotal, discount, orderNumber };
 }
 

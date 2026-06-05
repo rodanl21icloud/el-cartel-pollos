@@ -414,3 +414,47 @@ BEFORE DELETE ON audit_logs
 BEGIN
   SELECT RAISE(ABORT, 'audit_logs es append-only: DELETE no permitido');
 END;
+
+-- ----------------------------------------------------------------
+-- MÓDULO COMERCIAL / MARKETING — campañas y fidelización.
+-- (La segmentación de clientes es dinámica: se calcula desde sales.)
+-- ----------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS campaigns (
+  id             TEXT PRIMARY KEY,
+  name           TEXT NOT NULL,
+  description    TEXT,
+  channel        TEXT NOT NULL DEFAULT 'WHATSAPP' CHECK (channel IN ('WHATSAPP','LOCAL','REDES','OTRO')),
+  segment        TEXT,
+  discount_type  TEXT CHECK (discount_type IN ('PORCENTAJE','MONTO','2X1','COMBO','NINGUNO')),
+  discount_value REAL DEFAULT 0,
+  status         TEXT NOT NULL DEFAULT 'borrador' CHECK (status IN ('borrador','activa','pausada','finalizada')),
+  starts_at      TEXT,
+  ends_at        TEXT,
+  created_by     TEXT,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_campaigns_status ON campaigns(status, starts_at);
+
+CREATE TABLE IF NOT EXISTS loyalty_accounts (
+  client_id  TEXT PRIMARY KEY,
+  points     INTEGER NOT NULL DEFAULT 0,
+  tier       TEXT NOT NULL DEFAULT 'BRONCE' CHECK (tier IN ('BRONCE','PLATA','ORO')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS loyalty_transactions (
+  id         TEXT PRIMARY KEY,
+  client_id  TEXT NOT NULL,
+  type       TEXT NOT NULL CHECK (type IN ('EARN','REDEEM','ADJUST')),
+  points     INTEGER NOT NULL,
+  sale_id    TEXT,
+  reason     TEXT,
+  created_by TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+  FOREIGN KEY (sale_id)   REFERENCES sales(id)   ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_loyalty_tx_client ON loyalty_transactions(client_id, created_at);

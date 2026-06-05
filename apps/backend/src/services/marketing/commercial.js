@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { getDb } from '../../db.js';
 
 const round0 = (n) => Math.round(n || 0);
+const POINTS_PER_CLP = 1000; // 1 punto por cada $1.000 gastados (ajustable).
 const DORMANT_DAYS = 45;
 const VIP_ORDERS = 5;
 const FREQ_ORDERS = 3;
@@ -166,6 +167,32 @@ export async function loyaltyOverview() {
   return { miembros: Number(totals.n), puntos_totales: Number(totals.pts), cuentas: rows };
 }
 const tierOf = (pts) => (pts >= 1000 ? 'ORO' : pts >= 300 ? 'PLATA' : 'BRONCE');
+
+/**
+ * Devengo automático de puntos al confirmar una venta con cliente.
+ * Idempotente por venta (no duplica si la venta se sincroniza dos veces).
+ * NO debe lanzar: se invoca como efecto secundario no-crítico de la venta.
+ */
+export async function accrueForSale({ clientId, saleId, total }) {
+  if (!clientId || !(Number(total) > 0)) return null;
+  const db = getDb();
+  const ya = (await db.execute({ sql: `SELECT id FROM loyalty_transactions WHERE sale_id=? AND type='EARN'`, args: [saleId] })).rows[0];
+  if (ya) return null; // ya devengado para esta venta
+  const pts = Math.floor(Number(total) / POINTS_PER_CLP);
+  if (pts <= 0) return null;
+  await db.execute({
+    sql: `INSERT INTO loyalty_accounts (client_id, points) VALUES (?, ?)
+          ON CONFLICT(client_id) DO UPDATE SET points = loyalty_accounts.points + ?, updated_at=datetime('now')`,
+    args: [clientId, pts, pts],
+  });
+  const acc = (await db.execute({ sql: `SELECT points FROM loyalty_accounts WHERE client_id=?`, args: [clientId] })).rows[0];
+  await db.execute({ sql: `UPDATE loyalty_accounts SET tier=? WHERE client_id=?`, args: [tierOf(Number(acc.points)), clientId] });
+  await db.execute({
+    sql: `INSERT INTO loyalty_transactions (id, client_id, type, points, sale_id, reason) VALUES (?,?, 'EARN', ?, ?, ?)`,
+    args: [randomUUID(), clientId, pts, saleId, `Venta ${saleId}`],
+  });
+  return { client_id: clientId, earned: pts, points: Number(acc.points) };
+}
 export async function loyaltyMove({ clientId, type, points, reason, userId }) {
   const db = getDb();
   const cli = (await db.execute({ sql: `SELECT id FROM clients WHERE id=?`, args: [clientId] })).rows[0];

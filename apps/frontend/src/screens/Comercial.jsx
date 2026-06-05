@@ -198,6 +198,7 @@ function Loyalty() {
         <KpiCard label="Miembros" value={d.miembros} />
         <KpiCard label="Puntos en circulación" value={d.puntos_totales} />
       </div>
+      <p className="text-xs text-ink-mute">⭐ Devengo automático: <b>1 punto por cada $1.000</b> en ventas con cliente identificado. Tiers: Plata 300+ · Oro 1.000+.</p>
       <div className="card p-4 flex gap-2 flex-wrap items-end">
         <select value={mv.clientId} onChange={(e) => setMv({ ...mv, clientId: e.target.value })} className="px-2 py-2 rounded-lg border-2 border-slate-200 text-sm min-w-[160px]">
           <option value="">Cliente…</option>
