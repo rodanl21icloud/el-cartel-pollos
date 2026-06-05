@@ -21,13 +21,15 @@ const CHANGES = [
   ['COMBO POLLO + PAPAS 900',       { price: 21490, description: 'Pollo entero + 900g de papas bastón. Para compartir en grande.' }],
   ['COMBO POLLO + PAPAS 1KL',       { price: 21490, description: 'Pollo entero + 1kg de papas bastón crujientes.' }],
   ['COMBO POLLO + PAPAS 900 + BEBIDA 1,5', { price: 23490, description: 'Pollo entero + 900g de papas + bebida 1.5L bien helada.' }],
+  ['COMBO POLLO + PAPAS 1 KILO + BEBIDA 1,5LT', { price: 23490, description: 'Pollo entero + 1kg de papas + bebida 1.5L bien helada.' }],
   // Combo con bebida 1.5L: se mantiene en $20.500 (es el upsell del destacado).
   ['COMBO POLLO + PAPAS 500G + BEBIDA 1,5LT', { description: 'Pollo entero + 500g de papas + bebida 1.5L bien helada. ¡Combo completo!' }],
 
   // --- Papas: estandarizar a 3 opciones claras ---
   ['PAPA 300g', { name: 'Papas Individual (300g)', description: 'Papas bastón doradas y crujientes. Porción individual.' }],
   ['PAPA 500G', { name: 'Papas Mediano (500g)',    description: 'Papas bastón doradas y crujientes. Para compartir.' }],
-  ['PAPA 900g', { name: 'Papas Familiar (1kg)',    description: 'Papas bastón doradas y crujientes. Porción familiar.' }],
+  ['PAPA 900g',   { name: 'Papas Familiar (1kg)',  description: 'Papas bastón doradas y crujientes. Porción familiar.' }],
+  ['PAPA 1 KILO', { name: 'Papas Familiar (1kg)',  description: 'Papas bastón doradas y crujientes. Porción familiar.' }],
   // Ocultar variantes innecesarias del catálogo (siguen activas para el POS).
   ['PAPA 150g',    { in_catalog: 0 }],
   ['PAPA 400g',    { in_catalog: 0 }],
