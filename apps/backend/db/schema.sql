@@ -400,6 +400,18 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- ----------------------------------------------------------------
+-- SESSION_KEYS — claves HMAC de venta persistentes (sobreviven a redeploys).
+-- ----------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS session_keys (
+  id          TEXT PRIMARY KEY,
+  key         TEXT NOT NULL,
+  user_id     TEXT NOT NULL,
+  expires_at  TEXT NOT NULL,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_session_keys_exp ON session_keys(expires_at);
+
 CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_logs(action);
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at);
 

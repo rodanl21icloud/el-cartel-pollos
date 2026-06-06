@@ -47,7 +47,7 @@ export async function login(req, res) {
       { algorithm: 'HS256', expiresIn: JWT_TTL }
     );
 
-    const { sessionId, key } = issueSessionKey(user.id);
+    const { sessionId, key } = await issueSessionKey(user.id);
 
     await writeAudit({
       userId: user.id,

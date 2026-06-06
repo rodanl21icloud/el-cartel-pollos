@@ -1,31 +1,28 @@
-// Gestión de claves de sesión temporales para firma HMAC de ventas.
-// En login se genera una clave aleatoria, se entrega al frontend UNA
-// vez y se guarda server-side asociada al usuario con expiración corta.
-//
-// MVP: store en memoria. Producción: Redis / tabla con TTL.
+// Gestión de claves de sesión para firma HMAC de ventas.
+// En login se genera una clave aleatoria, se entrega al frontend UNA vez y se
+// guarda server-side (tabla session_keys) con expiración. Persistente: sobrevive
+// a reinicios/redeploys (antes era un Map en memoria que se perdía al reiniciar).
 import crypto from 'node:crypto';
+import { getDb } from '../db.js';
 
 const SESSION_TTL_MS = 1000 * 60 * 60 * 12; // 12h por turno
-const store = new Map(); // sessionId -> { key, userId, expiresAt }
 
-export function issueSessionKey(userId) {
+export async function issueSessionKey(userId) {
   const sessionId = crypto.randomUUID();
   const key = crypto.randomBytes(32).toString('hex'); // 256-bit
-  store.set(sessionId, { key, userId, expiresAt: Date.now() + SESSION_TTL_MS });
+  const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
+  await getDb().execute({ sql: `INSERT INTO session_keys (id, key, user_id, expires_at) VALUES (?,?,?,?)`, args: [sessionId, key, userId, expiresAt] });
   return { sessionId, key }; // `key` se envía al cliente solo aquí.
 }
 
 export async function getSessionKey(sessionId, userId) {
-  const entry = store.get(sessionId);
-  if (!entry) return null;
-  if (entry.expiresAt < Date.now()) {
-    store.delete(sessionId);
-    return null;
-  }
-  if (userId && entry.userId !== userId) return null;
-  return entry.key;
+  const r = (await getDb().execute({ sql: `SELECT key, user_id, expires_at FROM session_keys WHERE id = ?`, args: [sessionId] })).rows[0];
+  if (!r) return null;
+  if (new Date(r.expires_at).getTime() < Date.now()) { await getDb().execute({ sql: `DELETE FROM session_keys WHERE id = ?`, args: [sessionId] }); return null; }
+  if (userId && r.user_id !== userId) return null;
+  return r.key;
 }
 
-export function revokeSessionKey(sessionId) {
-  store.delete(sessionId);
+export async function revokeSessionKey(sessionId) {
+  await getDb().execute({ sql: `DELETE FROM session_keys WHERE id = ?`, args: [sessionId] });
 }

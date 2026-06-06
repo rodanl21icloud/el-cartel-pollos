@@ -38,7 +38,7 @@ import Usuarios from './screens/Usuarios.jsx';
 import Auditoria from './screens/Auditoria.jsx';
 
 // Inactividad: cierra sesión tras 30 min sin actividad (operación de caja).
-const IDLE_MS = 30 * 60 * 1000;
+const IDLE_MS = 8 * 60 * 60 * 1000; // 8 horas (un turno completo)
 
 export default function App() {
   const [user, setUser] = useState(null);
