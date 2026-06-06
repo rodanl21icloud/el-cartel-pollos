@@ -351,13 +351,42 @@ function ClosureDrawer({ id, onClose, onVerTx, onChanged }) {
 
   function imprimir() {
     if (!d) return;
-    const w = window.open('', '_blank', 'width=400,height=640'); if (!w) return;
-    const r = (l, v) => `<tr><td style="color:#555;padding:3px 0">${l}</td><td style="text-align:right;font-weight:700">${v}</td></tr>`;
-    w.document.write(`<html><head><title>Resumen del turno</title><style>@page{size:80mm auto;margin:2mm}body{font-family:'Courier New',monospace;padding:8px;color:#111}h1{font-size:14px;text-align:center;margin:0}table{width:100%;font-size:12px;border-collapse:collapse}hr{border:none;border-top:1px dashed #000;margin:6px 0}</style></head><body>
-      <h1>RESUMEN DEL TURNO</h1><div style="text-align:center;font-size:11px;color:#555">${fmt(d.period_start)} → ${fmt(d.period_end)}</div><hr>
-      <table>${r('Efectivo', money(d.declarado.efectivo))}${r('Tarjeta', money(d.declarado.tarjeta))}${r('Transferencia', money(d.declarado.transferencia))}</table><hr>
-      <table>${r('Total ventas', money(d.resumen.total_ventas))}${r('Total gastos', money(d.resumen.total_gastos))}${r('Descuadre', money(d.resumen.descuadre))}${r('Balance', money(d.resumen.balance))}</table>
-      <div style="height:8mm"></div><script>window.onload=function(){window.print();setTimeout(function(){window.close()},300)}</script></body></html>`);
+    const w = window.open('', '_blank', 'width=440,height=700'); if (!w) return;
+    const vm = d.ventas_metodo, cj = d.caja;
+    const totalIng = (vm.efectivo || 0) + (vm.tarjeta || 0) + (vm.transferencia || 0);
+    const row = (l, v, o = {}) => `<tr class="${o.b ? 'b' : ''} ${o.red ? 'red' : ''}"><td>${l}</td><td class="r">${money(v)}</td></tr>`;
+    w.document.write(`<html><head><title>Arqueo de caja</title><style>
+      @page{size:80mm auto;margin:3mm}
+      body{font-family:Arial,Helvetica,sans-serif;color:#111;padding:6px;font-size:13px}
+      h1{font-size:17px;margin:0 0 10px}
+      .meta{font-size:12px;margin:0 0 14px;line-height:1.5}.meta b{font-weight:700}
+      img{height:34px;float:right}
+      table{width:100%;border-collapse:collapse}
+      td{padding:7px 0;border-bottom:1px solid #eee}
+      td.r{text-align:right}
+      tr.head td{font-weight:800;border-bottom:2px solid #111}
+      tr.b td{font-weight:800;font-size:14px;border-bottom:none}
+      tr.red td{color:#c0392b}
+    </style></head><body>
+      <img src="/logo.jpeg" onerror="this.style.display='none'"/>
+      <h1>Arqueo de caja</h1>
+      <div class="meta"><b>Apertura:</b> ${fmt(d.period_start)}, ${d.opener}<br><b>Cierre:</b> ${fmt(d.period_end)}, ${d.closer}</div>
+      <table>
+        <tr class="head"><td>Método de pago</td><td class="r">Monto</td></tr>
+        ${row('Efectivo', vm.efectivo)}
+        ${row('Tarjeta', vm.tarjeta)}
+        ${vm.transferencia ? row('Transferencia', vm.transferencia) : ''}
+        ${row('Total ingresos', totalIng, { b: true })}
+        ${row('Dinero base', cj.dinero_base)}
+        ${row('Ingresos en efectivo', cj.ingresos_efectivo)}
+        ${row('Gastos en efectivo', cj.gastos_efectivo ? -cj.gastos_efectivo : 0)}
+        ${row('Total Efectivo', cj.total_efectivo, { b: true })}
+        ${row('Dinero contado en efectivo', cj.contado, { b: true })}
+        ${row('Descuadre', d.resumen.descuadre, { b: true, red: d.has_descuadre })}
+      </table>
+      <div style="height:8mm"></div>
+      <script>window.onload=function(){window.print();setTimeout(function(){window.close()},300)}</script>
+    </body></html>`);
     w.document.close();
   }
   const MRow = ({ label, v }) => <div className="cl-m"><span>{label}</span><b>{v}</b></div>;

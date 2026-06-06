@@ -77,6 +77,12 @@ export async function closureDetail(req, res) {
     teorico: { efectivo: n(c.efectivo_teorico), tarjeta: n(c.pos_teorico), transferencia: n(c.transferencias_teorico) },
     diff: { efectivo: n(c.diff_efectivo), tarjeta: n(c.diff_pos), transferencia: n(c.diff_transferencias), total: n(c.diff_total) },
     has_descuadre: !!c.has_descuadre,
+    // Arqueo de caja: desglose de efectivo + ventas por método.
+    ventas_metodo: { efectivo: n(c.ventas_efectivo), tarjeta: n(c.pos_teorico), transferencia: n(c.transferencias_teorico) },
+    caja: {
+      dinero_base: n(c.opening_float), ingresos_efectivo: n(c.ventas_efectivo), gastos_efectivo: n(c.gastos_efectivo),
+      movimientos_efectivo: n(c.movimientos_efectivo), total_efectivo: n(c.efectivo_teorico), contado: n(c.efectivo_declarado),
+    },
     resumen: { total_ventas: round2(ventas), total_gastos: round2(gastos), descuadre: n(c.diff_total), balance: round2(ventas - gastos) },
     created_at: c.created_at,
   });
