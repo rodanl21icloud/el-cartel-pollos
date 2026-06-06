@@ -15,7 +15,7 @@ export async function listDispatch(req, res) {
 
   const { rows } = await db.execute({
     sql: `SELECT s.id, s.order_number, s.dispatch_status, s.payment_method, s.total, s.sold_at,
-                 s.kind, s.note, s.delivery_address,
+                 s.kind, s.note, s.delivery_address, s.notify_phone,
                  (SELECT GROUP_CONCAT(p.name || ' x' || si.qty, ', ')
                   FROM sale_items si JOIN products p ON p.id = si.product_id
                   WHERE si.sale_id = s.id) AS detalle
@@ -42,6 +42,7 @@ export async function listDispatch(req, res) {
     sale_id: r.id, order_number: r.order_number, status: r.dispatch_status,
     payment_method: r.payment_method, total: Number(r.total), sold_at: r.sold_at,
     kind: r.kind, note: r.note || null, delivery_address: r.delivery_address || null,
+    notify_phone: r.notify_phone || null,
     detalle: r.detalle || '', items: itemsBySale[r.id] || [],
   }));
   // Resumen por estado.

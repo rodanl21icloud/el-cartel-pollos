@@ -178,11 +178,12 @@ export async function registerSale(payload, ctx) {
     sql: `INSERT INTO sales
             (id, client_uuid, user_id, total, subtotal, discount, delivery_fee, client_id, delivery_address,
              payment_method, status, payload_hash, synced_offline, business_day, order_number, dispatch_status, sold_at,
-             is_backdated, backdate_reason)
-          VALUES (?,?,?,?,?,?,?,?,?,?, 'CONFIRMADA', ?,?,?,?, ?, ?, ?, ?)`,
+             is_backdated, backdate_reason, notify_phone)
+          VALUES (?,?,?,?,?,?,?,?,?,?, 'CONFIRMADA', ?,?,?,?, ?, ?, ?, ?, ?)`,
     args: [saleId, client_uuid, ctx.userId, total, subtotal, discount, deliveryFee, clientId, deliveryAddress,
            payment_method, ctx.payloadHash, ctx.syncedOffline ? 1 : 0, businessDay, orderNumber, dispatchStatus,
-           sold_at || new Date().toISOString(), ctx.backdated ? 1 : 0, ctx.backdateReason || null],
+           sold_at || new Date().toISOString(), ctx.backdated ? 1 : 0, ctx.backdateReason || null,
+           (payload.notify_phone || null)],
   });
 
   for (const it of saleItems) {

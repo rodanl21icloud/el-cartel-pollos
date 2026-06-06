@@ -22,6 +22,7 @@ function beep() {
 const NEXT = { PENDIENTE: 'EN_PREPARACION', EN_PREPARACION: 'LISTO', LISTO: 'ENTREGADO' };
 const PREV = { EN_PREPARACION: 'PENDIENTE', LISTO: 'EN_PREPARACION' };
 const COLS = [['PENDIENTE', 'Pendientes', '🟡'], ['EN_PREPARACION', 'En preparación', '🔥'], ['LISTO', 'Listos', '✅']];
+const waReady = (o) => `https://wa.me/${o.notify_phone}?text=${encodeURIComponent('Su pedido N° ' + o.order_number + ' está listo para retiro. ¡Te esperamos! 🍗')}`;
 
 const hora = (iso) => { try { return new Date(iso).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }); } catch { return ''; } };
 const mods = (m) => { try { const a = JSON.parse(m); return Array.isArray(a) ? a.map((x) => x.name || x).filter(Boolean) : []; } catch { return []; } };
@@ -138,6 +139,13 @@ function Tarjeta({ o, now, fresh, onMove }) {
       </ul>
 
       {o.note && <div className="mt-3 bg-yellow-500/15 text-yellow-200 rounded-lg px-3 py-1.5 font-semibold">📝 {o.note}</div>}
+
+      {o.status === 'LISTO' && o.notify_phone && (
+        <a href={waReady(o)} target="_blank" rel="noopener noreferrer"
+          className="block mt-3 text-center py-2.5 rounded-xl bg-green-600 hover:bg-green-500 text-white font-black text-xl">
+          📲 Notificar al cliente
+        </a>
+      )}
 
       <div className="flex gap-2 mt-4">
         {PREV[o.status] && (

@@ -174,7 +174,7 @@ function ProductSale({ onSold, preload }) {
   function decLine(uid) { setLines((ls) => ls.flatMap((l) => l.uid === uid ? (l.qty <= 1 ? [] : [{ ...l, qty: l.qty - 1 }]) : [l])); }
   function setLineNote(uid, val) { setLines((ls) => ls.map((l) => l.uid === uid ? { ...l, note: val } : l)); }
 
-  async function createSale(method, { discount = 0, client = null, deliveryFee = 0 } = {}) {
+  async function createSale(method, { discount = 0, client = null, deliveryFee = 0, notifyPhone = null } = {}) {
     if (!lines.length) return;
     const receiptItems = lines.map((l) => ({
       name: l.name, qty: l.qty, unit_price: l.basePrice, line_total: (l.basePrice + l.modsTotal) * l.qty,
@@ -187,6 +187,7 @@ function ProductSale({ onSold, preload }) {
     if (discount > 0) payload.discount = discount;
     if (deliveryFee > 0) payload.delivery_fee = deliveryFee;
     if (client && (client.phone || client.name)) payload.client = client;
+    if (notifyPhone) payload.notify_phone = notifyPhone;
     const res = await recordSale(payload);
     setLines([]); setConfirming(false);
     const data = {
@@ -375,6 +376,8 @@ function PaymentConfirm({ lines, subtotal, onBack, onCreate }) {
   const [fee, setFee] = useState('');
   const [found, setFound] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [notify, setNotify] = useState(false);
+  const [notifyPhone, setNotifyPhone] = useState('');
 
   const discount = Math.min(Math.max(0, Number(discAmt) || 0), subtotal);
   const deliveryFee = domicilio ? Math.max(0, Number(fee) || 0) : 0;
@@ -405,7 +408,8 @@ function PaymentConfirm({ lines, subtotal, onBack, onCreate }) {
     setBusy(true);
     const client = domicilio && (phone.trim() || cname.trim())
       ? { phone: phone.trim(), name: cname.trim() || 'Cliente', address: address.trim() } : null;
-    try { await onCreate(method, { discount, client, deliveryFee }); } finally { setBusy(false); }
+    const np = notify && notifyPhone.length === 8 ? '569' + notifyPhone : null;
+    try { await onCreate(method, { discount, client, deliveryFee, notifyPhone: np }); } finally { setBusy(false); }
   }
 
   return (
@@ -473,6 +477,24 @@ function PaymentConfirm({ lines, subtotal, onBack, onCreate }) {
               <input type="number" min="0" value={fee} onChange={(e) => setFee(e.target.value)} placeholder="Costo de envío"
                 className="w-full pl-7 pr-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
             </div>
+          </div>
+        )}
+
+        {/* Aviso por WhatsApp cuando el pedido esté listo */}
+        <div className="flex items-center justify-between mb-2">
+          <label className="font-bold text-zinc-700">Avisar por WhatsApp al estar listo</label>
+          <button onClick={() => setNotify(!notify)}
+            className={`w-12 h-7 rounded-full transition relative ${notify ? 'bg-green-500' : 'bg-zinc-300'}`}>
+            <span className={`absolute top-0.5 w-6 h-6 bg-white rounded-full transition-all ${notify ? 'left-[1.4rem]' : 'left-0.5'}`} />
+          </button>
+        </div>
+        {notify && (
+          <div className="flex items-center gap-2 mb-4 bg-green-50 rounded-xl p-3">
+            <span className="font-black text-zinc-600 whitespace-nowrap">+56 9</span>
+            <input value={notifyPhone} onChange={(e) => setNotifyPhone(e.target.value.replace(/\D/g, '').slice(0, 8))}
+              placeholder="8 dígitos" inputMode="numeric"
+              className="flex-1 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none tabular-nums tracking-wider" />
+            {notifyPhone.length === 8 && <span className="text-green-600 text-lg">✓</span>}
           </div>
         )}
 
