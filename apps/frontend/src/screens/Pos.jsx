@@ -21,6 +21,7 @@ export default function Pos({ onNavigate }) {
   const [mode, setMode] = useState('choose'); // choose | productos | libre
   const [settings, setSettings] = useState({ name: 'El Cartel de los Pollos', paper_width: 80 });
   const [lastSale, setLastSale] = useState(null);
+  const [preload, setPreload] = useState(null); // producto a precargar en el carro (desde sugerencias)
   const [showApertura, setShowApertura] = useState(true); // KAN-31: pedir fondo al entrar con caja cerrada
 
   async function loadCaja() {
@@ -67,8 +68,8 @@ export default function Pos({ onNavigate }) {
         </div>
       </div>
 
-      {mode === 'choose' && <SaleChooser onPick={setMode} />}
-      {mode === 'productos' && <ProductSale settings={settings} onSold={onSold} />}
+      {mode === 'choose' && <SaleChooser onPick={(m) => { setPreload(null); setMode(m); }} onPickProduct={(p) => { setPreload(p); setMode('productos'); }} />}
+      {mode === 'productos' && <ProductSale settings={settings} onSold={onSold} preload={preload} />}
       {mode === 'libre' && <VentaLibre settings={settings} onSold={onSold} />}
 
       {lastSale && (
@@ -82,14 +83,10 @@ export default function Pos({ onNavigate }) {
 const PITCH = ['El más completo 🔥', 'Ideal para compartir', 'El favorito de la familia', 'Combo estrella ⭐'];
 const TIPS = ['🥤 Ofrece bebida 1.5L', '🍟 Suma papas familiares', '🌶️ Pregunta por salsas extra', '🍗 Sugiere subir a pollo entero'];
 
-function SaleChooser({ onPick }) {
-  const [products, setProducts] = useState([]);
-  useEffect(() => { api('/products').then(setProducts).catch(() => {}); }, []);
+function SaleChooser({ onPick, onPickProduct }) {
+  const [top, setTop] = useState([]);
+  useEffect(() => { api('/products/top?limit=3').then(setTop).catch(() => {}); }, []);
   const money = (n) => '$' + Number(n || 0).toLocaleString('es-CL');
-  const avail = products.filter((p) => p.available !== 0);
-  let sugeridos = avail.filter((p) => /combo/i.test(p.category) || /combo/i.test(p.name));
-  if (!sugeridos.length) sugeridos = avail; // sin combos: sugiere lo de mayor ticket
-  sugeridos = [...sugeridos].sort((a, b) => b.price - a.price).slice(0, 3);
 
   return (
     <div className="max-w-2xl mx-auto mt-4 space-y-3">
@@ -110,17 +107,17 @@ function SaleChooser({ onPick }) {
         <div><div className="font-bold text-sm">Venta libre</div><div className="text-xs text-zinc-400">Ingreso por un monto, sin seleccionar productos.</div></div>
       </button>
 
-      {/* Sugerencias para vender más */}
-      {sugeridos.length > 0 && (
+      {/* Más vendidos (click = agregar al carro) */}
+      {top.length > 0 && (
         <div className="pt-3">
-          <div className="text-xs font-black uppercase tracking-wide text-zinc-400 mb-2">💡 Sugerencias para vender más</div>
+          <div className="text-xs font-black uppercase tracking-wide text-zinc-400 mb-2">🔥 Los más vendidos · toca para agregar</div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            {sugeridos.map((p, i) => (
-              <button key={p.id} onClick={() => onPick('productos')}
+            {top.map((p, i) => (
+              <button key={p.id} onClick={() => onPickProduct(p)}
                 className="bg-white rounded-xl p-3 shadow-card text-left hover:ring-2 hover:ring-cartel transition">
                 <div className="font-bold text-sm text-ink leading-tight line-clamp-2">{p.name}</div>
                 <div className="text-cartel font-black mt-1">{money(p.price)}</div>
-                <div className="text-[11px] text-zinc-400 mt-0.5">{PITCH[i % PITCH.length]}</div>
+                <div className="text-[11px] text-zinc-400 mt-0.5">{p.units > 0 ? `${p.units} vendidos · toca para agregar` : (PITCH[i % PITCH.length] + ' · agregar')}</div>
               </button>
             ))}
           </div>
@@ -135,7 +132,7 @@ function SaleChooser({ onPick }) {
 
 // --- Venta de productos (catálogo + carrito con modificadores + confirmación) ---
 let _uid = 0;
-function ProductSale({ onSold }) {
+function ProductSale({ onSold, preload }) {
   const [products, setProducts] = useState([]);
   const [lines, setLines] = useState([]); // [{ uid, productId, name, basePrice, qty, modifiers:[{id,name,price_delta}], modsTotal }]
   const [cat, setCat] = useState('TODO');
@@ -145,6 +142,8 @@ function ProductSale({ onSold }) {
   const [toast, setToast] = useState(null);
 
   useEffect(() => { api('/products').then(setProducts).catch(() => {}); }, []);
+  // Precarga al carro un producto sugerido (al entrar desde "Los más vendidos").
+  useEffect(() => { if (preload) tapProduct(preload); /* eslint-disable-next-line */ }, []);
 
   const total = lines.reduce((s, l) => s + (l.basePrice + l.modsTotal) * l.qty, 0);
   const totalUnidades = lines.reduce((s, l) => s + l.qty, 0);

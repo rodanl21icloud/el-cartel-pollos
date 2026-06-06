@@ -195,3 +195,23 @@ export async function listProducts(req, res) {
     image_url: r.image_url, has_modifiers: Number(r.mod_groups) > 0,
   })));
 }
+
+/** GET /api/products/top?limit=3 — productos más vendidos (últimos 60 días). (pos.sell) */
+export async function topProducts(req, res) {
+  const { getDb } = await import('../db.js');
+  const limit = Math.min(Number(req.query.limit) || 3, 10);
+  const from = new Date(Date.now() - 60 * 86400000).toISOString();
+  const { rows } = await getDb().execute({
+    sql: `SELECT p.id, p.sku, p.name, p.price, p.category, p.image_url,
+                 (SELECT COUNT(*) FROM product_modifier_groups pmg WHERE pmg.product_id = p.id) AS mod_groups,
+                 COALESCE((SELECT SUM(si.qty) FROM sale_items si JOIN sales s ON s.id = si.sale_id
+                           WHERE si.product_id = p.id AND s.status='CONFIRMADA' AND s.sold_at >= ?), 0) AS units
+          FROM products p WHERE p.is_active = 1 AND p.available = 1
+          ORDER BY units DESC, p.price DESC LIMIT ?`,
+    args: [from, limit],
+  });
+  return res.json(rows.map((r) => ({
+    id: r.id, sku: r.sku, name: r.name, price: Number(r.price), category: r.category,
+    image_url: r.image_url, has_modifiers: Number(r.mod_groups) > 0, units: Number(r.units),
+  })));
+}

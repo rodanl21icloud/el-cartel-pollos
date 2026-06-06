@@ -9,7 +9,7 @@ import { requirePermission } from './middleware/permissions.js';
 import { verifyHmac } from './middleware/hmac.js';
 import { login } from './controllers/auth.js';
 import { closeCashRegister, getCurrentSession, openSession, registerMovement } from './controllers/cashRegister.js';
-import { syncSale, listProducts, getReceipt, listSales, voidSale, backdateSale } from './controllers/sales.js';
+import { syncSale, listProducts, topProducts, getReceipt, listSales, voidSale, backdateSale } from './controllers/sales.js';
 import { getSettings, updateSettings, setAdminPin } from './controllers/settings.js';
 import { registerMerma, listIngredients, lowStockAlerts, mermasHistorial,
          createIngredient, deleteIngredient, restockIngredient, setIngredientStock } from './controllers/inventory.js';
@@ -72,6 +72,7 @@ app.get('/api/permissions/me', myPermissions);
 
 // Catálogo POS (cualquier autenticado lo lee; vender requiere permiso).
 app.get('/api/products', listProducts);
+app.get('/api/products/top', requirePermission('pos.sell'), topProducts);
 
 // Caja: apertura con fondo, movimientos de efectivo y Cierre Ciego
 app.get('/api/cash-register/current', getCurrentSession);

@@ -63,6 +63,14 @@ describe('Movimientos y exportación de reportes', () => {
     expect(res.status).toBe(404);
   });
 
+  it('top de productos más vendidos (para sugerencias del POS)', async () => {
+    const top = await request(app).get('/api/products/top').query({ limit: 3 }).set('Authorization', bearer());
+    expect(top.status).toBe(200);
+    expect(Array.isArray(top.body)).toBe(true);
+    expect(top.body.length).toBeLessThanOrEqual(3);
+    if (top.body.length) { expect(top.body[0]).toHaveProperty('price'); expect(typeof top.body[0].has_modifiers).toBe('boolean'); }
+  });
+
   it('eliminar turno es acción de gerencia (cajero -> 403)', async () => {
     const caj = (await login(app, 'cajero1', 'cajero123')).token;
     const res = await request(app).delete('/api/reports/closures/cualquiera').set('Authorization', 'Bearer ' + caj);
