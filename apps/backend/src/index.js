@@ -16,7 +16,7 @@ import { registerMerma, listIngredients, lowStockAlerts, mermasHistorial,
 import { createProduct, updateProduct, deleteProduct, updateIngredient, listCatalog, bulkPriceChange, getPriceHistory } from './controllers/admin.js';
 import { getRecipe, setRecipe } from './controllers/recipes.js';
 import { listCategories, createExpense, listExpenses, updateExpense, deleteExpense } from './controllers/expenses.js';
-import { turnSummary, closuresHistory, closureDetail, cashFlow, pnl, stats, dashboard, movements, exportReport, forecast, turnos, consumoInsumos, preciosInsumos, estadisticasVentas, estadisticasGastos, retroactivasReport } from './controllers/reports.js';
+import { turnSummary, closuresHistory, closureDetail, deleteClosure, cashFlow, pnl, stats, dashboard, movements, exportReport, forecast, turnos, consumoInsumos, preciosInsumos, estadisticasVentas, estadisticasGastos, retroactivasReport } from './controllers/reports.js';
 import { costsSummary, costDeviations, productCost } from './controllers/financeCosts.js';
 import { expensesAudit, expenseAuditReview } from './controllers/financeExpenseAudit.js';
 import { taxForecast, createSimulation, readSimulation, readTaxConfig, updateTaxConfig } from './controllers/financeTax.js';
@@ -154,6 +154,7 @@ app.delete('/api/modifiers/options/:id', requirePermission('menu.manage'), delet
 app.get('/api/reports/turn-summary', requirePermission('reports.view'), turnSummary);
 app.get('/api/reports/closures', requirePermission('reports.view'), closuresHistory);
 app.get('/api/reports/closures/:id', requirePermission('reports.view'), closureDetail);
+app.delete('/api/reports/closures/:id', requirePermission('settings.manage'), deleteClosure);
 app.get('/api/reports/turnos', requirePermission('reports.view'), turnos);
 app.get('/api/reports/consumo-insumos', requirePermission('reports.view'), consumoInsumos);
 app.get('/api/reports/precios-insumos', requirePermission('reports.view'), preciosInsumos);

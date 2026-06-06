@@ -181,7 +181,7 @@ export default function Movimientos({ period: extPeriod, onGo, canVoid } = {}) {
 
       {/* Drawer detalle */}
       {sel && <Drawer m={sel} onClose={() => setSel(null)} onGo={onGo} canVoid={canVoid} onChanged={() => { loadTx(); }} />}
-      {selC && <ClosureDrawer id={selC.id} onClose={() => setSelC(null)} onVerTx={(p) => { setForced(p); setTopTab('tx'); setSelC(null); }} />}
+      {selC && <ClosureDrawer id={selC.id} onClose={() => setSelC(null)} onVerTx={(p) => { setForced(p); setTopTab('tx'); setSelC(null); }} onChanged={() => loadCierres()} />}
     </div>
   );
 }
@@ -336,10 +336,18 @@ function Drawer({ m, onClose, onGo, canVoid, onChanged }) {
   );
 }
 
-function ClosureDrawer({ id, onClose, onVerTx }) {
+function ClosureDrawer({ id, onClose, onVerTx, onChanged }) {
   const [d, setD] = useState(null);
   const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
   useEffect(() => { api(`/reports/closures/${id}`).then(setD).catch((e) => setErr(e.message)); }, [id]);
+
+  async function eliminarTurno() {
+    if (!window.confirm('¿Eliminar este turno? Es una acción de gerencia, queda auditada y no se puede deshacer.')) return;
+    setBusy(true);
+    try { await api(`/reports/closures/${id}`, { method: 'DELETE' }); onChanged?.(); onClose(); }
+    catch (e) { alert(e.message === 'PERMISO_DENEGADO' ? 'Solo gerencia puede eliminar turnos.' : e.message); setBusy(false); }
+  }
 
   function imprimir() {
     if (!d) return;
@@ -362,6 +370,7 @@ function ClosureDrawer({ id, onClose, onVerTx }) {
         <div className="d-head"><div className="d-head-l"><span className="d-ico">{I.cash}</span><b>Resumen del turno</b></div><button className="d-close" onClick={onClose}>{I.close}</button></div>
         <div className="d-body" style={{ textAlign: 'left' }}>
           {err ? <p className="v-red">{err}</p> : !d ? <Loading /> : (<>
+            <div style={{ textAlign: 'right', marginBottom: 8 }}><button className="cl-del" onClick={eliminarTurno} disabled={busy}>{I.trash}<span>{busy ? '…' : 'Eliminar turno'}</span></button></div>
             <MRow label="Efectivo" v={money(d.declarado.efectivo)} />
             <MRow label="Tarjeta" v={money(d.declarado.tarjeta)} />
             <MRow label="Transferencia bancaria" v={money(d.declarado.transferencia)} />
@@ -503,6 +512,8 @@ const CSS = `
 .mov .d-f-l{display:block;font-size:.74rem;font-weight:700;color:var(--mut);margin-bottom:10px}
 .mov .d-f-l input,.mov .d-f-l select{display:block;width:100%;margin-top:4px;font-weight:600}
 .mov .cl-m{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid var(--bd);border-radius:.8rem;padding:12px 14px;margin-bottom:10px;font-weight:700;color:#111}
+.mov .cl-del{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #F3C9C9;color:var(--danger);font-weight:800;font-size:.78rem;padding:6px 12px;border-radius:.6rem;cursor:pointer}
+.mov .cl-del:hover{background:var(--soft-r)}.mov .cl-del svg{width:15px;height:15px}
 .mov .d-foot{display:flex;justify-content:space-around;padding:14px 10px;border-top:1px solid var(--bd);gap:6px}
 .mov .d-act{display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:none;cursor:pointer;color:var(--tx);font-size:.72rem;font-weight:700}
 .mov .d-act svg{width:20px;height:20px;color:#0f1b16;border:1.5px solid var(--bd);border-radius:50%;padding:8px;width:38px;height:38px}

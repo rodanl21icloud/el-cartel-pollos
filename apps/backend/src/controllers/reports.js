@@ -82,6 +82,20 @@ export async function closureDetail(req, res) {
   });
 }
 
+/** DELETE /api/reports/closures/:id — elimina un turno (acción de GERENCIA, auditada). */
+export async function deleteClosure(req, res) {
+  const db = getDb();
+  const c = (await db.execute({ sql: `SELECT id, period_start, period_end, diff_total FROM cash_register_closures WHERE id=?`, args: [req.params.id] })).rows[0];
+  if (!c) return res.status(404).json({ error: 'CIERRE_NO_ENCONTRADO' });
+  await db.execute({ sql: `DELETE FROM cash_register_closures WHERE id=?`, args: [req.params.id] });
+  const { writeAudit } = await import('../services/audit.js');
+  await writeAudit({
+    userId: req.user.id, action: 'CASH_CLOSURE_DELETE', entity: 'cash_register_closures', entityId: c.id,
+    severity: 'ALERT', ip: req.ip, metadata: { period_start: c.period_start, period_end: c.period_end, diff_total: Number(c.diff_total) },
+  });
+  return res.json({ deleted: c.id });
+}
+
 /**
  * GET /api/reports/consumo-insumos?from=&to= — Consumo del período por receta.
  * Lee el descuento real de insumos al vender (inventory_adjustments type='VENTA').

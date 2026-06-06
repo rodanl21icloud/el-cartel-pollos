@@ -63,6 +63,12 @@ describe('Movimientos y exportación de reportes', () => {
     expect(res.status).toBe(404);
   });
 
+  it('eliminar turno es acción de gerencia (cajero -> 403)', async () => {
+    const caj = (await login(app, 'cajero1', 'cajero123')).token;
+    const res = await request(app).delete('/api/reports/closures/cualquiera').set('Authorization', 'Bearer ' + caj);
+    expect(res.status).toBe(403);
+  });
+
   it('stats incluye comparativo vs período anterior', async () => {
     const res = await request(app).get('/api/reports/stats').query({ from: FROM, to: TO }).set('Authorization', bearer());
     expect(res.body).toHaveProperty('comparativo');
