@@ -79,7 +79,18 @@ export default function Pos({ onNavigate }) {
 }
 
 // --- Elegir tipo de venta (estilo "Nueva venta" de Treinta) ---
+const PITCH = ['El más completo 🔥', 'Ideal para compartir', 'El favorito de la familia', 'Combo estrella ⭐'];
+const TIPS = ['🥤 Ofrece bebida 1.5L', '🍟 Suma papas familiares', '🌶️ Pregunta por salsas extra', '🍗 Sugiere subir a pollo entero'];
+
 function SaleChooser({ onPick }) {
+  const [products, setProducts] = useState([]);
+  useEffect(() => { api('/products').then(setProducts).catch(() => {}); }, []);
+  const money = (n) => '$' + Number(n || 0).toLocaleString('es-CL');
+  const avail = products.filter((p) => p.available !== 0);
+  let sugeridos = avail.filter((p) => /combo/i.test(p.category) || /combo/i.test(p.name));
+  if (!sugeridos.length) sugeridos = avail; // sin combos: sugiere lo de mayor ticket
+  sugeridos = [...sugeridos].sort((a, b) => b.price - a.price).slice(0, 3);
+
   return (
     <div className="max-w-2xl mx-auto mt-4 space-y-3">
       {/* Acción dominante */}
@@ -98,6 +109,26 @@ function SaleChooser({ onPick }) {
         <span className="text-xl">🧾</span>
         <div><div className="font-bold text-sm">Venta libre</div><div className="text-xs text-zinc-400">Ingreso por un monto, sin seleccionar productos.</div></div>
       </button>
+
+      {/* Sugerencias para vender más */}
+      {sugeridos.length > 0 && (
+        <div className="pt-3">
+          <div className="text-xs font-black uppercase tracking-wide text-zinc-400 mb-2">💡 Sugerencias para vender más</div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {sugeridos.map((p, i) => (
+              <button key={p.id} onClick={() => onPick('productos')}
+                className="bg-white rounded-xl p-3 shadow-card text-left hover:ring-2 hover:ring-cartel transition">
+                <div className="font-bold text-sm text-ink leading-tight line-clamp-2">{p.name}</div>
+                <div className="text-cartel font-black mt-1">{money(p.price)}</div>
+                <div className="text-[11px] text-zinc-400 mt-0.5">{PITCH[i % PITCH.length]}</div>
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {TIPS.map((t) => <span key={t} className="text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2.5 py-1">{t}</span>)}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
