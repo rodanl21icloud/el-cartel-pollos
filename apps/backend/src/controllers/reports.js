@@ -52,6 +52,36 @@ export async function closuresHistory(_req, res) {
   return res.json(rows);
 }
 
+/** GET /api/reports/closures/:id — resumen completo del turno (cierre). (reports.view) */
+export async function closureDetail(req, res) {
+  const db = getDb();
+  const c = (await db.execute({
+    sql: `SELECT cr.*, u.full_name AS closer, su.full_name AS opener
+          FROM cash_register_closures cr
+          LEFT JOIN users u ON u.id = cr.user_id
+          LEFT JOIN cash_sessions cs ON cs.id = cr.session_id
+          LEFT JOIN users su ON su.id = cs.opened_by
+          WHERE cr.id = ?`,
+    args: [req.params.id],
+  })).rows[0];
+  if (!c) return res.status(404).json({ error: 'CIERRE_NO_ENCONTRADO' });
+
+  const ventas = Number((await db.execute({ sql: `SELECT COALESCE(SUM(total),0) t FROM sales WHERE status='CONFIRMADA' AND sold_at>=? AND sold_at<=?`, args: [c.period_start, c.period_end] })).rows[0].t);
+  const gastos = Number((await db.execute({ sql: `SELECT COALESCE(SUM(amount),0) t FROM expenses WHERE spent_at>=? AND spent_at<=?`, args: [c.period_start, c.period_end] })).rows[0].t);
+  const n = (v) => Number(v || 0);
+
+  return res.json({
+    id: c.id, opener: c.opener || 'Vendedor', closer: c.closer || 'Vendedor',
+    period_start: c.period_start, period_end: c.period_end, opening_float: n(c.opening_float),
+    declarado: { efectivo: n(c.efectivo_declarado), tarjeta: n(c.pos_declarado), transferencia: n(c.transferencias_declarado), otro: 0 },
+    teorico: { efectivo: n(c.efectivo_teorico), tarjeta: n(c.pos_teorico), transferencia: n(c.transferencias_teorico) },
+    diff: { efectivo: n(c.diff_efectivo), tarjeta: n(c.diff_pos), transferencia: n(c.diff_transferencias), total: n(c.diff_total) },
+    has_descuadre: !!c.has_descuadre,
+    resumen: { total_ventas: round2(ventas), total_gastos: round2(gastos), descuadre: n(c.diff_total), balance: round2(ventas - gastos) },
+    created_at: c.created_at,
+  });
+}
+
 /**
  * GET /api/reports/consumo-insumos?from=&to= — Consumo del período por receta.
  * Lee el descuento real de insumos al vender (inventory_adjustments type='VENTA').

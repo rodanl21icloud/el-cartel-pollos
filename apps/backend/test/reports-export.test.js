@@ -58,6 +58,11 @@ describe('Movimientos y exportación de reportes', () => {
     expect(Array.isArray(res.body)).toBe(true);
   });
 
+  it('detalle de un cierre inexistente devuelve 404', async () => {
+    const res = await request(app).get('/api/reports/closures/no-existe').set('Authorization', bearer());
+    expect(res.status).toBe(404);
+  });
+
   it('stats incluye comparativo vs período anterior', async () => {
     const res = await request(app).get('/api/reports/stats').query({ from: FROM, to: TO }).set('Authorization', bearer());
     expect(res.body).toHaveProperty('comparativo');

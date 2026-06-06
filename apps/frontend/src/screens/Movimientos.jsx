@@ -29,7 +29,9 @@ export default function Movimientos({ period: extPeriod, onGo, canVoid } = {}) {
   const embedded = !!extPeriod;
   const [mode, setMode] = useState('Mensual');
   const [anchor, setAnchor] = useState(() => new Date().toISOString().slice(0, mode === 'Mensual' ? 7 : 10));
-  const period = extPeriod || rangeOf(mode, anchor.length === 7 ? anchor : anchor.slice(0, 7));
+  const [forced, setForced] = useState(null); // período forzado (al ver el detalle de un turno)
+  const period = extPeriod || forced || rangeOf(mode, anchor.length === 7 ? anchor : anchor.slice(0, 7));
+  const pickAnchor = (v) => { setForced(null); setAnchor(v); };
   const [topTab, setTopTab] = useState('tx');
   const [qf, setQf] = useState('');
   const [q, setQ] = useState('');
@@ -38,6 +40,7 @@ export default function Movimientos({ period: extPeriod, onGo, canVoid } = {}) {
   const [error, setError] = useState('');
   const [downloading, setDownloading] = useState(false);
   const [sel, setSel] = useState(null); // movimiento seleccionado -> drawer
+  const [selC, setSelC] = useState(null); // cierre seleccionado -> drawer resumen del turno
 
   const noImpl = qf === 'COBRAR' || qf === 'PAGAR';
 
@@ -61,7 +64,7 @@ export default function Movimientos({ period: extPeriod, onGo, canVoid } = {}) {
   useEffect(() => { loadCierres(); /* eslint-disable-next-line */ }, [topTab]);
 
   function changeMode(m) {
-    setMode(m);
+    setForced(null); setMode(m);
     setAnchor(new Date().toISOString().slice(0, m === 'Mensual' ? 7 : 10));
   }
   async function descargar() {
@@ -103,8 +106,8 @@ export default function Movimientos({ period: extPeriod, onGo, canVoid } = {}) {
                 </div>
                 <div className="input-ico">
                   {mode === 'Mensual'
-                    ? <input type="month" value={anchor.slice(0, 7)} onChange={(e) => setAnchor(e.target.value)} />
-                    : <input type="date" value={anchor.length === 7 ? anchor + '-01' : anchor} onChange={(e) => setAnchor(e.target.value)} />}
+                    ? <input type="month" value={anchor.slice(0, 7)} onChange={(e) => pickAnchor(e.target.value)} />
+                    : <input type="date" value={anchor.length === 7 ? anchor + '-01' : anchor} onChange={(e) => pickAnchor(e.target.value)} />}
                 </div>
               </>
             )}
@@ -162,7 +165,7 @@ export default function Movimientos({ period: extPeriod, onGo, canVoid } = {}) {
                     <thead><tr><th>Período</th><th className="r">Fondo inicial</th><th className="r">Diferencia</th><th>Estado</th><th>Fecha</th></tr></thead>
                     <tbody>
                       {closures.map((c) => (
-                        <tr key={c.id}>
+                        <tr key={c.id} onClick={() => setSelC(c)} className="row">
                           <td className="nowrap">{fmt(c.period_start)} → {fmt(c.period_end)}</td>
                           <td className="r muted">{money(c.opening_float)}</td>
                           <td className={`r val ${c.has_descuadre ? 'v-red' : 'v-dark'}`}>{money(c.diff_total)}</td>
@@ -178,6 +181,7 @@ export default function Movimientos({ period: extPeriod, onGo, canVoid } = {}) {
 
       {/* Drawer detalle */}
       {sel && <Drawer m={sel} onClose={() => setSel(null)} onGo={onGo} canVoid={canVoid} onChanged={() => { loadTx(); }} />}
+      {selC && <ClosureDrawer id={selC.id} onClose={() => setSelC(null)} onVerTx={(p) => { setForced(p); setTopTab('tx'); setSelC(null); }} />}
     </div>
   );
 }
@@ -332,6 +336,65 @@ function Drawer({ m, onClose, onGo, canVoid, onChanged }) {
   );
 }
 
+function ClosureDrawer({ id, onClose, onVerTx }) {
+  const [d, setD] = useState(null);
+  const [err, setErr] = useState('');
+  useEffect(() => { api(`/reports/closures/${id}`).then(setD).catch((e) => setErr(e.message)); }, [id]);
+
+  function imprimir() {
+    if (!d) return;
+    const w = window.open('', '_blank', 'width=400,height=640'); if (!w) return;
+    const r = (l, v) => `<tr><td style="color:#555;padding:3px 0">${l}</td><td style="text-align:right;font-weight:700">${v}</td></tr>`;
+    w.document.write(`<html><head><title>Resumen del turno</title><style>@page{size:80mm auto;margin:2mm}body{font-family:'Courier New',monospace;padding:8px;color:#111}h1{font-size:14px;text-align:center;margin:0}table{width:100%;font-size:12px;border-collapse:collapse}hr{border:none;border-top:1px dashed #000;margin:6px 0}</style></head><body>
+      <h1>RESUMEN DEL TURNO</h1><div style="text-align:center;font-size:11px;color:#555">${fmt(d.period_start)} → ${fmt(d.period_end)}</div><hr>
+      <table>${r('Efectivo', money(d.declarado.efectivo))}${r('Tarjeta', money(d.declarado.tarjeta))}${r('Transferencia', money(d.declarado.transferencia))}</table><hr>
+      <table>${r('Total ventas', money(d.resumen.total_ventas))}${r('Total gastos', money(d.resumen.total_gastos))}${r('Descuadre', money(d.resumen.descuadre))}${r('Balance', money(d.resumen.balance))}</table>
+      <div style="height:8mm"></div><script>window.onload=function(){window.print();setTimeout(function(){window.close()},300)}</script></body></html>`);
+    w.document.close();
+  }
+  const MRow = ({ label, v }) => <div className="cl-m"><span>{label}</span><b>{v}</b></div>;
+  const SRow = ({ l, v, red, bold }) => <div className="d-row"><span className="d-row-l">{l}</span><span className={`d-row-v ${red ? 'v-red' : ''}`} style={bold ? { fontWeight: 900 } : undefined}>{v}</span></div>;
+
+  return (
+    <>
+      <div className="d-overlay" onClick={onClose} />
+      <aside className="drawer">
+        <div className="d-head"><div className="d-head-l"><span className="d-ico">{I.cash}</span><b>Resumen del turno</b></div><button className="d-close" onClick={onClose}>{I.close}</button></div>
+        <div className="d-body" style={{ textAlign: 'left' }}>
+          {err ? <p className="v-red">{err}</p> : !d ? <Loading /> : (<>
+            <MRow label="Efectivo" v={money(d.declarado.efectivo)} />
+            <MRow label="Tarjeta" v={money(d.declarado.tarjeta)} />
+            <MRow label="Transferencia bancaria" v={money(d.declarado.transferencia)} />
+            <MRow label="Otro" v={money(d.declarado.otro)} />
+            <div className="d-card" style={{ marginTop: 4 }}>
+              <div className="d-card-top">
+                <div><div className="d-card-lbl">Dinero en efectivo</div><div className="d-card-val">{money(d.declarado.efectivo)}</div></div>
+                {d.has_descuadre ? <span className="badge bad">Descuadre</span> : <span className="badge ok">Cuadrado</span>}
+              </div>
+              <div style={{ fontWeight: 700, fontSize: '.85rem' }} className={d.diff.efectivo === 0 ? 'muted' : (d.diff.efectivo > 0 ? 'v-dark' : 'v-red')}>
+                {d.diff.efectivo === 0 ? 'Caja cuadrada ✅' : d.diff.efectivo > 0 ? `Te sobran ${money(d.diff.efectivo)} en efectivo.` : `Te faltan ${money(Math.abs(d.diff.efectivo))} en efectivo.`}
+              </div>
+            </div>
+            <div className="d-card" style={{ marginTop: 12 }}>
+              <div className="d-rec-h"><span>Detalle del turno</span></div>
+              <SRow l="Apertura" v={`${fmt(d.period_start)} · ${d.opener}`} />
+              <SRow l="Cierre" v={`${fmt(d.period_end)} · ${d.closer}`} />
+              <SRow l="Total ventas" v={money(d.resumen.total_ventas)} />
+              <SRow l="Total gastos" v={money(d.resumen.total_gastos)} />
+              <SRow l="Descuadre" v={money(d.resumen.descuadre)} red={d.has_descuadre} />
+              <SRow l="Balance" v={money(d.resumen.balance)} bold />
+            </div>
+          </>)}
+        </div>
+        <div className="d-foot" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+          <button className="d-act" onClick={imprimir}>{I.print}<span>Imprimir</span></button>
+          <button className="btn btn-dark" style={{ flex: 1, marginLeft: 10 }} onClick={() => d && onVerTx({ from: d.period_start, to: d.period_end })}>Ver detalle de transacciones</button>
+        </div>
+      </aside>
+    </>
+  );
+}
+
 const Loading = () => <div className="state">{[0, 1, 2, 3].map((i) => <div key={i} className="skel" style={{ opacity: 1 - i * 0.18 }} />)}</div>;
 const Empty = ({ title, hint }) => <div className="state center"><div className="state-em">📭</div><div className="state-t">{title}</div><div className="state-h">{hint}</div></div>;
 const ErrorBox = ({ msg, onRetry }) => <div className="state center"><div className="state-t" style={{ color: 'var(--danger)' }}>No se pudo cargar</div><div className="state-h">{msg}</div><button className="btn btn-dark" style={{ marginTop: 10 }} onClick={onRetry}>Reintentar</button></div>;
@@ -439,6 +502,7 @@ const CSS = `
 .mov .d-rec-tot{display:flex;justify-content:space-between;border-top:2px solid #ECECEC;margin-top:6px;padding-top:8px;font-weight:800;color:#0f1b16}
 .mov .d-f-l{display:block;font-size:.74rem;font-weight:700;color:var(--mut);margin-bottom:10px}
 .mov .d-f-l input,.mov .d-f-l select{display:block;width:100%;margin-top:4px;font-weight:600}
+.mov .cl-m{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid var(--bd);border-radius:.8rem;padding:12px 14px;margin-bottom:10px;font-weight:700;color:#111}
 .mov .d-foot{display:flex;justify-content:space-around;padding:14px 10px;border-top:1px solid var(--bd);gap:6px}
 .mov .d-act{display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:none;cursor:pointer;color:var(--tx);font-size:.72rem;font-weight:700}
 .mov .d-act svg{width:20px;height:20px;color:#0f1b16;border:1.5px solid var(--bd);border-radius:50%;padding:8px;width:38px;height:38px}
