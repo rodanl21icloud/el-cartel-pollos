@@ -89,7 +89,7 @@ export async function setIngredientStock(req, res) {
     return res.status(400).json({ error: 'COSTO_INVALIDO' });
   }
   const unitProvided = unit !== undefined && unit !== null && unit !== '';
-  if (unitProvided && !['unidad', 'gramo', 'mililitro', 'litro', 'empaque'].includes(unit)) {
+  if (unitProvided && !['unidad', 'kilo', 'gramo', 'onza', 'litro', 'mililitro', 'empaque'].includes(unit)) {
     return res.status(400).json({ error: 'UNIDAD_INVALIDA' });
   }
   if (!reason || !String(reason).trim()) return res.status(400).json({ error: 'MOTIVO_OBLIGATORIO' });
@@ -165,7 +165,7 @@ export async function listIngredients(_req, res) {
   return res.json(rows);
 }
 
-const UNITS = new Set(['unidad', 'gramo', 'mililitro', 'litro', 'empaque']);
+const UNITS = new Set(['unidad', 'kilo', 'gramo', 'onza', 'litro', 'mililitro', 'empaque']);
 
 /** POST /api/inventory/ingredients  Body: { name, unit, stock_qty?, min_stock_qty?, cost_unit? } */
 export async function createIngredient(req, res) {
