@@ -35,9 +35,12 @@ export function canonicalize(value) {
 /** Firma un payload y devuelve el sobre listo para enviar al backend. */
 export async function signSale(payload) {
   if (!_cryptoKey) throw new Error('SESION_SIN_CLAVE');
-  const data = new TextEncoder().encode(canonicalize(payload));
+  // Normaliza vía JSON: descarta claves con `undefined` (que se pierden al enviar).
+  // Así lo que se FIRMA es exactamente lo que se ENVÍA y recibe el backend.
+  const clean = JSON.parse(JSON.stringify(payload));
+  const data = new TextEncoder().encode(canonicalize(clean));
   const sig = await crypto.subtle.sign('HMAC', _cryptoKey, data);
-  return { payload, sessionId: _sessionId, hash: bytesToHex(new Uint8Array(sig)) };
+  return { payload: clean, sessionId: _sessionId, hash: bytesToHex(new Uint8Array(sig)) };
 }
 
 function hexToBytes(hex) {

@@ -62,9 +62,10 @@ export async function login(app, username = 'gerente', password = 'gerente123') 
 
 // Firma un payload de venta igual que el frontend (HMAC-SHA256 con clave hex -> bytes).
 export function signSale(payload, session) {
+  const clean = JSON.parse(JSON.stringify(payload)); // descarta `undefined` (igual que el envío real)
   const hash = crypto.createHmac('sha256', Buffer.from(session.key, 'hex'))
-    .update(canonicalize(payload)).digest('hex');
-  return { payload, sessionId: session.id, hash };
+    .update(canonicalize(clean)).digest('hex');
+  return { payload: clean, sessionId: session.id, hash };
 }
 
 export const auth = (req, token) => req.set('Authorization', 'Bearer ' + token);

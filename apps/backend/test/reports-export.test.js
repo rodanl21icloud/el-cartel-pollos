@@ -37,6 +37,16 @@ describe('Movimientos y exportación de reportes', () => {
     expect(res.body.items.every((m) => m.tipo === 'EGRESO')).toBe(true);
   });
 
+  it('sincroniza una venta con ítem sin nota (note undefined) — no rechaza HMAC', async () => {
+    const prod = await request(app).post('/api/products').set('Authorization', bearer())
+      .send({ name: 'Sin nota ' + randomUUID().slice(0, 6), price: 3000 });
+    const body = signSale({ client_uuid: randomUUID(), payment_method: 'EFECTIVO', sold_at: new Date().toISOString(),
+      items: [{ product_id: prod.body.id, qty: 1, note: undefined }] }, sess);
+    const res = await request(app).post('/api/sales/sync').set('Authorization', bearer()).send(body);
+    expect(res.status).toBe(201);
+    expect(res.body.status).toBe('CREATED');
+  });
+
   it('busca por concepto (q) en el libro de movimientos', async () => {
     const res = await request(app).get('/api/reports/movements').query({ from: FROM, to: TO, q: 'egreso' }).set('Authorization', bearer());
     expect(res.status).toBe(200);
