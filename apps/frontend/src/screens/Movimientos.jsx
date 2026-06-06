@@ -200,6 +200,10 @@ function Drawer({ m, onClose, onGo, canVoid, onChanged }) {
 
   const [printing, setPrinting] = useState(false);
   const [det, setDet] = useState(null); // ítems del recibo (ventas)
+  const [editing, setEditing] = useState(false);
+  const [cats, setCats] = useState([]);
+  const [form, setForm] = useState({ category_id: '', amount: '', payment_method: 'EFECTIVO', description: '' });
+  const [saving, setSaving] = useState(false);
   useEffect(() => { if (ingreso) api(`/sales/${m.id}/receipt`).then(setDet).catch(() => setDet(null)); /* eslint-disable-next-line */ }, [m.id]);
   async function comprobante() {
     const w = window.open('', '_blank', 'width=400,height=640'); if (!w) return;
@@ -223,14 +227,33 @@ function Drawer({ m, onClose, onGo, canVoid, onChanged }) {
       <script>window.onload=function(){window.print();setTimeout(function(){window.close()},300)}</script></body></html>`);
     w.document.close();
   }
-  function editar() { onGo?.(ingreso ? 'ventas' : 'gastos'); onClose(); }
+  async function editar() {
+    if (ingreso) { onGo?.('ventas'); onClose(); return; } // las ventas confirmadas no se editan: se anulan
+    try {
+      const c = await api('/expenses/categories');
+      setCats(c);
+      const match = c.find((x) => x.name === m.categoria);
+      setForm({ category_id: match?.id || c[0]?.id || '', amount: m.valor, payment_method: m.medio_pago || 'EFECTIVO', description: m.concepto });
+      setEditing(true);
+    } catch (e) { alert(e.message); }
+  }
+  async function saveEdit() {
+    if (!(Number(form.amount) > 0) || !form.description.trim() || !form.category_id) { alert('Completa monto, descripción y categoría.'); return; }
+    setSaving(true);
+    try {
+      await api(`/expenses/${m.id}`, { method: 'PUT', body: { category_id: form.category_id, amount: Number(form.amount), payment_method: form.payment_method, description: form.description.trim() } });
+      onChanged?.(); onClose();
+    } catch (e) { alert(e.message === 'PERMISO_DENEGADO' ? 'No tienes permiso para editar gastos.' : e.message); setSaving(false); }
+  }
   async function eliminar() {
-    if (!ingreso) { alert('Los gastos se editan o eliminan en la sección Gastos.'); onGo?.('gastos'); onClose(); return; }
-    if (!canVoid) { alert('No tienes permiso para anular ventas.'); return; }
-    if (!window.confirm('¿Anular esta venta? Se restaurará el inventario consumido.')) return;
+    const msg = ingreso ? '¿Anular esta venta? Se restaurará el inventario consumido.' : '¿Eliminar este gasto? No se puede deshacer.';
+    if (!window.confirm(msg)) return;
     setBusy(true);
-    try { await api(`/sales/${m.id}/void`, { method: 'POST', body: { reason: 'Anulada desde Movimientos' } }); onChanged?.(); onClose(); }
-    catch (e) { alert(e.message); setBusy(false); }
+    try {
+      if (ingreso) await api(`/sales/${m.id}/void`, { method: 'POST', body: { reason: 'Anulada desde Movimientos' } });
+      else await api(`/expenses/${m.id}`, { method: 'DELETE' });
+      onChanged?.(); onClose();
+    } catch (e) { alert(e.message === 'PERMISO_DENEGADO' ? 'No tienes permiso para esta acción.' : e.message); setBusy(false); }
   }
 
   return (
@@ -238,13 +261,14 @@ function Drawer({ m, onClose, onGo, canVoid, onChanged }) {
       <div className="d-overlay" onClick={onClose} />
       <aside className="drawer">
         <div className="d-head">
-          <div className="d-head-l"><span className="d-ico">{I.reg}</span><b>Detalle de la venta</b></div>
+          <div className="d-head-l"><span className="d-ico">{I.reg}</span><b>{editing ? 'Editar gasto' : (ingreso ? 'Detalle de la venta' : 'Detalle del gasto')}</b></div>
           <button className="d-close" onClick={onClose}>{I.close}</button>
         </div>
         <div className="d-body">
           <div className="d-title">{m.concepto}</div>
           <div className="d-sub">Transacción{m.ref ? ` #${m.ref}` : ''}</div>
 
+          <div style={{ display: editing ? 'none' : 'block' }}>
           <div className="d-card">
             <div className="d-card-top">
               <div><div className="d-card-lbl">Valor total</div><div className="d-card-val">{money(m.valor)}</div></div>
@@ -270,9 +294,35 @@ function Drawer({ m, onClose, onGo, canVoid, onChanged }) {
               <div className="d-rec-tot"><span>Total</span><b>{money(m.valor)}</b></div>
             </div>
           )}
+          </div>
+
+          {editing && (
+            <div className="d-card" style={{ textAlign: 'left', background: '#fff', border: '1px solid var(--bd)' }}>
+              <label className="d-f-l">Descripción
+                <input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+              </label>
+              <label className="d-f-l">Monto
+                <input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+              </label>
+              <label className="d-f-l">Método de pago
+                <select value={form.payment_method} onChange={(e) => setForm({ ...form, payment_method: e.target.value })}>
+                  <option value="EFECTIVO">Efectivo</option><option value="POS">Tarjeta</option><option value="TRANSFERENCIA">Transferencia</option>
+                </select>
+              </label>
+              <label className="d-f-l">Categoría
+                <select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
+                  {cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </label>
+              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <button className="btn" style={{ flex: 1 }} onClick={() => setEditing(false)}>Cancelar</button>
+                <button className="btn btn-dark" style={{ flex: 1 }} onClick={saveEdit} disabled={saving}>{saving ? 'Guardando…' : 'Guardar'}</button>
+              </div>
+            </div>
+          )}
         </div>
         <div className="d-foot">
-          <button className="d-act" onClick={() => window.print()}>{I.print}<span>Imprimir</span></button>
+          <button className="d-act" onClick={comprobante} disabled={printing}>{I.print}<span>Imprimir</span></button>
           <button className="d-act" onClick={comprobante} disabled={printing}>{I.doc}<span>{printing ? '…' : 'Comprobante'}</span></button>
           <button className="d-act" onClick={editar}>{I.edit}<span>Editar</span></button>
           <button className="d-act danger" onClick={eliminar} disabled={busy}>{I.trash}<span>{busy ? '…' : 'Eliminar'}</span></button>
@@ -387,6 +437,8 @@ const CSS = `
 .mov .d-rec-row:first-of-type{border-top:none}
 .mov .d-rec-n{color:#374151}
 .mov .d-rec-tot{display:flex;justify-content:space-between;border-top:2px solid #ECECEC;margin-top:6px;padding-top:8px;font-weight:800;color:#0f1b16}
+.mov .d-f-l{display:block;font-size:.74rem;font-weight:700;color:var(--mut);margin-bottom:10px}
+.mov .d-f-l input,.mov .d-f-l select{display:block;width:100%;margin-top:4px;font-weight:600}
 .mov .d-foot{display:flex;justify-content:space-around;padding:14px 10px;border-top:1px solid var(--bd);gap:6px}
 .mov .d-act{display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:none;cursor:pointer;color:var(--tx);font-size:.72rem;font-weight:700}
 .mov .d-act svg{width:20px;height:20px;color:#0f1b16;border:1.5px solid var(--bd);border-radius:50%;padding:8px;width:38px;height:38px}

@@ -103,3 +103,17 @@ export async function updateExpense(req, res) {
   });
   return res.json({ expense_id: id, amount, category: cat.name });
 }
+
+/** DELETE /api/expenses/:id — elimina un gasto (auditado). */
+export async function deleteExpense(req, res) {
+  const { id } = req.params;
+  const db = getDb();
+  const prev = (await db.execute({ sql: `SELECT e.amount, e.description, c.name cat FROM expenses e JOIN expense_categories c ON c.id=e.category_id WHERE e.id=?`, args: [id] })).rows[0];
+  if (!prev) return res.status(404).json({ error: 'GASTO_NO_ENCONTRADO' });
+  await db.execute({ sql: `DELETE FROM expenses WHERE id=?`, args: [id] });
+  await writeAudit({
+    userId: req.user.id, action: 'EXPENSE_DELETE', entity: 'expenses', entityId: id, severity: 'WARN', ip: req.ip,
+    metadata: { amount: Number(prev.amount), description: prev.description, category: prev.cat },
+  });
+  return res.json({ deleted: id });
+}

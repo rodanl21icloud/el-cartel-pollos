@@ -29,6 +29,20 @@ describe('Gastos', () => {
     expect(res.body.error).toBe('METODO_PAGO_INVALIDO');
   });
 
+  it('edita y luego elimina un gasto', async () => {
+    const cre = await request(app).post('/api/expenses').set('Authorization', bearer())
+      .send({ category_id: 'cat-arriendo', amount: 5000, payment_method: 'EFECTIVO', description: 'Gasto a borrar' });
+    const id = cre.body.expense_id;
+    const upd = await request(app).put(`/api/expenses/${id}`).set('Authorization', bearer())
+      .send({ category_id: 'cat-arriendo', amount: 6000, payment_method: 'EFECTIVO', description: 'Editado' });
+    expect(upd.status).toBe(200);
+    const del = await request(app).delete(`/api/expenses/${id}`).set('Authorization', bearer());
+    expect(del.status).toBe(200);
+    expect(del.body.deleted).toBe(id);
+    const del2 = await request(app).delete(`/api/expenses/${id}`).set('Authorization', bearer());
+    expect(del2.status).toBe(404);
+  });
+
   it('rechaza categoría inexistente', async () => {
     const res = await request(app).post('/api/expenses').set('Authorization', bearer())
       .send({ category_id: 'cat-fantasma', amount: 1000, payment_method: 'EFECTIVO', description: 'x' });

@@ -15,7 +15,7 @@ import { registerMerma, listIngredients, lowStockAlerts, mermasHistorial,
          createIngredient, deleteIngredient, restockIngredient, setIngredientStock } from './controllers/inventory.js';
 import { createProduct, updateProduct, deleteProduct, updateIngredient, listCatalog, bulkPriceChange, getPriceHistory } from './controllers/admin.js';
 import { getRecipe, setRecipe } from './controllers/recipes.js';
-import { listCategories, createExpense, listExpenses, updateExpense } from './controllers/expenses.js';
+import { listCategories, createExpense, listExpenses, updateExpense, deleteExpense } from './controllers/expenses.js';
 import { turnSummary, closuresHistory, cashFlow, pnl, stats, dashboard, movements, exportReport, forecast, turnos, consumoInsumos, preciosInsumos, estadisticasVentas, estadisticasGastos, retroactivasReport } from './controllers/reports.js';
 import { costsSummary, costDeviations, productCost } from './controllers/financeCosts.js';
 import { expensesAudit, expenseAuditReview } from './controllers/financeExpenseAudit.js';
@@ -84,6 +84,7 @@ app.get('/api/expenses/categories', listCategories);
 app.post('/api/expenses', requirePermission('expenses.manage'), createExpense);
 app.get('/api/expenses', requirePermission('reports.view'), listExpenses);
 app.put('/api/expenses/:id', requirePermission('expenses.manage'), updateExpense);
+app.delete('/api/expenses/:id', requirePermission('expenses.manage'), deleteExpense);
 
 // Clientes / domicilios (lookup por teléfono para autocompletar en la venta)
 app.get('/api/clients', listClients);
