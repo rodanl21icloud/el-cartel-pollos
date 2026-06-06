@@ -47,6 +47,19 @@ describe('Movimientos y exportación de reportes', () => {
     expect(res.body.status).toBe('CREATED');
   });
 
+  it('una venta con aviso WhatsApp registra/vincula al cliente (CRM)', async () => {
+    const phone = '5699' + Math.floor(Math.random() * 1e7);
+    const prod = await request(app).post('/api/products').set('Authorization', bearer())
+      .send({ name: 'Wa ' + randomUUID().slice(0, 6), price: 4000 });
+    const body = signSale({ client_uuid: randomUUID(), payment_method: 'EFECTIVO', sold_at: new Date().toISOString(),
+      items: [{ product_id: prod.body.id, qty: 1 }], notify_phone: phone }, sess);
+    const res = await request(app).post('/api/sales/sync').set('Authorization', bearer()).send(body);
+    expect(res.status).toBe(201);
+    const cli = await request(app).get('/api/clients').query({ phone }).set('Authorization', bearer());
+    expect(cli.status).toBe(200);
+    expect(cli.body?.phone).toBe(phone);
+  });
+
   it('busca por concepto (q) en el libro de movimientos', async () => {
     const res = await request(app).get('/api/reports/movements').query({ from: FROM, to: TO, q: 'egreso' }).set('Authorization', bearer());
     expect(res.status).toBe(200);

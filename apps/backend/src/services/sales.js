@@ -148,6 +148,12 @@ export async function registerSale(payload, ctx) {
     const { upsertClient } = await import('../controllers/clients.js');
     clientId = await upsertClient(db, cli);
   }
+  // Si dio su WhatsApp para el aviso "pedido listo", lo registramos/vinculamos
+  // como cliente -> queda disponible para seguimiento comercial, campañas y loyalty.
+  if (!clientId && payload.notify_phone) {
+    const { upsertClient } = await import('../controllers/clients.js');
+    clientId = await upsertClient(db, { phone: payload.notify_phone, notes: 'Aviso WhatsApp (POS)' });
+  }
   const deliveryAddress = cli && cli.address ? String(cli.address).trim() : (payload.delivery_address || null);
 
   // Verificación de stock teórico ANTES de comprometer la transacción.
