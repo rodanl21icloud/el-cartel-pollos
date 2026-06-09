@@ -471,3 +471,10 @@ CREATE TABLE IF NOT EXISTS loyalty_transactions (
   FOREIGN KEY (sale_id)   REFERENCES sales(id)   ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS idx_loyalty_tx_client ON loyalty_transactions(client_id, created_at);
+
+-- Tabla de seguridad: Persistencia de claves HMAC para Zero Trust
+CREATE TABLE IF NOT EXISTS session_keys (
+    client_uuid TEXT PRIMARY KEY,
+    hmac_key TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
