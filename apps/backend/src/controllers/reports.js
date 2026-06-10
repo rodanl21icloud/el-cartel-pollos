@@ -111,11 +111,15 @@ export async function consumoInsumos(req, res) {
   const db = getDb();
   const to = req.query.to || new Date().toISOString();
   const from = req.query.from || new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
+  // Consumo TEÓRICO = unidades vendidas × receta (BOM). Funciona aunque no existan
+  // descuentos de inventario registrados (ej. ventas importadas).
   const { rows } = await db.execute({
-    sql: `SELECT i.name, i.unit, COALESCE(SUM(ABS(ia.qty_delta)),0) qty
-          FROM inventory_adjustments ia JOIN ingredients i ON i.id = ia.ingredient_id
-          WHERE ia.type='VENTA' AND datetime(ia.created_at) >= datetime(?) AND datetime(ia.created_at) <= datetime(?)
-            AND (i.name LIKE '%ollo%' OR i.name LIKE '%apa%')
+    sql: `SELECT i.name, i.unit, COALESCE(SUM(si.qty * pr.qty_per_unit),0) qty
+          FROM sale_items si
+          JOIN sales s ON s.id = si.sale_id AND s.status='CONFIRMADA' AND s.sold_at >= ? AND s.sold_at <= ?
+          JOIN product_recipes pr ON pr.product_id = si.product_id
+          JOIN ingredients i ON i.id = pr.ingredient_id
+          WHERE (i.name LIKE '%ollo%' OR i.name LIKE '%apa%')
           GROUP BY i.id`,
     args: [from, to],
   });
