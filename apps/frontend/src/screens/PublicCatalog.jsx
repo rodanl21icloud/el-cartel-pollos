@@ -55,14 +55,18 @@ export default function PublicCatalog({ slug }) {
 
   const fee = method === 'domicilio' && quote?.ok ? quote.fee : 0;
   const finalTotal = total + fee;
-  const canOrder = name.trim() && phone.trim() && (method !== 'domicilio' || (address.trim() && quote?.ok));
+  // Solo bloquea si la dirección está FUERA DE ZONA. Si el cálculo no está
+  // disponible (sin API key / no geolocaliza), se permite pedir y coordinar envío.
+  const blocked = method === 'domicilio' && quote?.reason === 'fuera_zona';
+  const canOrder = !!name.trim() && !!phone.trim() && (method !== 'domicilio' || !!address.trim()) && !blocked;
 
   function pedir() {
     if (!canOrder) return;
     const L = items.map(([n, v]) => `• ${v.qty}× ${n} — ${money(v.qty * v.price)}`).join('\n');
     let t = `Hola 👋 quiero un pedido en ${business.name}:\n${L}\n\nSubtotal: ${money(total)}`;
     if (fee) t += `\nEnvío: ${money(fee)}${quote?.km ? ` (${quote.km} km)` : ''}`;
-    t += `\n*Total: ${money(finalTotal)}*\n\nEntrega: ${method === 'retiro' ? 'Retiro en tienda' : 'Despacho a domicilio'}\nNombre: ${name}\nTeléfono: ${phone}`;
+    else if (method === 'domicilio') t += `\nEnvío: por confirmar`;
+    t += `\n*Total: ${money(finalTotal)}${method === 'domicilio' && !fee ? ' + envío' : ''}*\n\nEntrega: ${method === 'retiro' ? 'Retiro en tienda' : 'Despacho a domicilio'}\nNombre: ${name}\nTeléfono: ${phone}`;
     if (method === 'domicilio') t += `\nDirección: ${address}`;
     const to = (business.whatsapp || '').replace(/\D/g, '');
     window.open(`https://wa.me/${to}?text=${encodeURIComponent(t)}`, '_blank');
