@@ -63,3 +63,15 @@ describe('Gastos', () => {
     expect(res.body.some((e) => e.category === 'Arriendo y servicios')).toBe(true);
   });
 });
+
+describe('Categorías de carta', () => {
+  it('renombra/fusiona una categoría (mueve productos)', async () => {
+    const request = (await import('supertest')).default;
+    await request(app).post('/api/products').set('Authorization', bearer())
+      .send({ name: 'Prod cat test', price: 1000, category: 'CATVIEJA' });
+    const res = await request(app).put('/api/products/categories/rename').set('Authorization', bearer())
+      .send({ from: 'CATVIEJA', to: 'CATNUEVA' });
+    expect(res.status).toBe(200);
+    expect(res.body.moved).toBeGreaterThan(0);
+  });
+});

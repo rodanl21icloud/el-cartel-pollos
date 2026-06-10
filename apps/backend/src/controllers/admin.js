@@ -77,7 +77,7 @@ export async function createProduct(req, res) {
 /** PUT /api/products/:id  — edita precio / nombre / estado / foto. */
 export async function updateProduct(req, res) {
   const { id } = req.params;
-  const { name, price, is_active, image_url, in_catalog, available, description } = req.body || {};
+  const { name, price, is_active, image_url, in_catalog, available, description, category } = req.body || {};
 
   const db = getDb();
   const cur = await db.execute({ sql: `SELECT * FROM products WHERE id = ?`, args: [id] });
@@ -99,11 +99,12 @@ export async function updateProduct(req, res) {
     in_catalog: in_catalog != null ? (in_catalog ? 1 : 0) : (cur.rows[0].in_catalog == null ? 1 : cur.rows[0].in_catalog),
     available: available != null ? (available ? 1 : 0) : (cur.rows[0].available == null ? 1 : cur.rows[0].available),
     description: description !== undefined ? (description ? String(description).trim() : null) : cur.rows[0].description,
+    category: category !== undefined && String(category).trim() ? String(category).trim().toUpperCase() : cur.rows[0].category,
   };
 
   await db.execute({
-    sql: `UPDATE products SET name = ?, price = ?, is_active = ?, image_url = ?, in_catalog = ?, available = ?, description = ?, updated_at = datetime('now') WHERE id = ?`,
-    args: [next.name, next.price, next.is_active, next.image_url, next.in_catalog, next.available, next.description, id],
+    sql: `UPDATE products SET name = ?, price = ?, is_active = ?, image_url = ?, in_catalog = ?, available = ?, description = ?, category = ?, updated_at = datetime('now') WHERE id = ?`,
+    args: [next.name, next.price, next.is_active, next.image_url, next.in_catalog, next.available, next.description, next.category, id],
   });
   // Historial de precio (solo si cambió).
   if (price != null && Number(next.price) !== Number(cur.rows[0].price)) {
@@ -208,4 +209,16 @@ export async function updateIngredient(req, res) {
     severity: 'INFO', ip: req.ip, metadata: { after: next },
   });
   return res.json({ id, ...next });
+}
+
+/** PUT /api/products/categories/rename  Body: { from, to } — renombra o fusiona una categoría. */
+export async function renameCategory(req, res) {
+  const from = String(req.body?.from || '').trim().toUpperCase();
+  const to = String(req.body?.to || '').trim().toUpperCase();
+  if (!from || !to || from === to) return res.status(400).json({ error: 'CATEGORIAS_INVALIDAS' });
+  const db = getDb();
+  const r = await db.execute({ sql: `UPDATE products SET category = ?, updated_at = datetime('now') WHERE category = ?`, args: [to, from] });
+  await writeAudit({ userId: req.user.id, action: 'CATEGORY_RENAME', entity: 'products', entityId: null,
+    severity: 'INFO', ip: req.ip, metadata: { from, to, moved: r.rowsAffected } });
+  return res.json({ from, to, moved: r.rowsAffected });
 }

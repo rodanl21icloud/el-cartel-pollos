@@ -13,7 +13,7 @@ import { syncSale, listProducts, topProducts, getReceipt, listSales, voidSale, b
 import { getSettings, updateSettings, setAdminPin } from './controllers/settings.js';
 import { registerMerma, listIngredients, lowStockAlerts, mermasHistorial,
          createIngredient, deleteIngredient, restockIngredient, setIngredientStock } from './controllers/inventory.js';
-import { createProduct, updateProduct, deleteProduct, updateIngredient, listCatalog, bulkPriceChange, getPriceHistory } from './controllers/admin.js';
+import { createProduct, updateProduct, deleteProduct, updateIngredient, listCatalog, bulkPriceChange, getPriceHistory, renameCategory } from './controllers/admin.js';
 import { getRecipe, setRecipe } from './controllers/recipes.js';
 import { listCategories, createExpense, listExpenses, updateExpense, deleteExpense } from './controllers/expenses.js';
 import { turnSummary, closuresHistory, closureDetail, deleteClosure, cashFlow, pnl, stats, dashboard, movements, exportReport, forecast, turnos, consumoInsumos, preciosInsumos, estadisticasVentas, estadisticasGastos, retroactivasReport } from './controllers/reports.js';
@@ -134,6 +134,7 @@ app.post('/api/inventory/ingredients/:id/set-stock',
 app.get('/api/products/catalog', requirePermission('menu.manage'), listCatalog);
 app.post('/api/products', requirePermission('menu.manage'), createProduct);
 app.put('/api/products/bulk-price', requirePermission('menu.manage'), requireOtpForMutation, bulkPriceChange);
+app.put('/api/products/categories/rename', requirePermission('menu.manage'), requireOtpForMutation, renameCategory);
 app.get('/api/products/:id/price-history', requirePermission('menu.manage'), getPriceHistory);
 app.put('/api/products/:id', requirePermission('menu.manage'), requireOtpForMutation, updateProduct);
 app.delete('/api/products/:id', requirePermission('menu.manage'), requireOtpForMutation, deleteProduct);

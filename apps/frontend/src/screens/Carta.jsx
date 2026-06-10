@@ -67,11 +67,16 @@ export default function Carta({ role }) {
     try { await api(`/products/${p.id}`, { method: 'DELETE', otp: otpArg }); load(); flash('Producto eliminado'); }
     catch (e) { handleErr(e); }
   }
-  async function setImage(p) {
-    const url = window.prompt('Pega la URL de la foto del producto:', p.image_url || '');
-    if (url === null) return;
+  const [editFor, setEditFor] = useState(null); // producto -> modal foto/categoría
+  async function saveEdit(p, body) {
     setError('');
-    try { await api(`/products/${p.id}`, { method: 'PUT', body: { image_url: url.trim() }, otp: otpArg }); load(); flash('Foto actualizada'); }
+    try { await api(`/products/${p.id}`, { method: 'PUT', body, otp: otpArg }); setEditFor(null); load(); flash('Producto actualizado'); }
+    catch (e) { handleErr(e); }
+  }
+  const [catMgr, setCatMgr] = useState(false);
+  async function renameCat(from, to) {
+    setError('');
+    try { const r = await api('/products/categories/rename', { method: 'PUT', body: { from, to }, otp: otpArg }); load(); flash(`${r.moved} producto(s) movidos a ${r.to}`); }
     catch (e) { handleErr(e); }
   }
   async function toggleCatalog(p) {
@@ -106,6 +111,7 @@ export default function Carta({ role }) {
             <input value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="OTP gerencia" inputMode="numeric"
               className="w-32 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none text-sm" />
           )}
+          <button onClick={() => setCatMgr(true)} className="px-4 py-2 rounded-xl bg-white border-2 border-zinc-200 font-bold text-sm">📂 Categorías</button>
           <button onClick={() => setShare(true)} className="px-4 py-2 rounded-xl bg-ink text-white font-bold flex items-center gap-1.5">
             <span>🔗</span> Catálogo virtual
           </button>
@@ -115,7 +121,9 @@ export default function Carta({ role }) {
         </div>
       </div>
       {error && <p className="text-red-600 font-semibold">{error}</p>}
-      {creating && <NewProduct onSave={createProduct} />}
+      {creating && <NewProduct onSave={createProduct} existingCats={tabs.slice(1)} />}
+      {editFor && <EditModal p={editFor} cats={tabs.slice(1)} onClose={() => setEditFor(null)} onSave={(body) => saveEdit(editFor, body)} />}
+      {catMgr && <CatManager items={items} onClose={() => setCatMgr(false)} onRename={renameCat} />}
 
       {/* Cambio masivo de precios */}
       <div className="bg-white rounded-2xl shadow p-3">
@@ -229,7 +237,7 @@ export default function Carta({ role }) {
                   </button>
                   <button onClick={() => toggleAvailable(p)} className="text-lg mr-1" title={p.available === false ? 'Marcar disponible' : 'Marcar agotado'}>{p.available === false ? '🔴' : '🟢'}</button>
                   <button onClick={() => setHistFor(p)} className="text-zinc-400 hover:text-cartel text-lg mr-1" title="Historial de precio">📈</button>
-                  <button onClick={() => setImage(p)} className="text-zinc-400 hover:text-cartel text-lg mr-1" title="Foto">📷</button>
+                  <button onClick={() => setEditFor(p)} className="text-zinc-400 hover:text-cartel text-lg mr-1" title="Foto y categoría">📷</button>
                   <button onClick={() => removeProduct(p)} className="text-zinc-400 hover:text-red-600 text-lg" title="Eliminar">🗑</button>
                 </td>
               </tr>
@@ -403,7 +411,7 @@ function Toggle({ label, on, onClick, disabled }) {
   );
 }
 
-function NewProduct({ onSave }) {
+function NewProduct({ onSave, existingCats }) {
   const [name, setName] = useState('');
   const [touched, setTouched] = useState(false);
   const [price, setPrice] = useState('');
@@ -425,10 +433,11 @@ function NewProduct({ onSave }) {
       <div className="grid grid-cols-2 gap-2">
         <input type="number" min="0" placeholder="Precio" value={price} onChange={(e) => setPrice(e.target.value)}
           className="px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
-        <select value={category} onChange={(e) => setCategory(e.target.value)}
-          className="px-3 py-2 rounded-xl border-2 border-zinc-200 outline-none">
-          {[...CAT_ORDER, 'OTROS'].map((c) => <option key={c} value={c}>{getCategoryAsset(c)?.emoji} {c}</option>)}
-        </select>
+        <div>
+          <input list="cats-new" value={category} onChange={(e) => setCategory(e.target.value.toUpperCase())} placeholder="Categoría"
+            className="w-full px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none font-bold" />
+          <datalist id="cats-new">{[...new Set([...CAT_ORDER, ...(existingCats || []), 'OTROS'])].map((c) => <option key={c} value={c} />)}</datalist>
+        </div>
       </div>
       <input placeholder="URL de foto (opcional)" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)}
         className="w-full px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
@@ -538,6 +547,92 @@ function RecipeBuilder({ product, ingredients, otp, onClose, onSaved, onError })
             </div>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Comprime una imagen local a JPEG ~480px y la devuelve como data URL (cabe en image_url).
+async function fileToDataUrl(file) {
+  const img = await createImageBitmap(file);
+  const max = 480, sc = Math.min(1, max / Math.max(img.width, img.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.78);
+}
+
+// Editar foto (subir archivo o URL) y categoría de un producto.
+function EditModal({ p, cats, onClose, onSave }) {
+  const [url, setUrl] = useState(p.image_url || '');
+  const [category, setCategory] = useState(p.category);
+  const [busy, setBusy] = useState(false);
+  async function pickFile(e) {
+    const f = e.target.files?.[0]; if (!f) return;
+    setBusy(true);
+    try { setUrl(await fileToDataUrl(f)); } catch { alert('No se pudo leer la imagen'); }
+    setBusy(false);
+  }
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 grid place-items-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
+        <h3 className="font-black text-lg">{p.name}</h3>
+        <div className="flex items-center gap-3">
+          {url ? <img src={url} alt="" className="w-20 h-20 rounded-xl object-cover bg-zinc-100" /> : <div className="w-20 h-20 rounded-xl bg-zinc-100 grid place-items-center text-2xl">🍗</div>}
+          <label className="flex-1 text-center px-3 py-2 rounded-xl bg-cartel text-white font-bold text-sm cursor-pointer">
+            {busy ? 'Procesando…' : '📷 Subir imagen'}
+            <input type="file" accept="image/*" onChange={pickFile} className="hidden" />
+          </label>
+        </div>
+        <input value={url.startsWith('data:') ? '' : url} onChange={(e) => setUrl(e.target.value)} placeholder="…o pega una URL de foto"
+          className="w-full px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none text-sm" />
+        {url.startsWith('data:') && <p className="text-xs text-emerald-600 font-bold">✓ Imagen cargada desde tu equipo</p>}
+        <label className="block text-xs font-bold text-zinc-500">Categoría
+          <input list="cats-edit" value={category} onChange={(e) => setCategory(e.target.value.toUpperCase())}
+            className="w-full mt-1 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none font-bold" />
+          <datalist id="cats-edit">{cats.map((c) => <option key={c} value={c} />)}</datalist>
+        </label>
+        <p className="text-[11px] text-zinc-400">Escribe un nombre nuevo para crear una categoría.</p>
+        <div className="flex gap-2">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-zinc-100 font-bold">Cancelar</button>
+          <button disabled={busy} onClick={() => onSave({ image_url: url.trim() || null, category: category.trim() })}
+            className="flex-1 py-2.5 rounded-xl bg-cartel text-white font-black disabled:opacity-50">Guardar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Gestor de categorías: renombrar o fusionar (eliminar = mover sus productos a otra).
+function CatManager({ items, onClose, onRename }) {
+  const counts = {};
+  for (const p of items) counts[p.category] = (counts[p.category] || 0) + 1;
+  const cats = Object.keys(counts).sort();
+  function ren(c) {
+    const to = window.prompt(`Nuevo nombre para "${c}":`, c);
+    if (to && to.trim().toUpperCase() !== c) onRename(c, to.trim().toUpperCase());
+  }
+  function del(c) {
+    const dest = window.prompt(`Para eliminar "${c}", sus ${counts[c]} producto(s) se moverán a otra categoría.\nEscribe la categoría destino:\n(${cats.filter((x) => x !== c).join(', ')})`);
+    if (dest && dest.trim()) onRename(c, dest.trim().toUpperCase());
+  }
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 grid place-items-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl max-w-sm w-full p-5" onClick={(e) => e.stopPropagation()}>
+        <h3 className="font-black text-lg mb-1">Categorías</h3>
+        <p className="text-xs text-zinc-500 mb-3">Para crear una nueva, escríbela al crear o editar un producto.</p>
+        <div className="space-y-2 max-h-80 overflow-y-auto">
+          {cats.map((c) => (
+            <div key={c} className="flex items-center justify-between bg-zinc-50 rounded-xl px-3 py-2">
+              <div className="font-bold">{c} <span className="text-zinc-400 font-normal text-sm">({counts[c]})</span></div>
+              <div className="flex gap-1">
+                <button onClick={() => ren(c)} className="px-2.5 py-1 rounded-lg bg-white border text-xs font-bold">✏️ Renombrar</button>
+                <button onClick={() => del(c)} className="px-2.5 py-1 rounded-lg bg-red-50 text-red-600 border border-red-200 text-xs font-bold">🗑 Eliminar</button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <button onClick={onClose} className="w-full mt-4 py-2.5 rounded-xl bg-zinc-100 font-bold">Cerrar</button>
       </div>
     </div>
   );
