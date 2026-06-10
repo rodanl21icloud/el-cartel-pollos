@@ -248,14 +248,23 @@ export async function restockIngredient(req, res) {
 
   let expenseId = null;
   if (expense && expense.payment_method) {
-    expenseId = randomUUID();
-    const monto = qty * unit_cost;
-    stmts.push({
-      sql: `INSERT INTO expenses (id, category_id, user_id, amount, payment_method, supplier, description, spent_at)
-            VALUES (?,?,?,?,?,?,?,?)`,
-      args: [expenseId, expense.category_id || 'cat-proveedores', req.user.id, monto, expense.payment_method,
-             prov, `Compra de ${ing.rows[0].name} (${qty})`, new Date().toISOString()],
-    });
+    // Resuelve una categoría REAL (los ids varían entre bases): proveedores/insumos,
+    // si no la primera operativa. Evita FK roto por un id hardcodeado inexistente.
+    let catId = expense.category_id;
+    if (!catId) {
+      const c = (await db.execute(`SELECT id, name, kind FROM expense_categories WHERE is_active = 1`)).rows;
+      catId = c.find((x) => /proveedor|insumo|compra/i.test(x.name))?.id || c.find((x) => x.kind !== 'RETIRO')?.id || c[0]?.id;
+    }
+    if (catId) {
+      expenseId = randomUUID();
+      const monto = qty * unit_cost;
+      stmts.push({
+        sql: `INSERT INTO expenses (id, category_id, user_id, amount, payment_method, supplier, description, spent_at)
+              VALUES (?,?,?,?,?,?,?,?)`,
+        args: [expenseId, catId, req.user.id, monto, expense.payment_method,
+               prov, `Compra de ${ing.rows[0].name} (${qty})`, new Date().toISOString()],
+      });
+    }
   }
   stmts.push({
     sql: `INSERT INTO audit_logs (id, user_id, action, entity, entity_id, severity, metadata, ip_address)
