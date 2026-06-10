@@ -155,7 +155,9 @@ export async function dashboard(day) {
   const ticket = pedidos ? round0(ventas / pedidos) : 0;
 
   // Food cost (COGS por ventas del día / ventas).
-  const cogs = Number((await db.execute({ sql: `SELECT COALESCE(SUM(ABS(qty_delta)*unit_cost),0) c FROM inventory_adjustments WHERE type='VENTA' AND created_at>=? AND created_at<=?`, args: dRange })).rows[0].c);
+  const cogs = Number((await db.execute({ sql: `SELECT COALESCE(SUM(si.qty*pr.qty_per_unit*i.cost_unit),0) c
+          FROM sale_items si JOIN sales s ON s.id=si.sale_id AND s.status='CONFIRMADA' AND s.business_day=?
+          JOIN product_recipes pr ON pr.product_id=si.product_id JOIN ingredients i ON i.id=pr.ingredient_id`, args: [day] })).rows[0].c);
   const food_cost_pct = ventas > 0 ? round0(cogs / ventas * 100) : null;
 
   // Merma del día (monto y nº de registros).

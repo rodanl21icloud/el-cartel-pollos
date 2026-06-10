@@ -107,6 +107,19 @@ export async function deleteClosure(req, res) {
  * Lee el descuento real de insumos al vender (inventory_adjustments type='VENTA').
  * Devuelve pollos (unidades) y papas en kg. (reports.view)
  */
+// COGS teórico por receta (BOM): funciona aunque no haya descuentos de inventario
+// registrados (ventas importadas). from/to = límites de sold_at.
+async function cogsBOM(db, from, to) {
+  return Number((await db.execute({
+    sql: `SELECT COALESCE(SUM(si.qty * pr.qty_per_unit * i.cost_unit),0) c
+          FROM sale_items si
+          JOIN sales s ON s.id = si.sale_id AND s.status='CONFIRMADA' AND s.sold_at >= ? AND s.sold_at <= ?
+          JOIN product_recipes pr ON pr.product_id = si.product_id
+          JOIN ingredients i ON i.id = pr.ingredient_id`,
+    args: [from, to],
+  })).rows[0].c);
+}
+
 export async function consumoInsumos(req, res) {
   const db = getDb();
   const to = req.query.to || new Date().toISOString();
@@ -196,7 +209,7 @@ export async function estadisticasVentas(req, res) {
 
   const agg = async (a, b) => {
     const r = (await db.execute({ sql: `SELECT COUNT(*) n, COALESCE(SUM(total),0) total, COALESCE(SUM(COALESCE(subtotal,total)),0) bruto, COALESCE(SUM(discount),0) descuentos FROM sales WHERE status='CONFIRMADA' AND sold_at>=? AND sold_at<=?`, args: [a, b] })).rows[0];
-    const cogs = Number((await db.execute({ sql: `SELECT COALESCE(SUM(ABS(qty_delta)*unit_cost),0) c FROM inventory_adjustments WHERE type='VENTA' AND datetime(created_at)>=datetime(?) AND datetime(created_at)<=datetime(?)`, args: [a, b] })).rows[0].c);
+    const cogs = await cogsBOM(db, a, b);
     const total = Number(r.total);
     return { n: Number(r.n), total, bruto: Number(r.bruto), descuentos: Number(r.descuentos), cogs, ganancia: round2(total - cogs) };
   };
@@ -453,7 +466,7 @@ export async function dashboard(req, res) {
     return { n: Number(r.n), total: Number(r.t) };
   };
   const gastos = async (a, b) => Number((await db.execute({ sql: `SELECT COALESCE(SUM(amount),0) t FROM expenses WHERE spent_at>=? AND spent_at<=?`, args: [a, b] })).rows[0].t);
-  const cogs = async (a, b) => Number((await db.execute({ sql: `SELECT COALESCE(SUM(ABS(qty_delta)*unit_cost),0) c FROM inventory_adjustments WHERE type='VENTA' AND created_at>=? AND created_at<=?`, args: [a, b] })).rows[0].c);
+  const cogs = (a, b) => cogsBOM(db, a, b);
 
   const cur = await ventas(from, to), prev = await ventas(prevFrom, prevTo);
   const gCur = await gastos(from, to), gPrev = await gastos(prevFrom, prevTo);
@@ -712,8 +725,8 @@ export async function exportReport(req, res) {
     name = 'estado_resultados';
     header = ['Concepto', 'Valor'];
     const ventas = Number((await db.execute({ sql: `SELECT COALESCE(SUM(total),0) t FROM sales WHERE status='CONFIRMADA' AND sold_at>=? AND sold_at<=?`, args: [from, to] })).rows[0].t);
-    const cog = (await db.execute({ sql: `SELECT type, COALESCE(SUM(ABS(qty_delta)*unit_cost),0) c FROM inventory_adjustments WHERE type IN ('VENTA','MERMA') AND created_at>=? AND created_at<=? GROUP BY type`, args: [from, to] })).rows;
-    const costo = Number(cog.find((r) => r.type === 'VENTA')?.c || 0), mermas = Number(cog.find((r) => r.type === 'MERMA')?.c || 0);
+    const costo = await cogsBOM(db, from, to);
+    const mermas = Number((await db.execute({ sql: `SELECT COALESCE(SUM(ABS(qty_delta)*unit_cost),0) c FROM inventory_adjustments WHERE type='MERMA' AND created_at>=? AND created_at<=?`, args: [from, to] })).rows[0].c);
     const gs = (await db.execute({ sql: `SELECT c.kind, COALESCE(SUM(e.amount),0) m FROM expenses e JOIN expense_categories c ON c.id=e.category_id WHERE e.spent_at>=? AND e.spent_at<=? GROUP BY c.kind`, args: [from, to] })).rows;
     let oper = 0, ret = 0; for (const g of gs) { if (g.kind === 'RETIRO') ret = Number(g.m); else oper += Number(g.m); }
     const ub = ventas - costo, uo = ub - mermas - oper;
@@ -979,18 +992,16 @@ export async function pnl(req, res) {
   });
   const ventas = Number(ventasRes.rows[0].monto);
 
-  // Costo de insumos vendidos (COGS) y mermas, con costo congelado.
-  const cogsRes = await db.execute({
-    sql: `SELECT type, COALESCE(SUM(ABS(qty_delta) * unit_cost),0) AS costo
-          FROM inventory_adjustments
-          WHERE type IN ('VENTA','MERMA') AND created_at >= ? AND created_at <= ?
-          GROUP BY type`,
+  // COGS por receta (BOM) + mermas reales (ajustes de inventario).
+  const costo_insumos = round2(await cogsBOM(db, from, to));
+  const mermasRes = await db.execute({
+    sql: `SELECT COALESCE(SUM(ABS(qty_delta) * unit_cost),0) AS costo
+          FROM inventory_adjustments WHERE type='MERMA' AND created_at >= ? AND created_at <= ?`,
     args: [from, to],
   });
-  let costo_insumos = 0, mermas = 0;
-  for (const r of cogsRes.rows) {
-    if (r.type === 'VENTA') costo_insumos = round2(Number(r.costo));
-    if (r.type === 'MERMA') mermas = round2(Number(r.costo));
+  let mermas = 0;
+  for (const r of mermasRes.rows) {
+    mermas = round2(Number(r.costo));
   }
 
   // Gastos por categoría, separando operativos de retiros.
