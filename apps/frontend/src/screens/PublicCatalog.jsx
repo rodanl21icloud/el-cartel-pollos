@@ -10,6 +10,11 @@ export default function PublicCatalog({ slug }) {
   const [error, setError] = useState('');
   const [cart, setCart] = useState({}); // { name: { qty, price } }
   const [method, setMethod] = useState(null);
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [quote, setQuote] = useState(null);   // { ok, fee, km, eta, message }
+  const [quoting, setQuoting] = useState(false);
 
   useEffect(() => {
     fetch(`/api/public/catalog/${encodeURIComponent(slug)}`)
@@ -30,19 +35,37 @@ export default function PublicCatalog({ slug }) {
   const upsellTarget = useMemo(() => data?.categories.flatMap((c) => c.items)
     .find((p) => { const s = p.name.toUpperCase(); return s.includes('PAPAS 500') && s.includes('BEBIDA'); }) || null, [data]);
 
+  // Cotiza el despacho (distancia de conducción) al cambiar la dirección (debounce).
+  useEffect(() => {
+    if (method !== 'domicilio' || address.trim().length < 6) { setQuote(null); return; }
+    setQuoting(true);
+    const t = setTimeout(() => {
+      fetch(`/api/public/delivery-quote?address=${encodeURIComponent(address.trim())}`)
+        .then((r) => r.json()).then(setQuote)
+        .catch(() => setQuote({ ok: false, message: 'No se pudo calcular el envío. Coordina por WhatsApp.' }))
+        .finally(() => setQuoting(false));
+    }, 700);
+    return () => clearTimeout(t);
+  }, [address, method]);
+
   if (error) return <Centered>{error}</Centered>;
   if (!data) return <Centered><span className="animate-pulse">Cargando catálogo…</span></Centered>;
 
   const { business, delivery, categories } = data;
-  const bothDelivery = delivery.pickup && delivery.delivery;
+
+  const fee = method === 'domicilio' && quote?.ok ? quote.fee : 0;
+  const finalTotal = total + fee;
+  const canOrder = name.trim() && phone.trim() && (method !== 'domicilio' || (address.trim() && quote?.ok));
 
   function pedir() {
-    const lines = items.map(([name, v]) => `• ${v.qty}× ${name} — ${money(v.qty * v.price)}`).join('%0A');
-    const metodo = method === 'retiro' ? 'Retiro en tienda' : 'Despacho a domicilio';
-    const msg = `Hola 👋 quiero hacer un pedido en ${business.name}:%0A${lines}%0A%0ATotal: ${money(total)}%0AEntrega: ${metodo}`;
-    const phone = (business.whatsapp || '').replace(/[^\d]/g, '');
-    if (phone) window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
-    else window.open(`https://wa.me/?text=${msg}`, '_blank');
+    if (!canOrder) return;
+    const L = items.map(([n, v]) => `• ${v.qty}× ${n} — ${money(v.qty * v.price)}`).join('\n');
+    let t = `Hola 👋 quiero un pedido en ${business.name}:\n${L}\n\nSubtotal: ${money(total)}`;
+    if (fee) t += `\nEnvío: ${money(fee)}${quote?.km ? ` (${quote.km} km)` : ''}`;
+    t += `\n*Total: ${money(finalTotal)}*\n\nEntrega: ${method === 'retiro' ? 'Retiro en tienda' : 'Despacho a domicilio'}\nNombre: ${name}\nTeléfono: ${phone}`;
+    if (method === 'domicilio') t += `\nDirección: ${address}`;
+    const to = (business.whatsapp || '').replace(/\D/g, '');
+    window.open(`https://wa.me/${to}?text=${encodeURIComponent(t)}`, '_blank');
   }
 
   return (
@@ -110,18 +133,34 @@ export default function PublicCatalog({ slug }) {
         </p>
       </main>
 
-      {/* Barra de pedido */}
+      {/* Checkout: método, datos del cliente, envío y total en tiempo real */}
       {count > 0 && (
-        <div className="fixed bottom-0 inset-x-0 bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,.08)]">
+        <div className="fixed bottom-0 inset-x-0 bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,.08)] max-h-[72vh] overflow-y-auto">
           <div className="max-w-2xl mx-auto px-4 py-3 space-y-2">
-            {bothDelivery && (
-              <div className="flex gap-2">
-                <Chip active={method === 'retiro'} onClick={() => setMethod('retiro')}>🏠 Retiro</Chip>
-                <Chip active={method === 'domicilio'} onClick={() => setMethod('domicilio')}>🛵 Domicilio</Chip>
-              </div>
+            <div className="flex gap-2">
+              {delivery.pickup && <Chip active={method === 'retiro'} onClick={() => setMethod('retiro')}>🏠 Retiro</Chip>}
+              {delivery.delivery && <Chip active={method === 'domicilio'} onClick={() => setMethod('domicilio')}>🛵 Delivery</Chip>}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre" className="field" />
+              <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Teléfono" inputMode="tel" className="field" />
+            </div>
+            {method === 'domicilio' && (
+              <>
+                <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Dirección exacta (calle, número, comuna)" className="field w-full" />
+                {quoting && <p className="text-xs text-slate-400">Calculando envío…</p>}
+                {!quoting && quote && !quote.ok && <p className="text-xs text-cartel font-bold">⚠️ {quote.message}</p>}
+                {!quoting && quote?.ok && <p className="text-xs text-green-600 font-bold">✓ A {quote.km} km · envío {money(quote.fee)}{quote.eta ? ` · ~${quote.eta}` : ''}</p>}
+              </>
             )}
-            <button onClick={pedir} className="w-full py-3 rounded-2xl bg-green-600 text-white font-black flex items-center justify-center gap-2">
-              <Wa /> Pedir por WhatsApp · {count} {count === 1 ? 'ítem' : 'ítems'} · {money(total)}
+            <div className="text-sm border-t pt-2 space-y-0.5">
+              <div className="flex justify-between text-slate-500"><span>Subtotal</span><span>{money(total)}</span></div>
+              {fee > 0 && <div className="flex justify-between text-slate-500"><span>Envío</span><span>{money(fee)}</span></div>}
+              <div className="flex justify-between font-black text-base text-slate-800"><span>Total</span><span>{money(finalTotal)}</span></div>
+            </div>
+            <button onClick={pedir} disabled={!canOrder}
+              className="w-full py-3 rounded-2xl bg-green-600 text-white font-black flex items-center justify-center gap-2 disabled:opacity-50">
+              <Wa /> Pedir por WhatsApp · {money(finalTotal)}
             </button>
           </div>
         </div>
@@ -144,7 +183,7 @@ export default function PublicCatalog({ slug }) {
       {/* WhatsApp flotante persistente (siempre visible en el scroll) */}
       <a href={`https://wa.me/${(business.whatsapp || '').replace(/\D/g, '')}`} target="_blank" rel="noreferrer"
         aria-label="Escríbenos por WhatsApp"
-        className={`fixed right-4 z-40 w-14 h-14 rounded-full bg-green-500 text-white grid place-items-center shadow-lg active:scale-95 transition-all ${count > 0 ? 'bottom-32' : 'bottom-5'}`}>
+        className={`fixed right-4 bottom-5 z-40 w-14 h-14 rounded-full bg-green-500 text-white grid place-items-center shadow-lg active:scale-95 transition-all ${count > 0 ? 'hidden' : ''}`}>
         <Wa />
       </a>
     </div>

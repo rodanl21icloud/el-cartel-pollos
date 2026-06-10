@@ -32,6 +32,7 @@ import { listDispatch, updateDispatchStatus } from './controllers/dispatch.js';
 import { getPublicCatalog } from './controllers/publicCatalog.js';
 import { getReviews } from './controllers/reviews.js';
 import { chat } from './controllers/chat.js';
+import { deliveryQuote } from './controllers/delivery.js';
 import { listAudit, auditActions } from './controllers/audit.js';
 
 const app = express();
@@ -59,6 +60,7 @@ app.post('/api/auth/login', rateLimit({ windowMs: 5 * 60_000, max: 30 }), login)
 app.get('/api/public/catalog/:slug', getPublicCatalog);
 app.get('/api/public/reviews', getReviews);
 app.post('/api/public/chat', chat); // chatbot de ventas (público)
+app.get('/api/public/delivery-quote', deliveryQuote); // cotización de despacho
 
 // --- Protegido: JWT en todo /api. El OTP de gerencia se aplica de forma
 // SELECTIVA solo a operaciones sensibles del catálogo/permisos (no a las
