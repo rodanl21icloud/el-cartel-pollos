@@ -225,6 +225,7 @@ export async function restockIngredient(req, res) {
   if (typeof unit_cost !== 'number' || !(unit_cost > 0)) return res.status(400).json({ error: 'COSTO_INVALIDO' });
 
   const db = getDb();
+  try {
   const ing = await db.execute({ sql: `SELECT id, name, stock_qty, cost_unit FROM ingredients WHERE id = ? AND is_active = 1`, args: [id] });
   if (!ing.rows.length) return res.status(404).json({ error: 'INSUMO_NO_ENCONTRADO' });
 
@@ -276,6 +277,10 @@ export async function restockIngredient(req, res) {
   await db.batch(stmts, 'write');
   const newStock = await db.execute({ sql: `SELECT stock_qty FROM ingredients WHERE id = ?`, args: [id] });
   return res.status(201).json({ ingredient: ing.rows[0].name, new_stock: Number(newStock.rows[0].stock_qty), unit_cost, cost_unit: costoPromedio, expense_id: expenseId });
+  } catch (e) {
+    console.error('[restock] error:', e.message);
+    return res.status(500).json({ error: 'REPOSICION_FALLIDA', detail: e.message });
+  }
 }
 
 /**
