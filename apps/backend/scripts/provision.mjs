@@ -1,16 +1,22 @@
 // ============================================================
-// Provisión de la base de datos de PRODUCCIÓN (Turso).
+// Provisión de la base de datos de una INSTANCIA (Turso o archivo local).
 //   1. Aplica schema.sql (tablas, triggers, índices).
-//   2. Aplica seed.sql (categorías de gasto, datos del negocio, insumos demo).
-//   3. Crea un usuario GERENCIA con contraseña fuerte y secreto OTP (TOTP).
+//   2. Siembra datos de referencia:
+//        - por defecto: solo lo estructural (seed-core.sql) -> BASE VACÍA.
+//        - con WITH_DEMO=1: además seed.sql (insumos/carta demo de El Cartel).
+//   3. Fija los datos del negocio (business_settings) con BUSINESS_NAME.
+//   4. Crea un usuario GERENCIA con contraseña fuerte y secreto OTP (TOTP).
 //
-// Uso (con las variables de Turso en el entorno o en un archivo .env):
-//   node --env-file=.env.production scripts/provision.mjs
+// Uso para una instancia NUEVA y VACÍA (ej. otro local):
+//   BUSINESS_NAME="El Pollo de la Tía" ADMIN_USER=gerente \
+//     node --env-file=.env.pollo-tia scripts/provision.mjs
 //
-// Variables opcionales:
+// Variables:
+//   BUSINESS_NAME   nombre del local (def. 'El Cartel de los Pollos').
+//                   Va en comprobantes, cartelera y el emisor del OTP.
 //   ADMIN_USER      (def. 'gerente')
 //   ADMIN_PASSWORD  (si no se entrega, se genera una fuerte y se imprime)
-//   WITH_DEMO=1     (además, siembra carta + recetas reales si existen los scripts)
+//   WITH_DEMO=1     siembra datos demo (solo para El Cartel / pruebas)
 // ============================================================
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -52,8 +58,20 @@ function strongPassword() {
   return randomBytes(9).toString('base64').replace(/[^a-zA-Z0-9]/g, '').slice(0, 14) + 'A9';
 }
 
+const BUSINESS_NAME = (process.env.BUSINESS_NAME || 'El Cartel de los Pollos').trim();
+
 await apply('schema.sql');
-await apply('seed.sql');
+// Base vacía por defecto (solo referencia); datos demo solo con WITH_DEMO=1.
+if (process.env.WITH_DEMO === '1') await apply('seed.sql');
+else await apply('seed-core.sql');
+
+// Datos del negocio: BUSINESS_NAME manda (sobre-escribe el de seed.sql si lo hubo).
+await db.execute({
+  sql: `INSERT INTO business_settings (id, name, paper_width)
+        VALUES (1, ?, 80)
+        ON CONFLICT(id) DO UPDATE SET name = excluded.name`,
+  args: [BUSINESS_NAME],
+});
 
 const username = (process.env.ADMIN_USER || 'gerente').trim().toLowerCase();
 const password = process.env.ADMIN_PASSWORD || strongPassword();
@@ -67,12 +85,13 @@ await db.execute({
   args: [randomUUID(), username, hash, 'Gerencia', otp],
 });
 
-const issuer = 'El Cartel de los Pollos';
-const otpauth = authenticator.keyuri(username, issuer, otp);
+const otpauth = authenticator.keyuri(username, BUSINESS_NAME, otp);
 
 console.log('\n========================================================');
-console.log(' USUARIO GERENCIA CREADO');
+console.log(` INSTANCIA PROVISIONADA — ${BUSINESS_NAME}`);
+console.log(`   ${process.env.WITH_DEMO === '1' ? 'con datos demo' : 'base vacía (sin transacciones ni demo)'}`);
 console.log('========================================================');
+console.log(' USUARIO GERENCIA');
 console.log(` Usuario:     ${username}`);
 console.log(` Contraseña:  ${password}`);
 console.log('\n OTP (TOTP) — cárgalo en Google Authenticator / Authy:');

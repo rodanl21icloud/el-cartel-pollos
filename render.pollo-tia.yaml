@@ -1,0 +1,34 @@
+# ============================================================
+# Render Blueprint — El Pollo de la Tía (segunda instancia)
+# MISMO código que El Cartel; cambia solo la base de datos (Turso propia) y,
+# por ende, el branding (el nombre sale de business_settings, que se fija al
+# provisionar con BUSINESS_NAME). El servidor NO necesita BUSINESS_NAME en
+# runtime: lo lee de la base. Despliega esta instancia desde el MISMO repo.
+#
+# Pasos: ver docs/NUEVA-INSTANCIA.md
+#   1) Crear una base Turso nueva (vacía) para este local.
+#   2) Provisionarla:  BUSINESS_NAME="El Pollo de la Tía" node scripts/provision.mjs
+#   3) En Render > New > Blueprint, apuntar a este archivo y completar TURSO_*.
+# ============================================================
+services:
+  - type: web
+    name: pollo-de-la-tia
+    runtime: node
+    plan: free                # "starter" (US$7/mes) para que no se duerma
+    region: oregon
+    branch: main              # mismo código que El Cartel
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true     # secreto propio e independiente de El Cartel
+      - key: JWT_TTL
+        value: 12h
+      - key: TURSO_DATABASE_URL
+        sync: false             # base Turso PROPIA de El Pollo de la Tía
+      - key: TURSO_AUTH_TOKEN
+        sync: false
