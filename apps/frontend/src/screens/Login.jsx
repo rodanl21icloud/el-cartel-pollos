@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { BRAND_NAME, IS_DEFAULT_BRAND, brandLines } from '../config/brand.js';
 
 /* -----------------------------------------------------------------------
    LOGIN — Estética "La Parrilla Subterránea"
@@ -86,7 +87,7 @@ export default function Login({ onLogin, notice }) {
         <div className="relative z-10 flex flex-col justify-between h-full p-12">
           {/* Logo arriba */}
           <div className="flex items-center gap-3">
-            <img src="/logo.jpeg" alt="El Cartel de los Pollos" className="h-10 rounded-lg" />
+            <img src="/logo.jpeg" alt={BRAND_NAME} className="h-10 rounded-lg" />
           </div>
 
           {/* Headline central */}
@@ -101,17 +102,20 @@ export default function Login({ onLogin, notice }) {
             </div>
             <h1
               className="font-display text-white leading-none mb-6"
-              style={{ fontSize: 'clamp(4rem, 6.5vw, 7rem)' }}
+              style={{ fontSize: 'clamp(3.4rem, 6.5vw, 7rem)' }}
             >
-              EL CARTEL<br />
-              <span
-                className="text-cartel"
-                style={{ animation: 'flicker 7s infinite' }}
-              >
-                DE LOS
-              </span>
-              <br />
-              POLLOS
+              {IS_DEFAULT_BRAND ? (
+                <>
+                  EL CARTEL<br />
+                  <span className="text-cartel" style={{ animation: 'flicker 7s infinite' }}>DE LOS</span>
+                  <br />POLLOS
+                </>
+              ) : (
+                <>
+                  {brandLines().head}{brandLines().head ? <br /> : null}
+                  <span className="text-cartel" style={{ animation: 'flicker 7s infinite' }}>{brandLines().last}</span>
+                </>
+              )}
             </h1>
             <p className="text-ink-subtle font-condensed text-xl tracking-wide max-w-xs leading-relaxed">
               Control total de tu operación.

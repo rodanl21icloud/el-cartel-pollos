@@ -4,6 +4,7 @@ import { setSessionKey } from './lib/crypto.js';
 import { NAV, ALL_ITEMS, itemByKey } from './config/nav.js';
 import { Icon } from './config/icons.jsx';
 import { roleLabel } from './config/roles.js';
+import { BRAND_NAME, IS_DEFAULT_BRAND, brandLines } from './config/brand.js';
 import { Forbidden } from './components/ui/States.jsx';
 import Login from './screens/Login.jsx';
 import Pos from './screens/Pos.jsx';
@@ -257,12 +258,23 @@ export default function App() {
 }
 
 function Brand({ onClose }) {
+  // Branding por instancia: default = "EL CARTEL / de los Pollos"; custom = nombre.
+  const { head, last } = brandLines();
   return (
     <div className="h-14 flex items-center gap-2.5 px-4 border-b border-ink-border shrink-0">
-      <img src="/logo.jpeg" alt="El Cartel de los Pollos" className="h-8 rounded-md" />
+      <img src="/logo.jpeg" alt={BRAND_NAME} className="h-8 rounded-md" />
       <div className="min-w-0 flex-1">
-        <div className="font-display text-white text-sm leading-none tracking-wide truncate">EL CARTEL</div>
-        <div className="text-[9px] font-condensed text-ink-mute tracking-[0.2em] uppercase leading-none mt-0.5">de los Pollos</div>
+        {IS_DEFAULT_BRAND ? (
+          <>
+            <div className="font-display text-white text-sm leading-none tracking-wide truncate">EL CARTEL</div>
+            <div className="text-[9px] font-condensed text-ink-mute tracking-[0.2em] uppercase leading-none mt-0.5">de los Pollos</div>
+          </>
+        ) : (
+          <>
+            <div className="font-display text-white text-sm leading-none tracking-wide truncate">{head || last}</div>
+            {head && <div className="text-[9px] font-condensed text-ink-mute tracking-[0.2em] uppercase leading-none mt-0.5">{last}</div>}
+          </>
+        )}
       </div>
       {onClose && (
         <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 text-ink-mute shrink-0">✕</button>
