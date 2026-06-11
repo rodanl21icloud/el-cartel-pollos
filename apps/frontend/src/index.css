@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;500;600;700;800;900&family=Barlow:wght@400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,8 +7,10 @@
 @layer base {
   html { -webkit-text-size-adjust: 100%; }
   body {
-    @apply bg-slate-100 text-slate-900 antialiased;
-    font-feature-settings: 'cv11', 'ss01';
+    @apply text-stone-900 antialiased;
+    background-color: #f3efe7; /* papel kraft cálido (no slate frío) */
+    font-family: 'Barlow', ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: 'ss01';
   }
   /* Scrollbars discretas y modernas */
   * { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
@@ -17,7 +21,20 @@
   .tabular-nums { font-variant-numeric: tabular-nums; }
 
   @keyframes slidein { from { transform: translateX(-100%); } to { transform: translateX(0); } }
-  @keyframes fadein { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  @keyframes fadein { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @keyframes flicker { 0%, 100% { opacity: 1; } 92% { opacity: 1; } 93% { opacity: .85; } 94% { opacity: 1; } 96% { opacity: .9; } 97% { opacity: 1; } }
+  @keyframes grain {
+    0%, 100% { transform: translate(0, 0); }
+    10% { transform: translate(-2%, -3%); }
+    20% { transform: translate(3%, 1%); }
+    30% { transform: translate(-1%, 4%); }
+    40% { transform: translate(2%, -2%); }
+    50% { transform: translate(-3%, 2%); }
+    60% { transform: translate(1%, -4%); }
+    70% { transform: translate(-2%, 3%); }
+    80% { transform: translate(3%, -1%); }
+    90% { transform: translate(-1%, 2%); }
+  }
 }
 
 @layer components {
@@ -25,21 +42,41 @@
   .btn-pos {
     @apply select-none rounded-2xl px-6 py-4 text-lg font-bold shadow-card active:scale-[.98] transition;
   }
-  /* Tarjeta base reutilizable */
+  /* CTA primario "brasa": gradiente brasa→rojo con glow. Une el botón de
+     login con el resto de la app (acción principal de cada pantalla). */
+  .btn-primary {
+    @apply select-none rounded-2xl px-6 py-4 text-lg font-condensed font-bold uppercase
+           tracking-wide text-white shadow-ember active:scale-[.98] transition;
+    background-image: linear-gradient(135deg, #ff5a1f 0%, #dc2626 60%, #b91c1c 100%);
+  }
+  /* Tarjeta base reutilizable (papel cálido). */
   .card {
-    @apply bg-white rounded-2xl shadow-card border border-slate-100;
+    @apply rounded-2xl shadow-card;
+    background: #fffdf8;
+    border: 1px solid #e7e0d4;
   }
   /* Campo de formulario consistente */
   .field {
-    @apply w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white outline-none
+    @apply w-full px-4 py-2.5 rounded-xl bg-white outline-none
            focus:border-cartel focus:ring-2 focus:ring-cartel/20 transition;
+    border: 1px solid #e7e0d4;
+  }
+  /* Etiqueta de sección (firma tipográfica: condensada, versalitas). */
+  .section-label {
+    @apply font-condensed font-bold uppercase tracking-[0.18em] text-ink-mute;
+  }
+  /* Número de orden estilo ticket de cocina (mono + brasa). */
+  .ticket-num {
+    @apply font-mono font-bold tabular-nums;
+    color: #d6450f;
   }
   /* Ítem de navegación del sidebar */
   .nav-item {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl font-semibold text-slate-300
-           hover:bg-white/10 hover:text-white transition cursor-pointer;
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl font-semibold text-ink-subtle
+           hover:bg-white/5 hover:text-white transition cursor-pointer;
   }
   .nav-item-active {
-    @apply bg-white text-slate-900 shadow-soft hover:bg-white hover:text-slate-900;
+    @apply text-white;
+    background: rgba(255,90,31,0.14);
   }
 }

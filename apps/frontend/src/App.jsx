@@ -112,7 +112,22 @@ export default function App() {
     return () => { evs.forEach((e) => window.removeEventListener(e, reset)); clearTimeout(idleTimer.current); };
   }, [user]);
 
-  if (booting) return <div className="h-screen grid place-items-center bg-ink"><img src="/logo.jpeg" alt="" className="w-48 rounded-xl animate-pulse" /></div>;
+  if (booting) return (
+    <div className="h-screen grid place-items-center bg-ink">
+      <div className="flex flex-col items-center gap-4">
+        <img src="/logo.jpeg" alt="" className="w-40 rounded-xl animate-pulse" />
+        <div className="flex gap-1.5">
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="w-1.5 h-1.5 rounded-full bg-cartel animate-bounce"
+              style={{ animationDelay: `${i * 0.15}s` }}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
   if (!user || !getToken()) return <Login onLogin={handleLogin} notice={sessionMsg} />;
 
   const current = itemByKey(screen);
@@ -120,9 +135,16 @@ export default function App() {
   const groups = NAV.map((g) => ({ ...g, items: g.items.filter((i) => perms[i.perm]) })).filter((g) => g.items.length);
 
   return (
-    <div className="h-screen flex bg-slate-100 overflow-hidden">
+    <div className="h-screen flex overflow-hidden" style={{ background: '#f3efe7' }}>
       {/* Sidebar — desktop / tablet */}
-      <aside className="hidden md:flex flex-col w-60 lg:w-64 shrink-0 bg-ink text-white">
+      <aside className="hidden md:flex flex-col w-[220px] lg:w-[240px] shrink-0 text-white relative" style={{ background: '#16110c' }}>
+        {/* Accent line derecha */}
+        <div className="absolute top-0 right-0 bottom-0 w-px bg-ink-border" />
+        {/* Glow de brasas en la base */}
+        <div
+          className="absolute bottom-0 left-0 right-0 h-40 pointer-events-none"
+          style={{ background: 'radial-gradient(ellipse 100% 60% at 50% 112%, rgba(255,90,31,0.16) 0%, transparent 70%)' }}
+        />
         <Brand />
         <NavList groups={groups} screen={screen} onGo={go} />
         <UserFooter user={user} online={online} onLogout={logout} />
@@ -131,8 +153,11 @@ export default function App() {
       {/* Drawer — móvil */}
       {drawer && (
         <div className="md:hidden fixed inset-0 z-40">
-          <div className="absolute inset-0 bg-ink/60 backdrop-blur-sm" onClick={() => setDrawer(false)} />
-          <aside className="absolute left-0 top-0 bottom-0 w-72 bg-ink text-white flex flex-col animate-[slidein_.2s_ease]">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setDrawer(false)} />
+          <aside
+            className="absolute left-0 top-0 bottom-0 w-72 text-white flex flex-col animate-[slidein_.2s_ease]"
+            style={{ background: '#16110c' }}
+          >
             <Brand onClose={() => setDrawer(false)} />
             <NavList groups={groups} screen={screen} onGo={go} />
             <UserFooter user={user} online={online} onLogout={logout} />
@@ -142,27 +167,49 @@ export default function App() {
 
       {/* Contenido */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-slate-200 px-4 sm:px-6 h-16 flex items-center gap-3">
-          <button onClick={() => setDrawer(true)} className="md:hidden p-2 -ml-2 rounded-lg hover:bg-slate-100" aria-label="Menú">
+        <header
+          className="sticky top-0 z-20 px-4 sm:px-6 h-14 flex items-center gap-3 border-b"
+          style={{
+            background: 'rgba(250,247,241,0.9)',
+            backdropFilter: 'blur(12px)',
+            borderColor: '#e7e0d4',
+          }}
+        >
+          <button
+            onClick={() => setDrawer(true)}
+            className="md:hidden p-2 -ml-2 rounded-lg hover:bg-slate-100 text-slate-600"
+            aria-label="Menú"
+          >
             <Bars />
           </button>
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-cartel"><Icon name={screen === 'home' ? 'home' : current?.icon} size={20} /></span>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="text-cartel shrink-0">
+              <Icon name={screen === 'home' ? 'home' : current?.icon} size={18} />
+            </span>
             <div className="min-w-0">
-              {currentSection && <div className="text-[10px] font-bold uppercase tracking-wider text-ink-mute leading-none">{currentSection}</div>}
-              <h1 className="text-lg font-extrabold tracking-tight truncate leading-tight">{current?.label || 'Inicio'}</h1>
+              {currentSection && (
+                <div className="text-[10px] font-condensed font-bold uppercase tracking-[0.15em] text-ink-mute leading-none">
+                  {currentSection}
+                </div>
+              )}
+              <h1 className="text-base font-bold tracking-tight truncate leading-tight text-slate-900">
+                {current?.label || 'Inicio'}
+              </h1>
             </div>
           </div>
           <div className="ml-auto flex items-center gap-3">
-            <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${online ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>
+            <span
+              className={`inline-flex items-center gap-1.5 text-[11px] font-condensed font-bold px-2.5 py-1 rounded-full tracking-wide
+                ${online ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}
+            >
               <span className={`w-1.5 h-1.5 rounded-full ${online ? 'bg-emerald-500' : 'bg-slate-400'}`} />
               {online ? 'En línea' : 'Offline'}
             </span>
             <div className="hidden sm:flex items-center gap-2">
               <Avatar name={user.name} />
               <div className="leading-tight">
-                <div className="text-sm font-bold">{user.name}</div>
-                <div className="text-[11px] text-ink-mute">{roleLabel(user.role)}</div>
+                <div className="text-sm font-semibold text-slate-800">{user.name}</div>
+                <div className="text-[10px] font-condensed text-ink-mute tracking-wide">{roleLabel(user.role)}</div>
               </div>
             </div>
           </div>
@@ -211,32 +258,49 @@ export default function App() {
 
 function Brand({ onClose }) {
   return (
-    <div className="h-16 flex items-center gap-2 px-4 border-b border-white/10 shrink-0">
-      <img src="/logo.jpeg" alt="El Cartel de los Pollos" className="h-10 rounded-md bg-white px-1.5 py-0.5" />
-      {onClose && <button onClick={onClose} className="ml-auto p-2 rounded-lg hover:bg-white/10 text-slate-300">✕</button>}
+    <div className="h-14 flex items-center gap-2.5 px-4 border-b border-ink-border shrink-0">
+      <img src="/logo.jpeg" alt="El Cartel de los Pollos" className="h-8 rounded-md" />
+      <div className="min-w-0 flex-1">
+        <div className="font-display text-white text-sm leading-none tracking-wide truncate">EL CARTEL</div>
+        <div className="text-[9px] font-condensed text-ink-mute tracking-[0.2em] uppercase leading-none mt-0.5">de los Pollos</div>
+      </div>
+      {onClose && (
+        <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 text-ink-mute shrink-0">✕</button>
+      )}
     </div>
   );
 }
 
 function NavList({ groups, screen, onGo }) {
   return (
-    <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-5">
-      <button onClick={() => onGo('home')} className={`nav-item w-full text-left ${screen === 'home' ? 'nav-item-active' : ''}`}>
-        <span className="w-5 grid place-items-center shrink-0"><Icon name="home" size={18} /></span>
-        <span className="text-sm">Inicio</span>
-      </button>
+    <nav className="flex-1 overflow-y-auto py-3 px-2.5 space-y-4">
+      {/* Inicio */}
+      <NavButton
+        icon="home"
+        label="Inicio"
+        active={screen === 'home'}
+        onClick={() => onGo('home')}
+      />
+
       {groups.map((g) => (
-        <div key={g.section} className={g.kind === 'ADMIN' ? 'pt-4 mt-2 border-t border-white/10' : ''}>
-          <div className="px-3 mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-            {g.kind === 'ADMIN' && <Icon name="lock" size={13} className="text-amber-400" />}{g.section}
+        <div key={g.section} className={g.kind === 'ADMIN' ? 'pt-3 mt-1 border-t border-ink-border' : ''}>
+          <div className="px-2 mb-1.5 flex items-center gap-1.5">
+            {g.kind === 'ADMIN' && (
+              <Icon name="lock" size={10} className="text-amber-500 shrink-0" />
+            )}
+            <span className="text-[10px] font-condensed font-bold uppercase tracking-[0.2em] text-ink-mute">
+              {g.section}
+            </span>
           </div>
           <div className="space-y-0.5">
             {g.items.map((i) => (
-              <button key={i.key} onClick={() => onGo(i.key)}
-                className={`nav-item w-full text-left ${screen === i.key ? 'nav-item-active' : ''}`}>
-                <span className="w-5 grid place-items-center shrink-0"><Icon name={i.icon} size={18} /></span>
-                <span className="text-sm">{i.label}</span>
-              </button>
+              <NavButton
+                key={i.key}
+                icon={i.icon}
+                label={i.label}
+                active={screen === i.key}
+                onClick={() => onGo(i.key)}
+              />
             ))}
           </div>
         </div>
@@ -245,25 +309,59 @@ function NavList({ groups, screen, onGo }) {
   );
 }
 
+function NavButton({ icon, label, active, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="relative w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all duration-150 group"
+      style={active
+        ? { background: 'rgba(255,90,31,0.14)', color: '#fff' }
+        : { color: '#8a7c6b' }
+      }
+    >
+      {/* Brasa lateral cuando activo (sello tipo hierro de marcar) */}
+      {active && (
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full"
+          style={{ background: 'linear-gradient(#ff5a1f,#dc2626)', boxShadow: '0 0 8px rgba(255,90,31,.6)' }} />
+      )}
+      <span className={`w-4 grid place-items-center shrink-0 transition-colors ${active ? 'text-ember' : 'text-ink-mute group-hover:text-ink-subtle'}`}>
+        <Icon name={icon} size={16} />
+      </span>
+      <span className={`text-[13px] font-condensed font-semibold tracking-wide truncate transition-colors ${active ? 'text-white' : 'group-hover:text-slate-200'}`}>
+        {label}
+      </span>
+    </button>
+  );
+}
+
 function UserFooter({ user, online, onLogout }) {
   return (
-    <div className="border-t border-white/10 p-3 shrink-0">
-      <div className="flex items-center gap-2 px-2 py-1">
-        <Avatar name={user.name} dark />
+    <div className="border-t border-ink-border p-3 shrink-0">
+      <div className="flex items-center gap-2 px-1.5 py-1">
+        <Avatar name={user.name} />
         <div className="leading-tight min-w-0 flex-1">
-          <div className="text-sm font-bold truncate">{user.name}</div>
-          <div className="text-[11px] text-slate-400">{user.role}</div>
+          <div className="text-[13px] font-semibold text-white truncate">{user.name}</div>
+          <div className="text-[10px] font-condensed text-ink-mute tracking-wide uppercase">{user.role}</div>
         </div>
-        <button onClick={onLogout} title="Cerrar sesión" className="p-2 rounded-lg hover:bg-white/10 text-slate-300">⏻</button>
+        <button
+          onClick={onLogout}
+          title="Cerrar sesión"
+          className="p-1.5 rounded-lg hover:bg-white/10 text-ink-mute hover:text-white transition-colors"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+        </button>
       </div>
     </div>
   );
 }
 
-function Avatar({ name, dark }) {
+function Avatar({ name }) {
   const initials = (name || '?').split(' ').map((s) => s[0]).slice(0, 2).join('').toUpperCase();
   return (
-    <div className={`w-9 h-9 rounded-full grid place-items-center font-black text-sm shrink-0 ${dark ? 'bg-white/10 text-white' : 'bg-cartel text-white'}`}>
+    <div className="w-8 h-8 rounded-lg grid place-items-center font-bold text-xs shrink-0 text-white"
+      style={{ background: 'linear-gradient(135deg, #dc2626, #991b1b)' }}>
       {initials}
     </div>
   );
