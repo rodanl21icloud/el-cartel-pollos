@@ -10,6 +10,25 @@ export default {
         mono: ['DM Mono', 'ui-monospace', 'monospace'],
       },
       colors: {
+        // Migración de marca: los grises FRÍOS heredados (zinc/slate/gray) se
+        // remapean al ramo CÁLIDO "stone". Misma escala de luminancia (contraste
+        // intacto), pero hue cálido -> todas las pantallas adoptan el "Asador"
+        // con una sola edición, sin tocar cada utilidad en las 34 pantallas.
+        slate: {
+          50: '#fafaf9', 100: '#f5f4f1', 200: '#e7e2d9', 300: '#d6cfc2',
+          400: '#a8a093', 500: '#787063', 600: '#57514a',
+          700: '#44403a', 800: '#292420', 900: '#1c1813', 950: '#0c0a07',
+        },
+        zinc: {
+          50: '#fafaf9', 100: '#f5f4f1', 200: '#e7e2d9', 300: '#d6cfc2',
+          400: '#a8a093', 500: '#787063', 600: '#57514a',
+          700: '#44403a', 800: '#292420', 900: '#1c1813', 950: '#0c0a07',
+        },
+        gray: {
+          50: '#fafaf9', 100: '#f5f4f1', 200: '#e7e2d9', 300: '#d6cfc2',
+          400: '#a8a093', 500: '#787063', 600: '#57514a',
+          700: '#44403a', 800: '#292420', 900: '#1c1813', 950: '#0c0a07',
+        },
         // Sistema "Asador" — anclado al tema (pollo a las brasas + cartel).
         // Rojo = marca/acción · Brasa = atmósfera/realce · Carbón = superficies
         // oscuras (cálido, humo de leña) · Kraft = papel de despacho (contenido).
