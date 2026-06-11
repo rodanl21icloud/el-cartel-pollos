@@ -44,13 +44,16 @@ solo (independiente de El Cartel).
 Quedarán dos servicios separados (`cartel-pollos` y `pollo-de-la-tia`), cada uno con su
 dominio, su base y sus usuarios. Los fixes al código se propagan a ambos en el próximo deploy.
 
-## 4. Branding fino (opcional)
+## 4. Branding
 
-- **Nombre, dirección, teléfono, RUT, mensaje, ancho de papel, plantilla de cartelera**:
-  se editan dentro de la app en **Ajustes** (rol con permiso `settings.manage`).
-- **Logo del staff** (sidebar / login / boleta): es el archivo estático
-  `apps/frontend/public/logo.jpeg`. Si quieres un logo distinto por instancia, reemplázalo
-  en el deploy de ese local (o lo parametrizamos por variable de build más adelante).
+- **Nombre del staff** (login, sidebar, título de la pestaña): se fija con la variable de
+  build **`VITE_BRAND_NAME`** (ya incluida en `render.pollo-tia.yaml`). Vite la inyecta en el
+  bundle al construir. *(Requiere el soporte de marca del front — rama `design/asador-system`.)*
+- **Datos del negocio para clientes** (nombre en boletas/cartelera, dirección, teléfono, RUT,
+  mensaje, ancho de papel, plantilla): se editan en la app en **Ajustes** (permiso
+  `settings.manage`) y salen de `business_settings` (lo fija `BUSINESS_NAME` al provisionar).
+- **Logo** (sidebar / login / boleta): archivo estático `apps/frontend/public/logo.jpeg`.
+  Para un logo distinto por instancia, reemplázalo en ese deploy.
 
 ## Resumen
 
@@ -59,5 +62,6 @@ dominio, su base y sus usuarios. Los fixes al código se propagan a ambos en el 
 | Código | mismo repo / branch `main` | mismo repo / branch `main` |
 | Deploy | `render.yaml` | `render.pollo-tia.yaml` |
 | Base Turso | propia | **propia (vacía)** |
-| Branding | `business_settings` | `business_settings` (BUSINESS_NAME al provisionar) |
+| Branding (clientes) | `business_settings` | `business_settings` (BUSINESS_NAME al provisionar) |
+| Branding (staff) | `VITE_BRAND_NAME` (def.) | `VITE_BRAND_NAME="El Pollo de la Tía"` |
 | Datos | independientes | independientes |

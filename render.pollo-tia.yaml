@@ -24,6 +24,10 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # Marca del staff (login/sidebar/título): Vite la inyecta en el build.
+      # Requiere el soporte VITE_BRAND_NAME del front (rama design/asador-system).
+      - key: VITE_BRAND_NAME
+        value: El Pollo de la Tía
       - key: JWT_SECRET
         generateValue: true     # secreto propio e independiente de El Cartel
       - key: JWT_TTL
