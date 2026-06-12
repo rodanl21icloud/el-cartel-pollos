@@ -28,6 +28,9 @@ services:
       # Requiere el soporte VITE_BRAND_NAME del front (rama design/asador-system).
       - key: VITE_BRAND_NAME
         value: El Pollo de la Tía
+      # Logo del local (asset en apps/frontend/public/). Vite lo usa en el build.
+      - key: VITE_BRAND_LOGO
+        value: /logo-pollo-tia.png
       - key: JWT_SECRET
         generateValue: true     # secreto propio e independiente de El Cartel
       - key: JWT_TTL
