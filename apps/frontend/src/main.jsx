@@ -3,7 +3,11 @@ import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import PublicCatalog from './screens/PublicCatalog.jsx';
 import PublicCartelera from './screens/PublicCartelera.jsx';
+import { BRAND_NAME } from './config/brand.js';
 import './index.css';
+
+// Título de la pestaña según la instancia (branding por deploy).
+document.title = `${BRAND_NAME} — POS`;
 
 // Rutas públicas (sin login):
 //   /catalogo/:slug | /menu/:slug   -> catálogo interactivo para clientes
