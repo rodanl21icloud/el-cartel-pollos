@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, apiDownload } from '../lib/api.js';
 import { buildCustomerReceiptHTML } from '../lib/receipt.js';
+import { brandLogoUrl } from '../config/brand.js';
 
 // ============================================================
 // Módulo "Movimientos" — clon visual de alta fidelidad (estilo Treinta):
@@ -368,7 +369,7 @@ function ClosureDrawer({ id, onClose, onVerTx, onChanged }) {
       tr.b td{font-weight:800;font-size:14px;border-bottom:none}
       tr.red td{color:#c0392b}
     </style></head><body>
-      <img src="/logo.jpeg" onerror="this.style.display='none'"/>
+      <img src="${brandLogoUrl()}" onerror="this.style.display='none'"/>
       <h1>Arqueo de caja</h1>
       <div class="meta"><b>Apertura:</b> ${fmt(d.period_start)}, ${d.opener}<br><b>Cierre:</b> ${fmt(d.period_end)}, ${d.closer}</div>
       <table>

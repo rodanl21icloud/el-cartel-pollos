@@ -4,7 +4,7 @@ import { setSessionKey } from './lib/crypto.js';
 import { NAV, ALL_ITEMS, itemByKey } from './config/nav.js';
 import { Icon } from './config/icons.jsx';
 import { roleLabel } from './config/roles.js';
-import { BRAND_NAME, IS_DEFAULT_BRAND, brandLines } from './config/brand.js';
+import { BRAND_NAME, IS_DEFAULT_BRAND, brandLines, BRAND_LOGO } from './config/brand.js';
 import { Forbidden } from './components/ui/States.jsx';
 import Login from './screens/Login.jsx';
 import Pos from './screens/Pos.jsx';
@@ -116,7 +116,7 @@ export default function App() {
   if (booting) return (
     <div className="h-screen grid place-items-center bg-ink">
       <div className="flex flex-col items-center gap-4">
-        <img src="/logo.jpeg" alt="" className="w-40 rounded-xl animate-pulse" />
+        <img src={BRAND_LOGO} alt="" className="w-40 rounded-xl animate-pulse" />
         <div className="flex gap-1.5">
           {[0, 1, 2].map((i) => (
             <span
@@ -262,7 +262,7 @@ function Brand({ onClose }) {
   const { head, last } = brandLines();
   return (
     <div className="h-14 flex items-center gap-2.5 px-4 border-b border-ink-border shrink-0">
-      <img src="/logo.jpeg" alt={BRAND_NAME} className="h-8 rounded-md" />
+      <img src={BRAND_LOGO} alt={BRAND_NAME} className="h-8 rounded-md" />
       <div className="min-w-0 flex-1">
         {IS_DEFAULT_BRAND ? (
           <>

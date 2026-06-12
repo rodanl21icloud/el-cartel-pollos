@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BRAND_NAME, IS_DEFAULT_BRAND, brandLines } from '../config/brand.js';
+import { BRAND_NAME, IS_DEFAULT_BRAND, brandLines, BRAND_LOGO } from '../config/brand.js';
 
 /* -----------------------------------------------------------------------
    LOGIN — Estética "La Parrilla Subterránea"
@@ -87,7 +87,7 @@ export default function Login({ onLogin, notice }) {
         <div className="relative z-10 flex flex-col justify-between h-full p-12">
           {/* Logo arriba */}
           <div className="flex items-center gap-3">
-            <img src="/logo.jpeg" alt={BRAND_NAME} className="h-10 rounded-lg" />
+            <img src={BRAND_LOGO} alt={BRAND_NAME} className="h-10 rounded-lg" />
           </div>
 
           {/* Headline central */}
@@ -144,7 +144,7 @@ export default function Login({ onLogin, notice }) {
 
         {/* Mobile: logo centrado */}
         <div className="lg:hidden flex justify-center pt-12 pb-0 px-8">
-          <img src="/logo.jpeg" alt="El Cartel de los Pollos" className="h-16 rounded-xl" />
+          <img src={BRAND_LOGO} alt={BRAND_NAME} className="h-16 rounded-xl" />
         </div>
 
         <form onSubmit={submit} className="p-8 xl:p-10" style={{ animation: 'fadein .4s ease' }}>

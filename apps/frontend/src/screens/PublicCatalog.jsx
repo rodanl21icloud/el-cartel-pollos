@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { BRAND_LOGO } from '../config/brand.js';
 
 // Página PÚBLICA del catálogo (sin login). La abren los clientes desde el link
 // compartible /catalogo/:slug. Permite armar un pedido y enviarlo por WhatsApp
@@ -77,7 +78,7 @@ export default function PublicCatalog({ slug }) {
       {/* Encabezado del negocio */}
       <header className="bg-ink text-white">
         <div className="max-w-2xl mx-auto px-4 py-6 flex items-center gap-4">
-          <img src="/logo.jpeg" alt="" className="w-16 h-16 rounded-xl bg-white object-contain p-1" onError={(e) => { e.target.style.display = 'none'; }} />
+          <img src={BRAND_LOGO} alt="" className="w-16 h-16 rounded-xl bg-white object-contain p-1" onError={(e) => { e.target.style.display = 'none'; }} />
           <div className="min-w-0">
             <h1 className="text-2xl font-black truncate">{business.name}</h1>
             <div className="flex flex-wrap gap-2 mt-2">

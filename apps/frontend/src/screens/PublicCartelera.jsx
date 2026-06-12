@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { getCategoryAsset } from '../lib/categoryAssets.js';
+import { BRAND_LOGO, BRAND_NAME } from '../config/brand.js';
 
 // ============================================================
 // Cartelera pública "digital menuboard" 16:9 para TV. Rediseño TDAH-friendly:
@@ -24,7 +25,7 @@ const PROMO = '';
 
 function Logo({ className = 'h-10' }) {
   return (
-    <img src="/logo.jpeg" alt="El Cartel de los Pollos"
+    <img src={BRAND_LOGO} alt={BRAND_NAME}
       className={`${className} w-auto object-contain rounded-md`}
       style={{ filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.8))' }} />
   );

@@ -2,6 +2,7 @@
 // Construcción de comprobantes (HTML para impresión térmica) y del
 // texto para enviar por WhatsApp. Soporta papel de 58mm y 80mm.
 // ============================================================
+import { brandLogoUrl } from '../config/brand.js';
 const money = (n) => '$' + Number(n || 0).toLocaleString('es-CL');
 const esc = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 const fecha = (iso) => {
@@ -43,7 +44,7 @@ export function buildCustomerReceiptHTML(data, settings = {}) {
   const rows = (data.items || []).map((i) =>
     `<tr><td>${i.qty} x ${esc(i.name)}</td><td class="right">${money(i.line_total)}</td></tr>${mods(i)}`
   ).join('');
-  const logo = (typeof window !== 'undefined' ? window.location.origin : '') + '/logo.jpeg';
+  const logo = brandLogoUrl();
   const inner = `
     <div class="c"><img src="${logo}" style="max-width:90%;filter:grayscale(1) contrast(1.2)" /></div>
     ${settings.address ? `<div class="c">${esc(settings.address)}</div>` : ''}

@@ -13,3 +13,13 @@ export function brandLines(name = BRAND_NAME) {
   const last = words.pop() || '';
   return { head: words.join(' '), last };
 }
+
+// Logo por instancia: ruta del asset estático o URL absoluta. Lo fija el deploy
+// con VITE_BRAND_LOGO (ej. '/logo-pollo-tia.png'). Por defecto, el logo actual.
+export const BRAND_LOGO = (import.meta.env.VITE_BRAND_LOGO || '/logo.jpeg').trim();
+
+// URL absoluta del logo (necesaria para el HTML de impresión de boletas/tickets).
+export function brandLogoUrl() {
+  if (/^https?:\/\//.test(BRAND_LOGO)) return BRAND_LOGO;
+  return (typeof window !== 'undefined' ? window.location.origin : '') + BRAND_LOGO;
+}
