@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { api, setToken, clearToken, getToken } from './lib/api.js';
 import { setSessionKey } from './lib/crypto.js';
 import { NAV, ALL_ITEMS, itemByKey } from './config/nav.js';
@@ -42,9 +43,12 @@ import Auditoria from './screens/Auditoria.jsx';
 const IDLE_MS = 8 * 60 * 60 * 1000; // 8 horas (un turno completo)
 
 export default function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  // La pantalla activa se deriva de la URL (primer segmento). '/' -> 'home'.
+  const screen = location.pathname === '/' ? 'home' : location.pathname.split('/')[1];
   const [user, setUser] = useState(null);
   const [perms, setPerms] = useState({});
-  const [screen, setScreen] = useState(null);
   const [online, setOnline] = useState(navigator.onLine);
   const [drawer, setDrawer] = useState(false);
   const [booting, setBooting] = useState(true);
@@ -69,8 +73,7 @@ export default function App() {
           const me = await api('/permissions/me'); // valida el JWT
           await setSessionKey(ss.id, ss.key);       // restaura clave HMAC
           setPerms(me.permissions); setUser(su);
-          const first = ALL_ITEMS.find((n) => me.permissions[n.perm]);
-          setScreen('home');
+          // La URL actual se conserva (deep-link / refresh mantiene la pantalla).
         }
       } catch { clearToken(); localStorage.removeItem('user'); localStorage.removeItem('session'); }
       finally { setBooting(false); }
@@ -87,7 +90,7 @@ export default function App() {
     setPerms(me.permissions);
     setUser(data.user);
     const first = ALL_ITEMS.find((n) => me.permissions[n.perm]);
-    setScreen(first ? first.key : null);
+    navigate(first ? `/${first.key}` : '/');
   }
   function logout(msg = '') {
     // Avisa al server para REVOCAR la clave HMAC (best-effort; el cierre local procede igual).
@@ -96,9 +99,9 @@ export default function App() {
       if (getToken() && ss?.id) api('/auth/logout', { method: 'POST', body: { sessionId: ss.id } }).catch(() => {});
     } catch { /* el cierre local procede igual */ }
     clearToken(); localStorage.removeItem('user'); localStorage.removeItem('session');
-    setUser(null); setPerms({}); setScreen(null); setSessionMsg(msg);
+    setUser(null); setPerms({}); setSessionMsg(msg); navigate('/');
   }
-  function go(key) { setScreen(key); setDrawer(false); }
+  function go(key) { navigate(key === 'home' ? '/' : `/${key}`); setDrawer(false); }
 
   // Seguridad de sesión: cierre por 401 global y por inactividad.
   useEffect(() => {
@@ -139,6 +142,13 @@ export default function App() {
   const current = itemByKey(screen);
   const currentSection = NAV.find((g) => g.items.some((i) => i.key === screen))?.section;
   const groups = NAV.map((g) => ({ ...g, items: g.items.filter((i) => perms[i.perm]) })).filter((g) => g.items.length);
+
+  // Guard de permiso por ruta (defensa además del filtro de menú). Las pantallas
+  // que no son ítems de menú (sin entrada en NAV) las refuerza el backend.
+  const guard = (key, el) => {
+    const it = itemByKey(key);
+    return it && !perms[it.perm] ? <Forbidden module={it.label.toLowerCase()} /> : el;
+  };
 
   return (
     <div className="h-screen flex overflow-hidden" style={{ background: '#f3efe7' }}>
@@ -222,40 +232,40 @@ export default function App() {
         </header>
 
         <main className="flex-1 overflow-auto p-4 sm:p-6">
-          {!screen && <p className="text-center text-ink-mute mt-12">No tienes módulos habilitados. Contacta a un administrador.</p>}
-          {/* Guard de permiso por pantalla (defensa además del filtro de menú). */}
-          {current && !perms[current.perm] ? <Forbidden module={current.label.toLowerCase()} /> : <>
-          {screen === 'home' && <Home role={user.role} onGo={go} userName={user.name} />}
-          {screen === 'operaciones' && <CentroOperaciones />}
-          {screen === 'pos' && <Pos onNavigate={go} />}
-          {screen === 'ventas' && <Ventas canVoid={!!perms['sales.void']} />}
-          {screen === 'retroactiva' && <VentaRetroactiva user={user} />}
-          {screen === 'despacho' && <Despacho />}
-          {screen === 'kds' && <Kds />}
-          {screen === 'prediccion' && <Prediccion />}
-          {screen === 'clientes' && <Clientes />}
-          {screen === 'gastos' && <Gastos />}
-          {screen === 'merma' && <Merma />}
-          {screen === 'inventario' && <Inventario />}
-          {screen === 'precios' && <PreciosInsumos />}
-          {screen === 'cash' && <CashClose userName={user.name} />}
-          {screen === 'finanzas' && <Finanzas role={user.role} />}
-          {screen === 'comercial' && <Comercial />}
-          {screen === 'resumen' && <Resumen role={user.role} />}
-          {screen === 'cuadre' && <Cuadre />}
-          {screen === 'movimientos' && <Movimientos onGo={go} canVoid={!!perms['sales.void']} />}
-          {screen === 'estadisticas' && <Estadisticas />}
-          {screen === 'banco' && <Banco role={user.role} />}
-          {screen === 'flujo' && <Flujo role={user.role} />}
-          {screen === 'pnl' && <Pnl role={user.role} />}
-          {screen === 'carta' && <Carta role={user.role} />}
-          {screen === 'cartelera' && <Cartelera />}
-          {screen === 'modificadores' && <Modificadores role={user.role} />}
-          {screen === 'ajustes' && <Ajustes role={user.role} />}
-          {screen === 'usuarios' && <Usuarios />}
-          {screen === 'permisos' && <Permisos />}
-          {screen === 'auditoria' && <Auditoria />}
-          </>}
+          {!groups.length && <p className="text-center text-ink-mute mt-12">No tienes módulos habilitados. Contacta a un administrador.</p>}
+          <Routes>
+            <Route path="/" element={<Home role={user.role} onGo={go} userName={user.name} />} />
+            <Route path="/operaciones" element={guard('operaciones', <CentroOperaciones />)} />
+            <Route path="/pos" element={guard('pos', <Pos onNavigate={go} />)} />
+            <Route path="/ventas" element={guard('ventas', <Ventas canVoid={!!perms['sales.void']} />)} />
+            <Route path="/retroactiva" element={guard('retroactiva', <VentaRetroactiva user={user} />)} />
+            <Route path="/despacho" element={guard('despacho', <Despacho />)} />
+            <Route path="/kds" element={guard('kds', <Kds />)} />
+            <Route path="/prediccion" element={guard('prediccion', <Prediccion />)} />
+            <Route path="/clientes" element={guard('clientes', <Clientes />)} />
+            <Route path="/gastos" element={guard('gastos', <Gastos />)} />
+            <Route path="/merma" element={guard('merma', <Merma />)} />
+            <Route path="/inventario" element={guard('inventario', <Inventario />)} />
+            <Route path="/precios" element={guard('precios', <PreciosInsumos />)} />
+            <Route path="/cash" element={guard('cash', <CashClose userName={user.name} />)} />
+            <Route path="/finanzas" element={guard('finanzas', <Finanzas role={user.role} />)} />
+            <Route path="/comercial" element={guard('comercial', <Comercial />)} />
+            <Route path="/resumen" element={guard('resumen', <Resumen role={user.role} />)} />
+            <Route path="/cuadre" element={guard('cuadre', <Cuadre />)} />
+            <Route path="/movimientos" element={guard('movimientos', <Movimientos onGo={go} canVoid={!!perms['sales.void']} />)} />
+            <Route path="/estadisticas" element={guard('estadisticas', <Estadisticas />)} />
+            <Route path="/banco" element={guard('banco', <Banco role={user.role} />)} />
+            <Route path="/flujo" element={guard('flujo', <Flujo role={user.role} />)} />
+            <Route path="/pnl" element={guard('pnl', <Pnl role={user.role} />)} />
+            <Route path="/carta" element={guard('carta', <Carta role={user.role} />)} />
+            <Route path="/cartelera" element={guard('cartelera', <Cartelera />)} />
+            <Route path="/modificadores" element={guard('modificadores', <Modificadores role={user.role} />)} />
+            <Route path="/ajustes" element={guard('ajustes', <Ajustes role={user.role} />)} />
+            <Route path="/usuarios" element={guard('usuarios', <Usuarios />)} />
+            <Route path="/permisos" element={guard('permisos', <Permisos />)} />
+            <Route path="/auditoria" element={guard('auditoria', <Auditoria />)} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
         </main>
       </div>
     </div>
