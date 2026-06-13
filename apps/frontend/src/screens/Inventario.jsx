@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
+import { humanizeError } from '../components/ui/States.jsx';
 
 const money = (n) => '$' + Number(n).toLocaleString('es-CL');
 const UNITS = ['unidad', 'kilo', 'gramo', 'onza', 'litro'];
@@ -28,7 +29,7 @@ export default function Inventario() {
           {creating ? 'Cancelar' : '+ Nuevo insumo'}
         </button>
       </div>
-      {error && <p className="text-red-600 font-semibold">{error}</p>}
+      {error && <p className="text-red-600 font-semibold">{humanizeError(error)}</p>}
 
       {creating && <NewIngredient onDone={() => { setCreating(false); load(); flash('Insumo creado'); }} onError={setError} />}
 
@@ -149,7 +150,7 @@ function StockEditModal({ ingredient, hasPin, onClose, onDone }) {
         <p className="text-sm text-zinc-500 mb-1">Edita el costo y/o ajusta el stock (el stock queda auditado).</p>
         <p className="text-sm mb-3">{ingredient.name} · stock <b>{actual} {ingredient.unit}</b> · costo <b>{money(ingredient.cost_unit)}</b></p>
         {!hasPin && <p className="text-xs bg-amber-50 text-amber-700 rounded-lg p-2 mb-3">⚠️ No hay PIN de administrador configurado. Gerencia debe definirlo en <b>Configuración</b> antes de poder ajustar.</p>}
-        {err && <p className="text-red-600 font-semibold text-sm mb-2">{err}</p>}
+        {err && <p className="text-red-600 font-semibold text-sm mb-2">{humanizeError(err)}</p>}
 
         {/* Nombre del insumo */}
         <label className="block text-xs font-bold text-zinc-500 mb-1">Nombre</label>

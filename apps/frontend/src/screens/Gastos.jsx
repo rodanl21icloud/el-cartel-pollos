@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
+import { humanizeError } from '../components/ui/States.jsx';
 
 const METODOS = [
   { id: 'EFECTIVO', label: '💵 Efectivo' },
@@ -76,7 +77,7 @@ export default function Gastos() {
         <input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="Ej: Avícola Sur"
           className="w-full mb-4 px-4 py-3 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
 
-        {error && <p className="text-red-600 font-semibold mb-3">{error}</p>}
+        {error && <p className="text-red-600 font-semibold mb-3">{humanizeError(error)}</p>}
         <button onClick={submit} className="w-full btn-pos bg-cartel text-white">Guardar gasto</button>
       </div>
 
@@ -166,7 +167,7 @@ function EditModal({ expense, cats, onClose, onSaved }) {
         <label className="block font-bold text-zinc-700 mb-1 text-sm">Proveedor (opcional)</label>
         <input value={supplier} onChange={(e) => setSupplier(e.target.value)} className="w-full mb-3 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
 
-        {err && <p className="text-red-600 font-semibold mb-2 text-sm">{err}</p>}
+        {err && <p className="text-red-600 font-semibold mb-2 text-sm">{humanizeError(err)}</p>}
         <div className="flex gap-2">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-zinc-100 text-zinc-700 font-bold">Cancelar</button>
           <button onClick={save} disabled={busy} className="flex-[2] btn-pos bg-cartel text-white disabled:opacity-50">{busy ? 'Guardando…' : 'Guardar cambios'}</button>

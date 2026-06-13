@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { api } from '../lib/api.js';
 import { buildCustomerReceiptHTML, buildKitchenTicketHTML, whatsappUrl } from '../lib/receipt.js';
 import { openPrint } from '../lib/print.js';
+import { Spinner, ErrorState, humanizeError } from '../components/ui/States.jsx';
 
 const money = (n) => '$' + Number(n).toLocaleString('es-CL');
 
@@ -45,8 +46,8 @@ export default function Despacho() {
     } catch (e) { setError(e.message); }
   }
 
-  if (error && !data) return <p className="text-red-600 text-center mt-10">{error}</p>;
-  if (!data) return <p className="text-zinc-500 text-center mt-10">Cargando despacho…</p>;
+  if (error && !data) return <ErrorState error={error} onRetry={load} />;
+  if (!data) return <Spinner label="Cargando despacho…" />;
 
   // Activos arriba (no entregados), entregados al final.
   const activos = data.orders.filter((o) => o.status !== 'ENTREGADO');
@@ -62,7 +63,7 @@ export default function Despacho() {
           ))}
         </div>
       </div>
-      {error && <p className="text-red-600 font-semibold">{error}</p>}
+      {error && <p className="text-red-600 font-semibold">{humanizeError(error)}</p>}
 
       <div className="space-y-2">
         {activos.map((o) => {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
+import { humanizeError } from '../components/ui/States.jsx';
 
 // Motivos predefinidos (Poka-yoke: sin texto libre salvo "Otro").
 const MOTIVOS = ['Mal estado', 'Caída / derrame', 'Error de preparación', 'Vencido', 'Otro'];
@@ -86,7 +87,7 @@ export default function Merma() {
                 className="w-full mb-3 px-4 py-3 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
             )}
 
-            {error && <p className="text-red-600 font-semibold my-2">{error}</p>}
+            {error && <p className="text-red-600 font-semibold my-2">{humanizeError(error)}</p>}
             <button onClick={submit} className="w-full btn-pos bg-cartel text-white mt-2">
               Confirmar merma
             </button>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
+import { humanizeError } from '../components/ui/States.jsx';
 
 const money = (n) => '$' + Number(n || 0).toLocaleString('es-CL');
 const fecha = (iso) => { try { return new Date(iso).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: '2-digit' }); } catch { return ''; } };
@@ -27,7 +28,7 @@ export default function Clientes() {
   return (
     <div className="max-w-2xl mx-auto space-y-3">
       <h2 className="font-black text-xl">Clientes</h2>
-      {error && <p className="text-red-600 font-semibold">{error}</p>}
+      {error && <p className="text-red-600 font-semibold">{humanizeError(error)}</p>}
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nombre o teléfono…"
         className="w-full px-4 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
       <div className="bg-white rounded-2xl shadow divide-y">

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { ROLES as ROLE_CATALOG, roleLabel } from '../config/roles.js';
+import { humanizeError } from '../components/ui/States.jsx';
 
 const ROLES = ROLE_CATALOG.map((r) => r.key);
 const ROLE_HINT = {
@@ -65,7 +66,7 @@ export default function Usuarios() {
         <h2 className="font-black text-xl">Usuarios</h2>
         <button onClick={() => setCreating(!creating)} className="px-4 py-2 rounded-xl bg-cartel text-white font-bold">{creating ? 'Cancelar' : '+ Nuevo usuario'}</button>
       </div>
-      {error && <p className="text-cartel font-semibold">{error}</p>}
+      {error && <p className="text-cartel font-semibold">{humanizeError(error)}</p>}
       {creating && <NewUser onSave={create} />}
 
       <div className="card divide-y">
