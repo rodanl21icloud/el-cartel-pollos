@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { api, setToken, clearToken, getToken } from './lib/api.js';
 import { setSessionKey } from './lib/crypto.js';
@@ -6,38 +6,40 @@ import { NAV, ALL_ITEMS, itemByKey } from './config/nav.js';
 import { Icon } from './config/icons.jsx';
 import { roleLabel } from './config/roles.js';
 import { BRAND_NAME, IS_DEFAULT_BRAND, brandLines, BRAND_LOGO } from './config/brand.js';
-import { Forbidden } from './components/ui/States.jsx';
+import { Forbidden, Spinner } from './components/ui/States.jsx';
+// Eager: pantallas críticas / offline-first (deben cargar sin red desde cero).
 import Login from './screens/Login.jsx';
-import Pos from './screens/Pos.jsx';
-import CashClose from './screens/CashClose.jsx';
-import Merma from './screens/Merma.jsx';
-import Gastos from './screens/Gastos.jsx';
-import Flujo from './screens/Flujo.jsx';
-import Pnl from './screens/Pnl.jsx';
-import Estadisticas from './screens/Estadisticas.jsx';
-import Movimientos from './screens/Movimientos.jsx';
-import Prediccion from './screens/Prediccion.jsx';
-import Resumen from './screens/Resumen.jsx';
-import Cuadre from './screens/Cuadre.jsx';
-import Finanzas from './screens/Finanzas.jsx';
 import Home from './screens/Home.jsx';
-import CentroOperaciones from './screens/CentroOperaciones.jsx';
-import Comercial from './screens/Comercial.jsx';
-import Banco from './screens/Banco.jsx';
-import Ventas from './screens/Ventas.jsx';
-import VentaRetroactiva from './screens/VentaRetroactiva.jsx';
-import Permisos from './screens/Permisos.jsx';
-import Inventario from './screens/Inventario.jsx';
-import PreciosInsumos from './screens/PreciosInsumos.jsx';
-import Carta from './screens/Carta.jsx';
-import Cartelera from './screens/Cartelera.jsx';
-import Modificadores from './screens/Modificadores.jsx';
-import Despacho from './screens/Despacho.jsx';
-import Kds from './screens/Kds.jsx';
-import Ajustes from './screens/Ajustes.jsx';
-import Clientes from './screens/Clientes.jsx';
-import Usuarios from './screens/Usuarios.jsx';
-import Auditoria from './screens/Auditoria.jsx';
+import Pos from './screens/Pos.jsx';
+// Lazy: el resto se divide en chunks por ruta (code-splitting).
+const CashClose = lazy(() => import('./screens/CashClose.jsx'));
+const Merma = lazy(() => import('./screens/Merma.jsx'));
+const Gastos = lazy(() => import('./screens/Gastos.jsx'));
+const Flujo = lazy(() => import('./screens/Flujo.jsx'));
+const Pnl = lazy(() => import('./screens/Pnl.jsx'));
+const Estadisticas = lazy(() => import('./screens/Estadisticas.jsx'));
+const Movimientos = lazy(() => import('./screens/Movimientos.jsx'));
+const Prediccion = lazy(() => import('./screens/Prediccion.jsx'));
+const Resumen = lazy(() => import('./screens/Resumen.jsx'));
+const Cuadre = lazy(() => import('./screens/Cuadre.jsx'));
+const Finanzas = lazy(() => import('./screens/Finanzas.jsx'));
+const CentroOperaciones = lazy(() => import('./screens/CentroOperaciones.jsx'));
+const Comercial = lazy(() => import('./screens/Comercial.jsx'));
+const Banco = lazy(() => import('./screens/Banco.jsx'));
+const Ventas = lazy(() => import('./screens/Ventas.jsx'));
+const VentaRetroactiva = lazy(() => import('./screens/VentaRetroactiva.jsx'));
+const Permisos = lazy(() => import('./screens/Permisos.jsx'));
+const Inventario = lazy(() => import('./screens/Inventario.jsx'));
+const PreciosInsumos = lazy(() => import('./screens/PreciosInsumos.jsx'));
+const Carta = lazy(() => import('./screens/Carta.jsx'));
+const Cartelera = lazy(() => import('./screens/Cartelera.jsx'));
+const Modificadores = lazy(() => import('./screens/Modificadores.jsx'));
+const Despacho = lazy(() => import('./screens/Despacho.jsx'));
+const Kds = lazy(() => import('./screens/Kds.jsx'));
+const Ajustes = lazy(() => import('./screens/Ajustes.jsx'));
+const Clientes = lazy(() => import('./screens/Clientes.jsx'));
+const Usuarios = lazy(() => import('./screens/Usuarios.jsx'));
+const Auditoria = lazy(() => import('./screens/Auditoria.jsx'));
 
 // Inactividad: cierra sesión tras 30 min sin actividad (operación de caja).
 const IDLE_MS = 8 * 60 * 60 * 1000; // 8 horas (un turno completo)
@@ -233,6 +235,7 @@ export default function App() {
 
         <main className="flex-1 overflow-auto p-4 sm:p-6">
           {!groups.length && <p className="text-center text-ink-mute mt-12">No tienes módulos habilitados. Contacta a un administrador.</p>}
+          <Suspense fallback={<Spinner />}>
           <Routes>
             <Route path="/" element={<Home role={user.role} onGo={go} userName={user.name} />} />
             <Route path="/operaciones" element={guard('operaciones', <CentroOperaciones />)} />
@@ -266,6 +269,7 @@ export default function App() {
             <Route path="/auditoria" element={guard('auditoria', <Auditoria />)} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
         </main>
       </div>
     </div>
