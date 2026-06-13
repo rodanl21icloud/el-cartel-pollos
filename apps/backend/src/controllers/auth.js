@@ -6,7 +6,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { getDb } from '../db.js';
-import { issueSessionKey } from '../services/sessionKeys.js';
+import { issueSessionKey, revokeSessionKey } from '../services/sessionKeys.js';
 import { writeAudit } from '../services/audit.js';
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -67,4 +67,18 @@ export async function login(req, res) {
     console.error('[LOGIN ERROR]', err.message, err.stack);
     return res.status(500).json({ error: 'ERROR_INTERNO_LOGIN', detail: err.message });
   }
+}
+
+/**
+ * POST /api/auth/logout — revoca la clave HMAC de la sesión (mata la capacidad de
+ * firmar ventas offline) y registra LOGOUT en la auditoría. Requiere JWT (requireAuth).
+ */
+export async function logout(req, res) {
+  const sessionId = String(req.body?.sessionId || '').trim();
+  if (sessionId) await revokeSessionKey(sessionId);
+  await writeAudit({
+    userId: req.user.id, action: 'LOGOUT', entity: 'users', entityId: req.user.id,
+    severity: 'INFO', ip: req.ip, metadata: { sessionId: sessionId || null },
+  });
+  return res.json({ ok: true });
 }

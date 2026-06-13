@@ -7,7 +7,7 @@
 // ============================================================
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../db.js';
-import { writeAudit } from '../services/audit.js';
+import { writeAudit, commitWithAudit } from '../services/audit.js';
 import { hasPermission } from '../services/permissions.js';
 
 const TOLERANCE = 0.0;
@@ -206,7 +206,7 @@ export async function closeCashRegister(req, res) {
     Math.abs(diff_transferencias) > TOLERANCE;
 
   const id = randomUUID();
-  await db.batch([
+  await commitWithAudit([
     {
       sql: `INSERT INTO cash_register_closures (
               id, user_id, session_id, period_start, period_end, opening_float,
@@ -229,13 +229,11 @@ export async function closeCashRegister(req, res) {
       sql: `UPDATE cash_sessions SET status='CLOSED', closed_at=?, closure_id=? WHERE id=?`,
       args: [periodEnd, id, session.id],
     },
-    {
-      sql: `INSERT INTO audit_logs (id, user_id, action, entity, entity_id, severity, metadata, ip_address)
-            VALUES (?,?, 'CASH_CLOSE', 'cash_register_closures', ?, ?, ?, ?)`,
-      args: [randomUUID(), req.user.id, id, has_descuadre ? 'ALERT' : 'INFO',
-             JSON.stringify({ diff_total, has_descuadre, fondo, conteo_cierre: ci.out }), req.ip || null],
-    },
-  ], 'write');
+  ], {
+    userId: req.user.id, action: 'CASH_CLOSE', entity: 'cash_register_closures', entityId: id,
+    severity: has_descuadre ? 'ALERT' : 'INFO',
+    metadata: { diff_total, has_descuadre, fondo, conteo_cierre: ci.out }, ip: req.ip,
+  });
 
   // El RESUMEN del turno (teórico, ventas, gastos, descuadre) solo se revela
   // a quien tenga permiso `reports.view` (gerencia). El cajero cierra a ciegas

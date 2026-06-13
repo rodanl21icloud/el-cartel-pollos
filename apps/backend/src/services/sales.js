@@ -4,8 +4,27 @@
 // - Atómico: venta + items + descuento de insumos + auditoría
 //   ocurren en una sola transacción libSQL (batch).
 // ============================================================
+import bcrypt from 'bcryptjs';
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../db.js';
+import { commitWithAudit } from './audit.js';
+
+// --- Control de descuentos (Fase 1.2) ---
+const DISCOUNT_MAX_PCT = Number(process.env.DISCOUNT_MAX_PCT || 15);   // % de subtotal sin autorización
+const OVERRIDE_ROLES = new Set(['SUPERVISOR', 'GERENCIA', 'ADMIN']);   // roles que autorizan (no toca la matriz)
+
+// Valida credenciales de un supervisor con poder para autorizar descuentos.
+// Devuelve el id del supervisor o null. Nunca expone/loguea la contraseña.
+async function validateSupervisor(db, auth) {
+  const username = String(auth?.username || '').trim().toLowerCase();
+  const password = String(auth?.password || '');
+  if (!username || !password) return null;
+  const u = (await db.execute({
+    sql: `SELECT id, password_hash, role, is_active FROM users WHERE username = ?`, args: [username],
+  })).rows[0];
+  if (!u || !u.is_active || !OVERRIDE_ROLES.has(u.role)) return null;
+  return (await bcrypt.compare(password, u.password_hash)) ? u.id : null;
+}
 
 /**
  * registerSale — persiste una venta verificada (HMAC) y descuenta el BOM.
@@ -48,7 +67,7 @@ export async function registerSale(payload, ctx) {
       sql: `SELECT COALESCE(MAX(order_number), 0) AS m FROM sales WHERE business_day = ?`, args: [businessDay],
     });
     const orderNumber = Number(maxRes.rows[0].m) + 1;
-    await db.batch([
+    await commitWithAudit([
       {
         sql: `INSERT INTO sales (id, client_uuid, user_id, total, payment_method, status,
                  payload_hash, synced_offline, business_day, order_number, kind, note, dispatch_status, sold_at,
@@ -58,12 +77,8 @@ export async function registerSale(payload, ctx) {
                ctx.syncedOffline ? 1 : 0, businessDay, orderNumber, note ? String(note).trim() : null,
                sold_at || new Date().toISOString(), ctx.backdated ? 1 : 0, ctx.backdateReason || null],
       },
-      {
-        sql: `INSERT INTO audit_logs (id, user_id, action, entity, entity_id, severity, metadata, ip_address)
-              VALUES (?,?, 'SALE_FREE', 'sales', ?, 'INFO', ?, ?)`,
-        args: [randomUUID(), ctx.userId, saleId, JSON.stringify({ free_amount, payment_method, note }), ctx.ip || null],
-      },
-    ], 'write');
+    ], { userId: ctx.userId, action: 'SALE_FREE', entity: 'sales', entityId: saleId, severity: 'INFO',
+         metadata: { free_amount, payment_method, note }, ip: ctx.ip });
     return { status: 'CREATED', saleId, total: free_amount, orderNumber };
   }
 
@@ -140,6 +155,20 @@ export async function registerSale(payload, ctx) {
   const discount = Math.min(Math.max(0, Number(rawDiscount) || 0), subtotal);
   const deliveryFee = Math.max(0, Number(payload.delivery_fee) || 0);
   total = Math.round((subtotal - discount + deliveryFee) * 100) / 100;
+
+  // --- Control de descuentos (Fase 1.2): umbral % -> exige supervisor ---
+  let discountAuthBy = null;
+  if (discount > 0) {
+    const pct = subtotal > 0 ? (discount / subtotal) * 100 : 0;
+    if (pct > DISCOUNT_MAX_PCT) {
+      discountAuthBy = await validateSupervisor(db, payload.supervisor_auth);
+      if (!discountAuthBy) {
+        const e = new Error('DISCOUNT_REQUIRES_SUPERVISOR');
+        e.status = 403; e.detail = { max_pct: DISCOUNT_MAX_PCT, applied_pct: Math.round(pct) };
+        throw e;
+      }
+    }
+  }
 
   // Cliente / domicilio (upsert por teléfono, anti-tamper irrelevante: datos del cliente).
   let clientId = null;
@@ -219,15 +248,20 @@ export async function registerSale(payload, ctx) {
     });
   }
 
-  // Auditoría dentro del mismo batch atómico.
-  stmts.push({
-    sql: `INSERT INTO audit_logs (id, user_id, action, entity, entity_id, severity, metadata, ip_address)
-          VALUES (?,?, 'SALE_SYNC', 'sales', ?, 'INFO', ?, ?)`,
-    args: [randomUUID(), ctx.userId, saleId,
-           JSON.stringify({ total, payment_method, offline: !!ctx.syncedOffline }), ctx.ip || null],
-  });
-
-  await db.batch(stmts, 'write'); // rollback automático si algo falla.
+  // Auditoría encadenada DENTRO del mismo batch atómico (SALE_SYNC + SALE_DISCOUNT si aplica).
+  const audits = [{
+    userId: ctx.userId, action: 'SALE_SYNC', entity: 'sales', entityId: saleId, severity: 'INFO',
+    metadata: { total, payment_method, offline: !!ctx.syncedOffline }, ip: ctx.ip,
+  }];
+  if (discount > 0) {
+    audits.push({
+      userId: ctx.userId, action: 'SALE_DISCOUNT', entity: 'sales', entityId: saleId,
+      severity: discountAuthBy ? 'ALERT' : 'INFO',
+      metadata: { subtotal, discount, pct: Math.round((discount / subtotal) * 100), authorized_by: discountAuthBy },
+      ip: ctx.ip,
+    });
+  }
+  await commitWithAudit(stmts, audits); // rollback automático si algo falla.
 
   // Devengo de puntos de fidelización (efecto secundario NO crítico: nunca rompe la venta).
   if (clientId && total > 0) {

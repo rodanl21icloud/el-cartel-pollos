@@ -400,7 +400,9 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   severity        TEXT NOT NULL DEFAULT 'INFO' CHECK (severity IN ('INFO','WARN','ALERT')),
   metadata        TEXT,                             -- JSON serializado
   ip_address      TEXT,
-  created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  prev_hash       TEXT,                             -- record_hash de la fila anterior (cadena antifraude)
+  record_hash     TEXT                              -- HMAC-SHA256(secreto, contenido + prev_hash)
 );
 
 -- ----------------------------------------------------------------

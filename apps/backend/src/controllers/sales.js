@@ -124,7 +124,7 @@ export async function getReceipt(req, res) {
 // descontó inventario por BOM, restaura el stock.
 export async function voidSale(req, res) {
   const { getDb } = await import('../db.js');
-  const { writeAudit } = await import('../services/audit.js');
+  const { commitWithAudit } = await import('../services/audit.js');
   const db = getDb();
   const sale = (await db.execute({ sql: `SELECT id, status, order_number, total FROM sales WHERE id = ?`, args: [req.params.id] })).rows[0];
   if (!sale) return res.status(404).json({ error: 'VENTA_NO_ENCONTRADA' });
@@ -138,12 +138,11 @@ export async function voidSale(req, res) {
     stmts.push({ sql: `DELETE FROM inventory_adjustments WHERE id = ?`, args: [a.id] });
   }
   stmts.push({ sql: `UPDATE sales SET status = 'ANULADA' WHERE id = ?`, args: [req.params.id] });
-  stmts.push({
-    sql: `INSERT INTO audit_logs (id, user_id, action, entity, entity_id, severity, metadata, ip_address)
-          VALUES (?,?, 'SALE_VOID', 'sales', ?, 'ALERT', ?, ?)`,
-    args: [crypto.randomUUID(), req.user.id, req.params.id, JSON.stringify({ order_number: sale.order_number, total: Number(sale.total), reason: (req.body?.reason || '').slice(0, 200) }), req.ip || null],
+  await commitWithAudit(stmts, {
+    userId: req.user.id, action: 'SALE_VOID', entity: 'sales', entityId: req.params.id, severity: 'ALERT',
+    metadata: { order_number: sale.order_number, total: Number(sale.total), reason: (req.body?.reason || '').slice(0, 200) },
+    ip: req.ip,
   });
-  await db.batch(stmts, 'write');
   return res.json({ id: sale.id, status: 'ANULADA', restored: adj.length });
 }
 

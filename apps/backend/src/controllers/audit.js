@@ -3,6 +3,12 @@
 // Requiere permiso audit.view (administración).
 // ============================================================
 import { getDb } from '../db.js';
+import { verifyAuditChain } from '../services/audit.js';
+
+/** GET /api/audit/verify — verifica la integridad de la cadena antifraude. */
+export async function auditVerify(_req, res) {
+  return res.json(await verifyAuditChain());
+}
 
 // Acciones consideradas "sensibles" para el filtro rápido de la UI.
 const SENSITIVE = [

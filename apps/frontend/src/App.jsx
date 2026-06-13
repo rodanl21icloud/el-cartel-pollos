@@ -90,6 +90,11 @@ export default function App() {
     setScreen(first ? first.key : null);
   }
   function logout(msg = '') {
+    // Avisa al server para REVOCAR la clave HMAC (best-effort; el cierre local procede igual).
+    try {
+      const ss = JSON.parse(localStorage.getItem('session') || 'null');
+      if (getToken() && ss?.id) api('/auth/logout', { method: 'POST', body: { sessionId: ss.id } }).catch(() => {});
+    } catch { /* el cierre local procede igual */ }
     clearToken(); localStorage.removeItem('user'); localStorage.removeItem('session');
     setUser(null); setPerms({}); setScreen(null); setSessionMsg(msg);
   }

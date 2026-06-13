@@ -7,7 +7,7 @@ import { requireAuth, requireOtpForMutation } from './middleware/auth.js';
 import { rateLimit } from './middleware/rateLimit.js';
 import { requirePermission } from './middleware/permissions.js';
 import { verifyHmac } from './middleware/hmac.js';
-import { login } from './controllers/auth.js';
+import { login, logout } from './controllers/auth.js';
 import { closeCashRegister, getCurrentSession, openSession, registerMovement } from './controllers/cashRegister.js';
 import { syncSale, listProducts, topProducts, getReceipt, listSales, voidSale, backdateSale } from './controllers/sales.js';
 import { getSettings, updateSettings, setAdminPin } from './controllers/settings.js';
@@ -33,7 +33,7 @@ import { getPublicCatalog } from './controllers/publicCatalog.js';
 import { getReviews } from './controllers/reviews.js';
 import { chat } from './controllers/chat.js';
 import { deliveryQuote } from './controllers/delivery.js';
-import { listAudit, auditActions } from './controllers/audit.js';
+import { listAudit, auditActions, auditVerify } from './controllers/audit.js';
 
 const app = express();
 // Detrás del proxy de Render/PaaS: req.ip refleja la IP real del cliente
@@ -68,6 +68,9 @@ app.get('/api/public/delivery-quote', deliveryQuote); // cotización de despacho
 // TODO [KAN-16] Rate limit global (~300 req/min por IP) — implementar aparte con
 // 'trust proxy' correcto para Render; no dejarlo en línea con requireAuth.
 app.use('/api', requireAuth);
+
+// Cierre de sesión: revoca la clave HMAC de la sesión + audita LOGOUT.
+app.post('/api/auth/logout', logout);
 
 // Permisos efectivos del usuario actual (para que la UI muestre/oculte).
 app.get('/api/permissions/me', myPermissions);
@@ -235,6 +238,7 @@ app.post('/api/users/:id/password', requirePermission('permissions.manage'), res
 // Auditoría / actividad (solo lectura)
 app.get('/api/audit', requirePermission('audit.view'), listAudit);
 app.get('/api/audit/actions', requirePermission('audit.view'), auditActions);
+app.get('/api/audit/verify', requirePermission('audit.view'), auditVerify);
 
 app.get('/api/permissions', requirePermission('permissions.manage'), getPermissions);
 app.put('/api/permissions', requirePermission('permissions.manage'), requireOtpForMutation, updatePermission);

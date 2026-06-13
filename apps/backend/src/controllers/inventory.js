@@ -5,7 +5,7 @@
 import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { getDb } from '../db.js';
-import { writeAudit } from '../services/audit.js';
+import { writeAudit, commitWithAudit } from '../services/audit.js';
 
 const MERMA_TYPES = new Set(['MERMA', 'REPOSICION', 'CONTEO']);
 
@@ -41,7 +41,7 @@ export async function registerMerma(req, res) {
   }
 
   const adjId = randomUUID();
-  await db.batch([
+  await commitWithAudit([
     {
       sql: `UPDATE ingredients SET stock_qty = stock_qty + ?, updated_at = datetime('now') WHERE id = ?`,
       args: [delta, ingredient_id],
@@ -51,13 +51,10 @@ export async function registerMerma(req, res) {
             VALUES (?,?,?,?,?,?,?)`,
       args: [adjId, ingredient_id, req.user.id, type, delta, Number(ing.rows[0].cost_unit), String(reason).trim()],
     },
-    {
-      sql: `INSERT INTO audit_logs (id, user_id, action, entity, entity_id, severity, metadata, ip_address)
-            VALUES (?,?, ?, 'inventory_adjustments', ?, 'WARN', ?, ?)`,
-      args: [randomUUID(), req.user.id, `INV_${type}`, adjId,
-             JSON.stringify({ ingredient: ing.rows[0].name, delta, reason }), req.ip || null],
-    },
-  ], 'write');
+  ], {
+    userId: req.user.id, action: `INV_${type}`, entity: 'inventory_adjustments', entityId: adjId, severity: 'WARN',
+    metadata: { ingredient: ing.rows[0].name, delta, reason }, ip: req.ip,
+  });
 
   return res.status(201).json({
     adjustment_id: adjId,
@@ -128,20 +125,18 @@ export async function setIngredientStock(req, res) {
   const reasonFull = obs ? `${motivo} — ${obs}` : motivo;
 
   try {
-    await db.batch([
+    await commitWithAudit([
       { sql: `UPDATE ingredients SET name = ?, unit = ?, stock_qty = ?, cost_unit = ?, updated_at = datetime('now') WHERE id = ?`, args: [nameNuevo, unitNuevo, stockNuevo, costNuevo, id] },
       {
         sql: `INSERT INTO inventory_adjustments (id, ingredient_id, user_id, type, qty_delta, unit_cost, reason)
               VALUES (?,?,?, 'CONTEO', ?, ?, ?)`,
         args: [adjId, id, req.user.id, delta, costNuevo, reasonFull],
       },
-      {
-        sql: `INSERT INTO audit_logs (id, user_id, action, entity, entity_id, severity, metadata, ip_address)
-              VALUES (?,?, 'STOCK_AJUSTE', 'ingredients', ?, 'WARN', ?, ?)`,
-        args: [randomUUID(), req.user.id, id,
-               JSON.stringify({ ingredient: nameNuevo, nombre_anterior: ing.name, unidad: unitNuevo, unidad_anterior: ing.unit, tipo, stock_anterior: stockAnterior, stock_nuevo: stockNuevo, delta, costo_anterior: costAnterior, costo_nuevo: costNuevo, motivo, observacion: obs }), req.ip || null],
-      },
-    ], 'write');
+    ], {
+      userId: req.user.id, action: 'STOCK_AJUSTE', entity: 'ingredients', entityId: id, severity: 'WARN',
+      metadata: { ingredient: nameNuevo, nombre_anterior: ing.name, unidad: unitNuevo, unidad_anterior: ing.unit, tipo, stock_anterior: stockAnterior, stock_nuevo: stockNuevo, delta, costo_anterior: costAnterior, costo_nuevo: costNuevo, motivo, observacion: obs },
+      ip: req.ip,
+    });
   } catch (e) {
     if (String(e.message).includes('UNIQUE')) return res.status(409).json({ error: 'NOMBRE_DUPLICADO' });
     throw e;
@@ -267,14 +262,11 @@ export async function restockIngredient(req, res) {
       });
     }
   }
-  stmts.push({
-    sql: `INSERT INTO audit_logs (id, user_id, action, entity, entity_id, severity, metadata, ip_address)
-          VALUES (?,?, 'INV_REPOSICION', 'inventory_adjustments', ?, 'INFO', ?, ?)`,
-    args: [randomUUID(), req.user.id, adjId,
-           JSON.stringify({ qty, unit_cost, costo_anterior: costAnt, costo_promedio: costoPromedio, proveedor: prov, nota, expenseId }), req.ip || null],
+  await commitWithAudit(stmts, {
+    userId: req.user.id, action: 'INV_REPOSICION', entity: 'inventory_adjustments', entityId: adjId, severity: 'INFO',
+    metadata: { qty, unit_cost, costo_anterior: costAnt, costo_promedio: costoPromedio, proveedor: prov, nota, expenseId },
+    ip: req.ip,
   });
-
-  await db.batch(stmts, 'write');
   const newStock = await db.execute({ sql: `SELECT stock_qty FROM ingredients WHERE id = ?`, args: [id] });
   return res.status(201).json({ ingredient: ing.rows[0].name, new_stock: Number(newStock.rows[0].stock_qty), unit_cost, cost_unit: costoPromedio, expense_id: expenseId });
   } catch (e) {
