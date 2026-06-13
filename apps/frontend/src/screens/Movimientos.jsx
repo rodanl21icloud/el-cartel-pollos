@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, apiDownload } from '../lib/api.js';
 import { buildCustomerReceiptHTML } from '../lib/receipt.js';
 import { brandLogoUrl } from '../config/brand.js';
+import { openPrint } from '../lib/print.js';
 
 // ============================================================
 // Módulo "Movimientos" — clon visual de alta fidelidad (estilo Treinta):
@@ -352,21 +353,20 @@ function ClosureDrawer({ id, onClose, onVerTx, onChanged }) {
 
   function imprimir() {
     if (!d) return;
-    const w = window.open('', '_blank', 'width=440,height=700'); if (!w) return;
     const vm = d.ventas_metodo, cj = d.caja;
     const totalIng = (vm.efectivo || 0) + (vm.tarjeta || 0) + (vm.transferencia || 0);
     const row = (l, v, o = {}) => `<tr class="${o.b ? 'b' : ''} ${o.red ? 'red' : ''}"><td>${l}</td><td class="r">${money(v)}</td></tr>`;
-    w.document.write(`<html><head><title>Arqueo de caja</title><style>
+    const html = `<html><head><title>Arqueo de caja</title><style>
       @page{size:80mm auto;margin:3mm}
-      body{font-family:Arial,Helvetica,sans-serif;color:#111;padding:6px;font-size:13px}
-      h1{font-size:17px;margin:0 0 10px}
-      .meta{font-size:12px;margin:0 0 14px;line-height:1.5}.meta b{font-weight:700}
+      body{font-family:Arial,Helvetica,sans-serif;color:#111;padding:6px;font-size:15px}
+      h1{font-size:19px;margin:0 0 10px}
+      .meta{font-size:14px;margin:0 0 14px;line-height:1.5}.meta b{font-weight:700}
       img{height:34px;float:right}
       table{width:100%;border-collapse:collapse}
       td{padding:7px 0;border-bottom:1px solid #eee}
       td.r{text-align:right}
       tr.head td{font-weight:800;border-bottom:2px solid #111}
-      tr.b td{font-weight:800;font-size:14px;border-bottom:none}
+      tr.b td{font-weight:800;font-size:16px;border-bottom:none}
       tr.red td{color:#c0392b}
     </style></head><body>
       <img src="${brandLogoUrl()}" onerror="this.style.display='none'"/>
@@ -387,8 +387,8 @@ function ClosureDrawer({ id, onClose, onVerTx, onChanged }) {
       </table>
       <div style="height:8mm"></div>
       <script>window.onload=function(){window.print();setTimeout(function(){window.close()},300)}</script>
-    </body></html>`);
-    w.document.close();
+    </body></html>`;
+    openPrint(html);
   }
   const MRow = ({ label, v }) => <div className="cl-m"><span>{label}</span><b>{v}</b></div>;
   const SRow = ({ l, v, red, bold }) => <div className="d-row"><span className="d-row-l">{l}</span><span className={`d-row-v ${red ? 'v-red' : ''}`} style={bold ? { fontWeight: 900 } : undefined}>{v}</span></div>;

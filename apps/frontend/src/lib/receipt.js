@@ -20,11 +20,11 @@ function docShell(width, inner) {
   @page { size: ${w}mm auto; margin: 2mm; }
   * { box-sizing: border-box; }
   body { width: ${w}mm; margin: 0; font-family: 'Courier New', monospace; color: #000; }
-  .r { font-size: ${w === 58 ? 13 : 14}px; line-height: 1.38; }
+  .r { font-size: ${w === 58 ? 15 : 16}px; line-height: 1.38; }
   .c { text-align: center; }
   .b { font-weight: 700; }
-  .big { font-size: ${w === 58 ? 18 : 21}px; font-weight: 700; }
-  .xl { font-size: ${w === 58 ? 32 : 40}px; font-weight: 800; }
+  .big { font-size: ${w === 58 ? 20 : 23}px; font-weight: 700; }
+  .xl { font-size: ${w === 58 ? 34 : 42}px; font-weight: 800; }
   hr { border: none; border-top: 1px dashed #000; margin: 4px 0; }
   table { width: 100%; border-collapse: collapse; }
   td { vertical-align: top; padding: 1px 0; }
@@ -75,7 +75,7 @@ export function buildCustomerReceiptHTML(data, settings = {}) {
     <div class="c">Escanea el código y déjanos tu reseña</div>
     <div class="c"><img src="https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=0&data=${encodeURIComponent(REVIEW_URL)}" style="width:${w === 58 ? 32 : 42}mm;height:${w === 58 ? 32 : 42}mm" alt="QR reseña" /></div>
     <div class="c b">y recibe papas fritas o empanaditas de regalo</div>
-    <div class="c" style="font-size:${w === 58 ? 11 : 12}px">Muestra tu reseña en tu próxima compra.</div>
+    <div class="c" style="font-size:${w === 58 ? 13 : 14}px">Muestra tu reseña en tu próxima compra.</div>
     <div style="height:8mm"></div>
   `;
   // El avance final ayuda a que el corte automático del driver (si la impresora

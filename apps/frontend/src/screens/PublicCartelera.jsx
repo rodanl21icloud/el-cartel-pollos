@@ -14,10 +14,14 @@ const BASE_W = 1280, BASE_H = 720;
 const SLIDE_MS = 8000;
 // Plantillas configurables de la cartelera (color de acento, tipografía, densidad).
 const THEMES = {
-  western: { accent: '#f5a623', titlefont: "'Rye', serif", maxItems: 5 },
-  rojo:    { accent: '#dc2626', titlefont: "'Rye', serif", maxItems: 5 },
-  moderno: { accent: '#22d3ee', titlefont: 'system-ui, sans-serif', maxItems: 6 },
-  minimal: { accent: '#e5e7eb', titlefont: 'system-ui, sans-serif', maxItems: 4 },
+  western:  { accent: '#f5a623', titlefont: "'Rye', serif", maxItems: 5 },
+  rojo:     { accent: '#dc2626', titlefont: "'Rye', serif", maxItems: 5 },
+  moderno:  { accent: '#22d3ee', titlefont: 'system-ui, sans-serif', maxItems: 6 },
+  minimal:  { accent: '#e5e7eb', titlefont: 'system-ui, sans-serif', maxItems: 4 },
+  dorado:   { accent: '#d4a017', titlefont: "'Rye', serif", maxItems: 5 },   // premium dorado
+  brasa:    { accent: '#ff5a1f', titlefont: "'Rye', serif", maxItems: 5 },   // brasa (asador)
+  verde:    { accent: '#16a34a', titlefont: 'system-ui, sans-serif', maxItems: 6 }, // fresco
+  azul:     { accent: '#2563eb', titlefont: 'system-ui, sans-serif', maxItems: 6 }, // corporativo
 };
 const RYE = { fontFamily: 'var(--titlefont)' };
 // 👉 Promo opcional. Deja '' para ocultar la cinta. Ej: 'SOLO HOY 2x1 EN PAPAS'.

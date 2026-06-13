@@ -25,12 +25,13 @@ export default function Resumen({ period: extPeriod } = {}) {
   const [cFrom, setCFrom] = useState(''); const [cTo, setCTo] = useState('');
   const [error, setError] = useState('');
 
+  // Rango efectivo: el del panel principal (verde) si viene, si no el propio.
+  const range = extPeriod || rangoFechas(per, cFrom, cTo);
   useEffect(() => {
-    const r = extPeriod || rangoFechas(per, cFrom, cTo);
     setData(null); setError('');
-    if (!r) return;
-    api(`/reports/dashboard?from=${encodeURIComponent(r.from)}&to=${encodeURIComponent(r.to)}`).then(setData).catch((e) => setError(e.message));
-  }, [per, cFrom, cTo, extPeriod]);
+    if (!range) return;
+    api(`/reports/dashboard?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`).then(setData).catch((e) => setError(e.message));
+  }, [range?.from, range?.to]);
 
   const customIncompleto = per === 'custom' && (!cFrom || !cTo);
 
@@ -51,7 +52,7 @@ export default function Resumen({ period: extPeriod } = {}) {
         </div>
       </div>
 
-      <ConsumoCard />
+      <ConsumoCard from={range?.from} to={range?.to} />
 
       {error ? <p className="text-cartel text-center mt-10">{error === 'PERMISO_DENEGADO' ? 'Sin permiso para ver reportes.' : error}</p>
         : customIncompleto ? <p className="text-ink-mute text-center mt-10">Elige las fechas para ver el resumen.</p>
@@ -87,8 +88,6 @@ function ResumenBody({ data }) {
           </div>
         </div>
       </div>
-
-      <ConsumoCard />
 
       {/* Tendencia mensual */}
       <div className="card p-4">
@@ -161,33 +160,22 @@ function ResumenBody({ data }) {
   );
 }
 
-// Consumo del período (pollos vendidos por receta + papas en kg) con selector propio.
-function ConsumoCard() {
-  const [per, setPer] = useState('dia');
-  const [cFrom, setCFrom] = useState(''); const [cTo, setCTo] = useState('');
+// Consumo del período (pollos vendidos por receta + papas en kg).
+// Sigue el rango del panel principal (verde): sin selector propio.
+function ConsumoCard({ from, to }) {
   const [d, setD] = useState(null); const [err, setErr] = useState('');
   useEffect(() => {
-    const r = rangoFechas(per, cFrom, cTo);
     setErr(''); setD(null);
-    if (!r) return;
-    api(`/reports/consumo-insumos?from=${encodeURIComponent(r.from)}&to=${encodeURIComponent(r.to)}`).then(setD).catch((e) => setErr(e.message));
-  }, [per, cFrom, cTo]);
+    if (!from || !to) return;
+    api(`/reports/consumo-insumos?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`).then(setD).catch((e) => setErr(e.message));
+  }, [from, to]);
   return (
     <div className="card p-4">
       <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
         <h3 className="font-black">Consumo del período</h3>
-        <div className="flex gap-1 bg-slate-100 rounded-xl p-1 flex-wrap">
-          {PERIODOS.map((p) => <button key={p.id} onClick={() => setPer(p.id)} className={`px-3 py-1.5 rounded-lg font-bold text-sm ${per === p.id ? 'bg-cartel text-white' : 'text-ink-mute'}`}>{p.label}</button>)}
-        </div>
       </div>
-      {per === 'custom' && (
-        <div className="flex gap-2 mb-3">
-          <input type="date" value={cFrom} onChange={(e) => setCFrom(e.target.value)} className="px-2 py-1.5 rounded-lg border-2 border-slate-200 text-sm" />
-          <input type="date" value={cTo} onChange={(e) => setCTo(e.target.value)} className="px-2 py-1.5 rounded-lg border-2 border-slate-200 text-sm" />
-        </div>
-      )}
       {err ? <p className="text-cartel text-sm">{err}</p>
-        : per === 'custom' && (!cFrom || !cTo) ? <p className="text-ink-mute text-sm">Elige las fechas.</p>
+        : !from || !to ? <p className="text-ink-mute text-sm">Elige las fechas.</p>
           : !d ? <p className="text-ink-mute text-sm">Cargando…</p>
             : (
               <div className="grid grid-cols-2 gap-3">

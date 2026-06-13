@@ -43,7 +43,7 @@ export async function updateSettings(req, res) {
   if (name != null && !String(name).trim()) return res.status(400).json({ error: 'NOMBRE_REQUERIDO' });
   if (paper_width != null && ![58, 80].includes(Number(paper_width))) return res.status(400).json({ error: 'ANCHO_INVALIDO' });
   if (catalog_slug != null && normSlug(catalog_slug).length < 3) return res.status(400).json({ error: 'SLUG_INVALIDO' });
-  if (cartelera_theme != null && !['western', 'rojo', 'moderno', 'minimal'].includes(cartelera_theme)) return res.status(400).json({ error: 'PLANTILLA_INVALIDA' });
+  if (cartelera_theme != null && !['western', 'rojo', 'moderno', 'minimal', 'dorado', 'brasa', 'verde', 'azul'].includes(cartelera_theme)) return res.status(400).json({ error: 'PLANTILLA_INVALIDA' });
 
   const db = getDb();
   const cur = (await db.execute({ sql: `SELECT * FROM business_settings WHERE id = 1`, args: [] })).rows[0] || {};

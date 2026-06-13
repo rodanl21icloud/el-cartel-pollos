@@ -63,9 +63,13 @@ export default function Ajustes({ role }) {
       <label className="block font-bold text-zinc-700 mb-1">Plantilla de cartelera (TV)</label>
       <select value={f.cartelera_theme || 'western'} onChange={(e) => setF({ ...f, cartelera_theme: e.target.value })}
         className="w-full mb-3 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none">
-        <option value="western">Western (dorado · Rye)</option>
+        <option value="western">Western (ámbar · Rye)</option>
         <option value="rojo">Rojo (Rye)</option>
+        <option value="dorado">Dorado premium (Rye)</option>
+        <option value="brasa">Brasa (naranja · Rye)</option>
         <option value="moderno">Moderno (cian · sans)</option>
+        <option value="verde">Verde fresco (sans)</option>
+        <option value="azul">Azul corporativo (sans)</option>
         <option value="minimal">Minimal (claro · sans)</option>
       </select>
 
