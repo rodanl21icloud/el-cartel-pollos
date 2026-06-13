@@ -417,12 +417,23 @@ function NewProduct({ onSave, existingCats }) {
   const [price, setPrice] = useState('');
   const [category, setCategory] = useState('POLLO');
   const [imageUrl, setImageUrl] = useState('');
+  const [cost, setCost] = useState('');
+  const [sku, setSku] = useState('');
+  const [taxRate, setTaxRate] = useState('');
+  const [trackInv, setTrackInv] = useState(false);
   const nameErr = validarNombreProducto(name);          // '' si es válido
+
+  const margen = Number(price) > 0 ? Math.round((1 - (Number(cost) || 0) / Number(price)) * 100) : null;
 
   function submit() {
     setTouched(true);
     if (nameErr) return;                                 // bloquea el submit si el nombre es inválido
-    onSave({ name: name.trim(), price: Number(price || 0), category, image_url: imageUrl.trim() || undefined });
+    onSave({
+      name: name.trim(), price: Number(price || 0), category,
+      image_url: imageUrl.trim() || undefined,
+      cost: Number(cost || 0), tax_rate: Number(taxRate || 0),
+      track_inventory: trackInv, sku: sku.trim() || undefined,
+    });
   }
   return (
     <div className="bg-white rounded-2xl p-4 shadow space-y-2">
@@ -439,8 +450,23 @@ function NewProduct({ onSave, existingCats }) {
           <datalist id="cats-new">{[...new Set([...CAT_ORDER, ...(existingCats || []), 'OTROS'])].map((c) => <option key={c} value={c} />)}</datalist>
         </div>
       </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <input type="number" min="0" placeholder="Costo (si no usas receta)" value={cost} onChange={(e) => setCost(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
+          {margen != null && cost !== '' && <p className="text-[11px] text-zinc-500 mt-0.5">Margen ≈ {margen}%</p>}
+        </div>
+        <input type="number" min="0" max="100" placeholder="Impuesto base %" value={taxRate} onChange={(e) => setTaxRate(e.target.value)}
+          className="px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
+      </div>
+      <input placeholder="Código de referencia (SKU) — opcional" value={sku} onChange={(e) => setSku(e.target.value)}
+        className="w-full px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
       <input placeholder="URL de foto (opcional)" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)}
         className="w-full px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
+      <label className="flex items-center gap-2 text-sm font-semibold text-zinc-700 px-1 py-1">
+        <input type="checkbox" checked={trackInv} onChange={(e) => setTrackInv(e.target.checked)} />
+        Agregar al inventario <span className="text-xs text-zinc-400 font-normal">(productos que llevas en stock directo)</span>
+      </label>
       <button onClick={submit} disabled={!!nameErr}
         className="w-full btn-pos bg-cartel text-white disabled:opacity-50 disabled:cursor-not-allowed">Crear plato</button>
     </div>
@@ -562,10 +588,14 @@ async function fileToDataUrl(file) {
   return c.toDataURL('image/jpeg', 0.78);
 }
 
-// Editar foto (subir archivo o URL) y categoría de un producto.
+// Editar foto, categoría, costo, SKU, impuesto e inventario de un producto.
 function EditModal({ p, cats, onClose, onSave }) {
   const [url, setUrl] = useState(p.image_url || '');
   const [category, setCategory] = useState(p.category);
+  const [cost, setCost] = useState(p.cost != null ? String(p.cost) : '');
+  const [sku, setSku] = useState(p.sku || '');
+  const [taxRate, setTaxRate] = useState(p.tax_rate != null ? String(p.tax_rate) : '');
+  const [trackInv, setTrackInv] = useState(!!p.track_inventory);
   const [busy, setBusy] = useState(false);
   async function pickFile(e) {
     const f = e.target.files?.[0]; if (!f) return;
@@ -575,7 +605,7 @@ function EditModal({ p, cats, onClose, onSave }) {
   }
   return (
     <div className="fixed inset-0 z-50 bg-black/50 grid place-items-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-3 max-h-[88vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
         <h3 className="font-black text-lg">{p.name}</h3>
         <div className="flex items-center gap-3">
           {url ? <img src={url} alt="" className="w-20 h-20 rounded-xl object-cover bg-zinc-100" /> : <div className="w-20 h-20 rounded-xl bg-zinc-100 grid place-items-center text-2xl">🍗</div>}
@@ -592,10 +622,31 @@ function EditModal({ p, cats, onClose, onSave }) {
             className="w-full mt-1 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none font-bold" />
           <datalist id="cats-edit">{cats.map((c) => <option key={c} value={c} />)}</datalist>
         </label>
-        <p className="text-[11px] text-zinc-400">Escribe un nombre nuevo para crear una categoría.</p>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block text-xs font-bold text-zinc-500">Costo {p.has_recipe && <span className="text-zinc-400 font-normal">(usa receta)</span>}
+            <input type="number" min="0" value={cost} onChange={(e) => setCost(e.target.value)} disabled={p.has_recipe} placeholder="0"
+              className="w-full mt-1 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none disabled:bg-zinc-100" />
+          </label>
+          <label className="block text-xs font-bold text-zinc-500">Impuesto base %
+            <input type="number" min="0" max="100" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} placeholder="0"
+              className="w-full mt-1 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
+          </label>
+        </div>
+        <label className="block text-xs font-bold text-zinc-500">Código de referencia (SKU)
+          <input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="SKU"
+            className="w-full mt-1 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
+        </label>
+        <label className="flex items-center gap-2 text-sm font-semibold text-zinc-700">
+          <input type="checkbox" checked={trackInv} onChange={(e) => setTrackInv(e.target.checked)} />
+          Agregar al inventario
+        </label>
         <div className="flex gap-2">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-zinc-100 font-bold">Cancelar</button>
-          <button disabled={busy} onClick={() => onSave({ image_url: url.trim() || null, category: category.trim() })}
+          <button disabled={busy} onClick={() => onSave({
+            image_url: url.trim() || null, category: category.trim(),
+            cost: Number(cost || 0), tax_rate: Number(taxRate || 0),
+            track_inventory: trackInv, sku: sku.trim() || undefined,
+          })}
             className="flex-1 py-2.5 rounded-xl bg-cartel text-white font-black disabled:opacity-50">Guardar</button>
         </div>
       </div>

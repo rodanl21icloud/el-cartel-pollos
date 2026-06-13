@@ -239,7 +239,17 @@ async function delIngredient(i, reload, flash, setError) {
 
 function NewIngredient({ onDone, onError }) {
   const [f, setF] = useState({ name: '', unit: 'unidad', stock_qty: '', min_stock_qty: '', cost_unit: '' });
+  const [pedido, setPedido] = useState({ qty: '', total: '' }); // último pedido -> calcula costo unitario
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  // Al cambiar el último pedido, recalcula el costo unitario automáticamente.
+  function setPed(k) {
+    return (e) => {
+      const np = { ...pedido, [k]: e.target.value };
+      setPedido(np);
+      const q = Number(np.qty), t = Number(np.total);
+      if (q > 0 && t >= 0) setF((cur) => ({ ...cur, cost_unit: String(Math.round((t / q) * 100) / 100) }));
+    };
+  }
   async function save() {
     onError('');
     try {
@@ -258,15 +268,36 @@ function NewIngredient({ onDone, onError }) {
       <input placeholder="Nombre del insumo" value={f.name} onChange={set('name')}
         className="w-full px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
       <div className="grid grid-cols-2 gap-2">
-        <select value={f.unit} onChange={set('unit')} className="px-3 py-2 rounded-xl border-2 border-zinc-200 outline-none">
-          {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
-        </select>
-        <input type="number" min="0" placeholder="Costo unitario" value={f.cost_unit} onChange={set('cost_unit')}
-          className="px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
-        <input type="number" min="0" placeholder="Stock inicial" value={f.stock_qty} onChange={set('stock_qty')}
-          className="px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
-        <input type="number" min="0" placeholder="Stock mínimo (alerta)" value={f.min_stock_qty} onChange={set('min_stock_qty')}
-          className="px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
+        <label className="text-xs font-bold text-zinc-500">Unidad de medida
+          <select value={f.unit} onChange={set('unit')} className="w-full mt-1 px-3 py-2 rounded-xl border-2 border-zinc-200 outline-none">
+            {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+          </select>
+        </label>
+        <label className="text-xs font-bold text-zinc-500">Cantidad disponible
+          <input type="number" placeholder="0" value={f.stock_qty} onChange={set('stock_qty')}
+            className="w-full mt-1 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
+        </label>
+      </div>
+      {/* Último pedido -> calcula el costo unitario solo (como Treinta) */}
+      <div className="bg-zinc-50 rounded-xl p-3 grid grid-cols-2 gap-2">
+        <label className="text-xs font-bold text-zinc-500">¿Cuántas compraste el último pedido?
+          <input type="number" min="0" placeholder="0" value={pedido.qty} onChange={setPed('qty')}
+            className="w-full mt-1 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
+        </label>
+        <label className="text-xs font-bold text-zinc-500">¿Cuánto te costó ese pedido?
+          <input type="number" min="0" placeholder="$0" value={pedido.total} onChange={setPed('total')}
+            className="w-full mt-1 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
+        </label>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="text-xs font-bold text-zinc-500">Costo unitario
+          <input type="number" min="0" placeholder="0" value={f.cost_unit} onChange={set('cost_unit')}
+            className="w-full mt-1 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
+        </label>
+        <label className="text-xs font-bold text-zinc-500">Stock mínimo (alerta)
+          <input type="number" min="0" placeholder="0" value={f.min_stock_qty} onChange={set('min_stock_qty')}
+            className="w-full mt-1 px-3 py-2 rounded-xl border-2 border-zinc-200 focus:border-cartel outline-none" />
+        </label>
       </div>
       <button onClick={save} className="w-full btn-pos bg-cartel text-white">Crear insumo</button>
     </div>

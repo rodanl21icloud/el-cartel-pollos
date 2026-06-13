@@ -82,6 +82,9 @@ CREATE TABLE IF NOT EXISTS products (
   name            TEXT NOT NULL,
   price           REAL NOT NULL CHECK (price >= 0),
   category        TEXT NOT NULL DEFAULT 'COMBO',
+  cost            REAL NOT NULL DEFAULT 0,          -- costo manual (Treinta); se usa si no hay receta BOM
+  tax_rate        REAL NOT NULL DEFAULT 0,          -- impuesto base % (informativo)
+  track_inventory INTEGER NOT NULL DEFAULT 0 CHECK (track_inventory IN (0,1)), -- "agregar al inventario"
   image_url       TEXT,                             -- URL de la foto del producto
   description     TEXT,                             -- descripción para el catálogo público
   is_active       INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0,1)),

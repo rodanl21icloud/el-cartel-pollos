@@ -29,41 +29,56 @@ export async function listCatalog(_req, res) {
   const db = getDb();
   const { rows } = await db.execute({
     sql: `SELECT p.id, p.sku, p.name, p.price, p.category, p.is_active, p.image_url, p.in_catalog, p.available,
+                 p.cost AS cost_manual, p.tax_rate, p.track_inventory,
                  COALESCE((SELECT SUM(pr.qty_per_unit * i.cost_unit)
                            FROM product_recipes pr JOIN ingredients i ON i.id = pr.ingredient_id
-                           WHERE pr.product_id = p.id), 0) AS costo,
+                           WHERE pr.product_id = p.id), 0) AS costo_receta,
                  (SELECT COUNT(*) FROM product_recipes pr WHERE pr.product_id = p.id) AS recipe_lines
           FROM products p WHERE p.is_active = 1
           ORDER BY p.category, p.name`,
     args: [],
   });
   return res.json(rows.map((r) => {
-    const price = Number(r.price); const costo = Math.round(Number(r.costo) * 100) / 100;
+    const price = Number(r.price);
+    const hasRecipe = Number(r.recipe_lines) > 0;
+    const costManual = Math.round(Number(r.cost_manual || 0) * 100) / 100;
+    // Costo efectivo: receta (BOM) si la tiene; si no, el costo manual estilo Treinta.
+    const costo = hasRecipe ? Math.round(Number(r.costo_receta) * 100) / 100 : costManual;
     const ganancia = Math.round((price - costo) * 100) / 100;
     return {
       id: r.id, sku: r.sku, name: r.name, price, category: r.category, image_url: r.image_url,
       in_catalog: r.in_catalog == null ? true : !!r.in_catalog,
       available: r.available == null ? true : !!r.available,
+      cost: costManual, tax_rate: Number(r.tax_rate || 0), track_inventory: !!r.track_inventory,
       costo, ganancia, margen: price > 0 ? Math.round((ganancia / price) * 100) : 0,
-      has_recipe: Number(r.recipe_lines) > 0,
+      has_recipe: hasRecipe,
     };
   }));
 }
 
-/** POST /api/products  Body: { name, price, category?, sku?, image_url? } */
+// Saneo de números opcionales (>= 0). Devuelve null si no vino el campo.
+const num0 = (v) => (v == null ? null : (Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : NaN));
+
+/** POST /api/products  Body: { name, price, category?, sku?, image_url?, cost?, tax_rate?, track_inventory? } */
 export async function createProduct(req, res) {
-  const { name, price, category = 'COMBO', sku, image_url } = req.body || {};
+  const { name, price, category = 'COMBO', sku, image_url,
+          cost, tax_rate, track_inventory } = req.body || {};
   if (nombreInvalido(name)) return res.status(400).json({ error: 'NOMBRE_INVALIDO' });
   if (typeof price !== 'number' || !Number.isFinite(price) || price < 0) return res.status(400).json({ error: 'PRECIO_INVALIDO' });
+  const costV = num0(cost), taxV = num0(tax_rate);
+  if (Number.isNaN(costV)) return res.status(400).json({ error: 'COSTO_INVALIDO' });
+  if (Number.isNaN(taxV)) return res.status(400).json({ error: 'IMPUESTO_INVALIDO' });
 
   const db = getDb();
   const id = randomUUID();
   const finalSku = (sku && String(sku).trim()) || `PRD-${randomBytes(3).toString('hex').toUpperCase()}`;
   try {
     await db.execute({
-      sql: `INSERT INTO products (id, sku, name, price, category, image_url) VALUES (?,?,?,?,?,?)`,
+      sql: `INSERT INTO products (id, sku, name, price, category, image_url, cost, tax_rate, track_inventory)
+            VALUES (?,?,?,?,?,?,?,?,?)`,
       args: [id, finalSku, String(name).trim(), price, String(category).trim() || 'COMBO',
-             image_url ? String(image_url).trim() : null],
+             image_url ? String(image_url).trim() : null,
+             costV ?? 0, taxV ?? 0, track_inventory ? 1 : 0],
     });
   } catch (e) {
     if (String(e.message).includes('UNIQUE')) return res.status(409).json({ error: 'SKU_DUPLICADO' });
@@ -74,10 +89,11 @@ export async function createProduct(req, res) {
   return res.status(201).json({ id, sku: finalSku, name: String(name).trim(), price, category, is_active: 1 });
 }
 
-/** PUT /api/products/:id  — edita precio / nombre / estado / foto. */
+/** PUT /api/products/:id  — edita precio / nombre / estado / foto / costo / impuesto / sku. */
 export async function updateProduct(req, res) {
   const { id } = req.params;
-  const { name, price, is_active, image_url, in_catalog, available, description, category } = req.body || {};
+  const { name, price, is_active, image_url, in_catalog, available, description, category,
+          cost, tax_rate, track_inventory, sku } = req.body || {};
 
   const db = getDb();
   const cur = await db.execute({ sql: `SELECT * FROM products WHERE id = ?`, args: [id] });
@@ -90,6 +106,9 @@ export async function updateProduct(req, res) {
   if (name !== undefined && nombreInvalido(name)) {
     return res.status(400).json({ error: 'NOMBRE_INVALIDO' });
   }
+  const costV = num0(cost), taxV = num0(tax_rate);
+  if (Number.isNaN(costV)) return res.status(400).json({ error: 'COSTO_INVALIDO' });
+  if (Number.isNaN(taxV)) return res.status(400).json({ error: 'IMPUESTO_INVALIDO' });
 
   const next = {
     name: name ?? cur.rows[0].name,
@@ -100,12 +119,24 @@ export async function updateProduct(req, res) {
     available: available != null ? (available ? 1 : 0) : (cur.rows[0].available == null ? 1 : cur.rows[0].available),
     description: description !== undefined ? (description ? String(description).trim() : null) : cur.rows[0].description,
     category: category !== undefined && String(category).trim() ? String(category).trim().toUpperCase() : cur.rows[0].category,
+    cost: costV != null ? costV : (cur.rows[0].cost ?? 0),
+    tax_rate: taxV != null ? taxV : (cur.rows[0].tax_rate ?? 0),
+    track_inventory: track_inventory != null ? (track_inventory ? 1 : 0) : (cur.rows[0].track_inventory ?? 0),
+    sku: sku !== undefined && String(sku).trim() ? String(sku).trim() : cur.rows[0].sku,
   };
 
-  await db.execute({
-    sql: `UPDATE products SET name = ?, price = ?, is_active = ?, image_url = ?, in_catalog = ?, available = ?, description = ?, category = ?, updated_at = datetime('now') WHERE id = ?`,
-    args: [next.name, next.price, next.is_active, next.image_url, next.in_catalog, next.available, next.description, next.category, id],
-  });
+  try {
+    await db.execute({
+      sql: `UPDATE products SET name = ?, price = ?, is_active = ?, image_url = ?, in_catalog = ?, available = ?,
+              description = ?, category = ?, cost = ?, tax_rate = ?, track_inventory = ?, sku = ?, updated_at = datetime('now')
+            WHERE id = ?`,
+      args: [next.name, next.price, next.is_active, next.image_url, next.in_catalog, next.available,
+             next.description, next.category, next.cost, next.tax_rate, next.track_inventory, next.sku, id],
+    });
+  } catch (e) {
+    if (String(e.message).includes('UNIQUE')) return res.status(409).json({ error: 'SKU_DUPLICADO' });
+    throw e;
+  }
   // Historial de precio (solo si cambió).
   if (price != null && Number(next.price) !== Number(cur.rows[0].price)) {
     await db.execute({
