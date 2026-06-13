@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { api, setToken, clearToken, getToken } from './lib/api.js';
-import { setSessionKey } from './lib/crypto.js';
-import { NAV, ALL_ITEMS, itemByKey } from './config/nav.js';
+import { getToken } from './lib/api.js';
+import { useSession } from './store/session.js';
+import { NAV, itemByKey } from './config/nav.js';
 import { Icon } from './config/icons.jsx';
 import { roleLabel } from './config/roles.js';
 import { BRAND_NAME, IS_DEFAULT_BRAND, brandLines, BRAND_LOGO } from './config/brand.js';
@@ -49,12 +49,10 @@ export default function App() {
   const location = useLocation();
   // La pantalla activa se deriva de la URL (primer segmento). '/' -> 'home'.
   const screen = location.pathname === '/' ? 'home' : location.pathname.split('/')[1];
-  const [user, setUser] = useState(null);
-  const [perms, setPerms] = useState({});
+  // Sesión + permisos centralizados en el store global (zustand).
+  const { user, perms, booting, sessionMsg, setSessionMsg, restore, login, logout } = useSession();
   const [online, setOnline] = useState(navigator.onLine);
   const [drawer, setDrawer] = useState(false);
-  const [booting, setBooting] = useState(true);
-  const [sessionMsg, setSessionMsg] = useState('');
   const idleTimer = useRef(null);
 
   useEffect(() => {
@@ -64,44 +62,12 @@ export default function App() {
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
   }, []);
 
-  // Restaurar la sesión al recargar (sin re-login) si el JWT sigue vigente.
-  useEffect(() => {
-    (async () => {
-      try {
-        const token = getToken();
-        const su = JSON.parse(localStorage.getItem('user') || 'null');
-        const ss = JSON.parse(localStorage.getItem('session') || 'null');
-        if (token && su && ss) {
-          const me = await api('/permissions/me'); // valida el JWT
-          await setSessionKey(ss.id, ss.key);       // restaura clave HMAC
-          setPerms(me.permissions); setUser(su);
-          // La URL actual se conserva (deep-link / refresh mantiene la pantalla).
-        }
-      } catch { clearToken(); localStorage.removeItem('user'); localStorage.removeItem('session'); }
-      finally { setBooting(false); }
-    })();
-  }, []);
+  // Restaurar la sesión al recargar (la URL actual se conserva: deep-link / refresh).
+  useEffect(() => { restore(); }, [restore]);
 
   async function handleLogin(username, password) {
-    const data = await api('/auth/login', { method: 'POST', body: { username, password } });
-    setToken(data.token);
-    await setSessionKey(data.session.id, data.session.key);
-    localStorage.setItem('user', JSON.stringify(data.user));
-    localStorage.setItem('session', JSON.stringify(data.session));
-    const me = await api('/permissions/me');
-    setPerms(me.permissions);
-    setUser(data.user);
-    const first = ALL_ITEMS.find((n) => me.permissions[n.perm]);
-    navigate(first ? `/${first.key}` : '/');
-  }
-  function logout(msg = '') {
-    // Avisa al server para REVOCAR la clave HMAC (best-effort; el cierre local procede igual).
-    try {
-      const ss = JSON.parse(localStorage.getItem('session') || 'null');
-      if (getToken() && ss?.id) api('/auth/logout', { method: 'POST', body: { sessionId: ss.id } }).catch(() => {});
-    } catch { /* el cierre local procede igual */ }
-    clearToken(); localStorage.removeItem('user'); localStorage.removeItem('session');
-    setUser(null); setPerms({}); setSessionMsg(msg); navigate('/');
+    const path = await login(username, password);
+    navigate(path);
   }
   function go(key) { navigate(key === 'home' ? '/' : `/${key}`); setDrawer(false); }
 
@@ -110,7 +76,7 @@ export default function App() {
     const onExpired = () => { if (getToken()) logout('Tu sesión expiró. Inicia sesión de nuevo.'); };
     window.addEventListener('session-expired', onExpired);
     return () => window.removeEventListener('session-expired', onExpired);
-  }, []);
+  }, [logout]);
   useEffect(() => {
     if (!user) return;
     const reset = () => {
