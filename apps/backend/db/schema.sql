@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS business_settings (
   admin_pin_hash TEXT,                              -- PIN de administrador (bcrypt) para ajustes de stock
   pickup_enabled   INTEGER NOT NULL DEFAULT 1 CHECK (pickup_enabled IN (0,1)),   -- retiro en tienda
   delivery_enabled INTEGER NOT NULL DEFAULT 1 CHECK (delivery_enabled IN (0,1)), -- entrega a domicilio
+  loyalty_cashback_pct REAL NOT NULL DEFAULT 5,     -- % de cashback abonado a la billetera del cliente (0..100)
   updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

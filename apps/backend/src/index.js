@@ -30,6 +30,7 @@ import { bankSummary, bankMovements, addBankMovement, reconcileMovement, reconci
 import { listUsers, createUser, updateUser, resetPassword } from './controllers/users.js';
 import { listDispatch, updateDispatchStatus } from './controllers/dispatch.js';
 import { getPublicCatalog } from './controllers/publicCatalog.js';
+import { getPublicWallet } from './controllers/publicLoyalty.js';
 import { getReviews } from './controllers/reviews.js';
 import { chat } from './controllers/chat.js';
 import { deliveryQuote } from './controllers/delivery.js';
@@ -58,6 +59,8 @@ app.post('/api/auth/login', rateLimit({ windowMs: 5 * 60_000, max: 30 }), login)
 
 // Catálogo público compartible (sin JWT). Solo datos de vitrina.
 app.get('/api/public/catalog/:slug', getPublicCatalog);
+// Billetera de fidelización del cliente (consulta por teléfono). Rate-limit anti-enumeración.
+app.get('/api/public/clients/:phone/wallet', rateLimit({ windowMs: 60_000, max: 20 }), getPublicWallet);
 app.get('/api/public/reviews', getReviews);
 app.post('/api/public/chat', chat); // chatbot de ventas (público)
 app.get('/api/public/delivery-quote', deliveryQuote); // cotización de despacho

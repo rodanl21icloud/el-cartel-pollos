@@ -7,7 +7,6 @@ import { randomUUID } from 'node:crypto';
 import { getDb } from '../../db.js';
 
 const round0 = (n) => Math.round(n || 0);
-const POINTS_PER_CLP = 1000; // 1 punto por cada $1.000 gastados (ajustable).
 const DORMANT_DAYS = 45;
 const VIP_ORDERS = 5;
 const FREQ_ORDERS = 3;
@@ -166,10 +165,33 @@ export async function loyaltyOverview() {
   const totals = (await db.execute(`SELECT COUNT(*) n, COALESCE(SUM(points),0) pts FROM loyalty_accounts`)).rows[0];
   return { miembros: Number(totals.n), puntos_totales: Number(totals.pts), cuentas: rows };
 }
-const tierOf = (pts) => (pts >= 1000 ? 'ORO' : pts >= 300 ? 'PLATA' : 'BRONCE');
+// --- Cashback de fidelización (1 punto = $1 CLP; % configurable) ---
+const DEFAULT_CASHBACK_PCT = 5;
+const TIER_PLATA = 15000;  // CLP de cashback acumulado (≈ $300k gastados al 5%)
+const TIER_ORO = 50000;    // (≈ $1.000.000 gastados al 5%)
+
+async function cashbackPct(db) {
+  try {
+    const r = (await db.execute(`SELECT loyalty_cashback_pct FROM business_settings WHERE id=1`)).rows[0];
+    const p = Number(r?.loyalty_cashback_pct);
+    return Number.isFinite(p) && p >= 0 && p <= 100 ? p : DEFAULT_CASHBACK_PCT;
+  } catch { return DEFAULT_CASHBACK_PCT; }
+}
+
+// Tier por acumulado histórico (SUM de EARN), NO por saldo: no baja al canjear.
+async function tierFor(db, clientId) {
+  const r = (await db.execute({
+    sql: `SELECT COALESCE(SUM(points),0) e FROM loyalty_transactions WHERE client_id=? AND type='EARN'`,
+    args: [clientId],
+  })).rows[0];
+  const lifetime = Number(r?.e || 0);
+  return lifetime >= TIER_ORO ? 'ORO' : lifetime >= TIER_PLATA ? 'PLATA' : 'BRONCE';
+}
+
+const firstName = (n) => String(n || 'Cliente').trim().split(/\s+/)[0];
 
 /**
- * Devengo automático de puntos al confirmar una venta con cliente.
+ * Devengo de cashback al confirmar una venta con cliente.
  * Idempotente por venta (no duplica si la venta se sincroniza dos veces).
  * NO debe lanzar: se invoca como efecto secundario no-crítico de la venta.
  */
@@ -178,20 +200,48 @@ export async function accrueForSale({ clientId, saleId, total }) {
   const db = getDb();
   const ya = (await db.execute({ sql: `SELECT id FROM loyalty_transactions WHERE sale_id=? AND type='EARN'`, args: [saleId] })).rows[0];
   if (ya) return null; // ya devengado para esta venta
-  const pts = Math.floor(Number(total) / POINTS_PER_CLP);
+  const pct = await cashbackPct(db);
+  const pts = Math.round(Number(total) * pct / 100);
   if (pts <= 0) return null;
   await db.execute({
     sql: `INSERT INTO loyalty_accounts (client_id, points) VALUES (?, ?)
           ON CONFLICT(client_id) DO UPDATE SET points = loyalty_accounts.points + ?, updated_at=datetime('now')`,
     args: [clientId, pts, pts],
   });
-  const acc = (await db.execute({ sql: `SELECT points FROM loyalty_accounts WHERE client_id=?`, args: [clientId] })).rows[0];
-  await db.execute({ sql: `UPDATE loyalty_accounts SET tier=? WHERE client_id=?`, args: [tierOf(Number(acc.points)), clientId] });
   await db.execute({
     sql: `INSERT INTO loyalty_transactions (id, client_id, type, points, sale_id, reason) VALUES (?,?, 'EARN', ?, ?, ?)`,
-    args: [randomUUID(), clientId, pts, saleId, `Venta ${saleId}`],
+    args: [randomUUID(), clientId, pts, saleId, `Cashback ${pct}%`],
   });
-  return { client_id: clientId, earned: pts, points: Number(acc.points) };
+  const tier = await tierFor(db, clientId);
+  await db.execute({ sql: `UPDATE loyalty_accounts SET tier=? WHERE client_id=?`, args: [tier, clientId] });
+  const acc = (await db.execute({ sql: `SELECT points FROM loyalty_accounts WHERE client_id=?`, args: [clientId] })).rows[0];
+  return { client_id: clientId, earned: pts, points: Number(acc.points), tier };
+}
+
+/**
+ * Billetera PÚBLICA por teléfono (match por últimos 8 dígitos).
+ * Expone solo primer nombre + saldo + tier + últimos movimientos (privacidad).
+ */
+export async function walletByPhone(phone) {
+  const db = getDb();
+  const digits = String(phone || '').replace(/\D/g, '');
+  if (digits.length < 8) { const e = new Error('TELEFONO_INVALIDO'); e.status = 400; throw e; }
+  const pct = await cashbackPct(db);
+  const c = (await db.execute({
+    sql: `SELECT c.id, c.name, COALESCE(la.points,0) points, COALESCE(la.tier,'BRONCE') tier
+          FROM clients c LEFT JOIN loyalty_accounts la ON la.client_id=c.id
+          WHERE REPLACE(REPLACE(c.phone,'+',''),' ','') LIKE ? LIMIT 1`,
+    args: [`%${digits.slice(-8)}`],
+  })).rows[0];
+  if (!c) return { found: false, points: 0, tier: 'BRONCE', cashback_pct: pct };
+  const tx = (await db.execute({
+    sql: `SELECT type, points, reason, created_at FROM loyalty_transactions WHERE client_id=? ORDER BY created_at DESC LIMIT 10`,
+    args: [c.id],
+  })).rows;
+  return {
+    found: true, name: firstName(c.name), points: Number(c.points), tier: c.tier, cashback_pct: pct,
+    movements: tx.map((t) => ({ type: t.type, points: Number(t.points), reason: t.reason, at: t.created_at })),
+  };
 }
 export async function loyaltyMove({ clientId, type, points, reason, userId }) {
   const db = getDb();
@@ -203,11 +253,12 @@ export async function loyaltyMove({ clientId, type, points, reason, userId }) {
           ON CONFLICT(client_id) DO UPDATE SET points = MAX(0, loyalty_accounts.points + ?), updated_at=datetime('now')`,
     args: [clientId, Math.max(0, delta), delta],
   });
-  const acc = (await db.execute({ sql: `SELECT points FROM loyalty_accounts WHERE client_id=?`, args: [clientId] })).rows[0];
-  await db.execute({ sql: `UPDATE loyalty_accounts SET tier=? WHERE client_id=?`, args: [tierOf(Number(acc.points)), clientId] });
   await db.execute({
     sql: `INSERT INTO loyalty_transactions (id, client_id, type, points, reason, created_by) VALUES (?,?,?,?,?,?)`,
     args: [randomUUID(), clientId, type, delta, reason || null, userId || null],
   });
-  return { client_id: clientId, points: Number(acc.points), tier: tierOf(Number(acc.points)) };
+  const acc = (await db.execute({ sql: `SELECT points FROM loyalty_accounts WHERE client_id=?`, args: [clientId] })).rows[0];
+  const tier = await tierFor(db, clientId);
+  await db.execute({ sql: `UPDATE loyalty_accounts SET tier=? WHERE client_id=?`, args: [tier, clientId] });
+  return { client_id: clientId, points: Number(acc.points), tier };
 }
