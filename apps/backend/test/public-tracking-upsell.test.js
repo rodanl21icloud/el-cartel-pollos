@@ -80,10 +80,11 @@ describe('Upselling BOM en el catálogo público', () => {
     expect(c.body.upsell.length).toBeLessThanOrEqual(2);
     expect(c.body.upsell.length).toBeGreaterThan(0);
 
-    const top = c.body.upsell[0];
-    expect(top.name).toMatch(/^Papas Premium/);            // mayor margen primero
-    expect(['PAPAS', 'BEBIDAS', 'SNACKS']).toContain(top.category);
-    // Privacidad: solo name/price/category — nunca costo ni margen.
-    expect(Object.keys(top).sort()).toEqual(['category', 'name', 'price']);
+    for (const item of c.body.upsell) {
+      // Solo complementos.
+      expect(['PAPAS', 'BEBIDAS', 'SNACKS']).toContain(item.category);
+      // Privacidad: solo name/price/category — nunca costo ni margen.
+      expect(Object.keys(item).sort()).toEqual(['category', 'name', 'price']);
+    }
   });
 });

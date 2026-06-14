@@ -22,7 +22,7 @@ import { expensesAudit, expenseAuditReview } from './controllers/financeExpenseA
 import { taxForecast, createSimulation, readSimulation, readTaxConfig, updateTaxConfig } from './controllers/financeTax.js';
 import { liquidity, liquidityScenario, liquidityPolicy } from './controllers/financeLiquidity.js';
 import { opsToday, opsEvaluate, opsChecklist, opsChecklistUpdate, opsCriticalInventory, opsOpenDay, opsCloseDay, opsTasks, opsCreateTask, opsUpdateTask, opsGetConfig, opsSetConfig } from './controllers/ops.js';
-import { mktDashboard, mktCustomers, mktReports, mktCampaigns, mktCreateCampaign, mktUpdateCampaign, mktLoyalty, mktLoyaltyMove } from './controllers/marketing.js';
+import { mktDashboard, mktCustomers, mktReports, mktCampaigns, mktCreateCampaign, mktUpdateCampaign, mktLoyalty, mktLoyaltyMove, mktWinback } from './controllers/marketing.js';
 import { getPermissions, myPermissions, updatePermission } from './controllers/permissions.js';
 import { listGroups, createGroup, deleteGroup, createOption, deleteOption, setGroupProducts, getProductModifiers } from './controllers/modifiers.js';
 import { listClients, createClient, clientHistory } from './controllers/clients.js';
@@ -226,6 +226,7 @@ app.post('/api/marketing/campaigns',      requirePermission('settings.manage'), 
 app.patch('/api/marketing/campaigns/:id', requirePermission('settings.manage'), mktUpdateCampaign);
 app.get('/api/marketing/loyalty',         requirePermission('reports.view'), mktLoyalty);
 app.post('/api/marketing/loyalty/:clientId', requirePermission('settings.manage'), mktLoyaltyMove);
+app.get('/api/marketing/winback',         requirePermission('reports.view'), mktWinback);
 
 // Conciliación bancaria
 app.get('/api/bank/summary', requirePermission('reports.view'), bankSummary);

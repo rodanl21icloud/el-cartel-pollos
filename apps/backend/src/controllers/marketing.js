@@ -3,9 +3,19 @@ import {
   dashboard, customers, reports, listCampaigns, createCampaign, updateCampaign,
   loyaltyOverview, loyaltyMove,
 } from '../services/marketing/commercial.js';
+import { draftWinbacks } from '../services/marketing/winback.js';
 import { writeAudit } from '../services/audit.js';
 
 const range = (q) => ({ from: q.from || null, to: q.to || null });
+
+/** GET /api/marketing/winback — borradores de recuperación de clientes dormidos. */
+export async function mktWinback(req, res) {
+  const { min_days, max_days, limit } = req.query;
+  const out = await draftWinbacks({
+    minDays: Number(min_days) || 15, maxDays: Number(max_days) || 60, limit: Number(limit) || 50,
+  });
+  return res.json(out);
+}
 
 export async function mktDashboard(req, res) { res.json(await dashboard(range(req.query))); }
 export async function mktCustomers(req, res) { res.json(await customers({ segment: req.query.segment || null })); }
