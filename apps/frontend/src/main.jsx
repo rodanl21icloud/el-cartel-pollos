@@ -4,6 +4,8 @@ import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom';
 import App from './App.jsx';
 import PublicCatalog from './screens/PublicCatalog.jsx';
 import PublicCartelera from './screens/PublicCartelera.jsx';
+import PublicTracking from './screens/PublicTracking.jsx';
+import PublicWallet from './screens/PublicWallet.jsx';
 import { BRAND_NAME } from './config/brand.js';
 import './index.css';
 
@@ -17,6 +19,7 @@ document.title = `${BRAND_NAME} — POS`;
 // /cartelera sin slug caen al shell autenticado (rutas internas homónimas).
 function CatalogRoute() { const { slug } = useParams(); return <PublicCatalog slug={decodeURIComponent(slug)} />; }
 function CarteleraRoute() { const { slug } = useParams(); return <PublicCartelera slug={decodeURIComponent(slug)} />; }
+function TrackingRoute() { const { orderNumber } = useParams(); return <PublicTracking orderNumber={decodeURIComponent(orderNumber)} />; }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -27,6 +30,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <Route path="/carta/:slug" element={<CatalogRoute />} />
         <Route path="/cartelera/:slug" element={<CarteleraRoute />} />
         <Route path="/tv/:slug" element={<CarteleraRoute />} />
+        <Route path="/seguimiento/:orderNumber" element={<TrackingRoute />} />
+        <Route path="/pedido/:orderNumber" element={<TrackingRoute />} />
+        <Route path="/billetera" element={<PublicWallet />} />
         <Route path="/*" element={<App />} />
       </Routes>
     </BrowserRouter>

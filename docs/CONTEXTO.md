@@ -147,6 +147,14 @@ fija el negocio y crea el usuario gerencia). Guía: `docs/NUEVA-INSTANCIA.md`.
 
 ## 8. Despliegue
 
+> **`AUDIT_CHAIN_SECRET` (cadena antifraude).** Las instancias **existentes** (El Cartel,
+> El Pollo de la Tía) usan a propósito el *fallback* a `JWT_SECRET`: como `audit_logs` es
+> append-only y sus registros ya se hashearon con ese secreto, fijar un `AUDIT_CHAIN_SECRET`
+> distinto haría que `verifyAuditChain` reportara una ruptura permanente en todo lo previo
+> (los hashes viejos no se pueden recomputar). En **instancias NUEVAS**, en cambio, definir
+> un `AUDIT_CHAIN_SECRET` dedicado **desde el día cero** (antes del primer registro) para
+> separar la firma JWT de la cadena de auditoría.
+
 - Render lee `render.yaml` (El Cartel) y `render.pollo-tia.yaml` (El Pollo de la Tía)
   desde `main`. Cada servicio: build de la PWA + servidor que expone API y PWA en el
   mismo dominio; base Turso por variables (`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`).

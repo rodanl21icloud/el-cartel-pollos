@@ -25,6 +25,7 @@ const Cuadre = lazy(() => import('./screens/Cuadre.jsx'));
 const Finanzas = lazy(() => import('./screens/Finanzas.jsx'));
 const CentroOperaciones = lazy(() => import('./screens/CentroOperaciones.jsx'));
 const Comercial = lazy(() => import('./screens/Comercial.jsx'));
+const Winback = lazy(() => import('./screens/Winback.jsx'));
 const Banco = lazy(() => import('./screens/Banco.jsx'));
 const Ventas = lazy(() => import('./screens/Ventas.jsx'));
 const VentaRetroactiva = lazy(() => import('./screens/VentaRetroactiva.jsx'));
@@ -219,6 +220,7 @@ export default function App() {
             <Route path="/cash" element={guard('cash', <CashClose userName={user.name} />)} />
             <Route path="/finanzas" element={guard('finanzas', <Finanzas role={user.role} />)} />
             <Route path="/comercial" element={guard('comercial', <Comercial />)} />
+            <Route path="/winback" element={guard('winback', <Winback />)} />
             <Route path="/resumen" element={guard('resumen', <Resumen role={user.role} />)} />
             <Route path="/cuadre" element={guard('cuadre', <Cuadre />)} />
             <Route path="/movimientos" element={guard('movimientos', <Movimientos onGo={go} canVoid={!!perms['sales.void']} />)} />

@@ -43,6 +43,7 @@ export const NAV = [
   {
     section: 'Comercial', kind: 'OPERACION', items: [
       { key: 'comercial', label: 'Comercial', icon: 'sparkles', perm: 'reports.view' },
+      { key: 'winback', label: 'Recuperar clientes', icon: 'users', perm: 'reports.view' },
     ],
   },
   {
