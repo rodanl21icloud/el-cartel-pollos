@@ -11,7 +11,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { SYSTEM_PROMPT, FALLBACK_REPLY } from '../../config/chat.js';
 import { TOOL_DEFS, runTool } from './tools.js';
 
-const MODEL = process.env.CHAT_MODEL || 'claude-3-5-haiku-latest';
+const MODEL = process.env.CHAT_MODEL || 'claude-haiku-4-5';
 const MAX_STEPS = 5;
 const MAX_HISTORY = 20;          // últimos N mensajes que se envían al modelo
 const EPHEMERAL = { type: 'ephemeral' };
