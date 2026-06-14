@@ -7,6 +7,27 @@
 import { getDb } from '../db.js';
 
 const CAT_ORDER = ['POLLO', 'COMBOS', 'COLACIONES', 'PAPAS', 'SNACKS', 'BEBIDAS'];
+const COMPLEMENT_CATS = ['PAPAS', 'BEBIDAS', 'SNACKS'];
+
+// 2 complementos de mayor margen (costo BOM real; fallback products.cost).
+// Devuelve SOLO nombre/precio/categoría — nunca costo ni margen.
+async function highMarginComplements(db, limit = 2) {
+  const ph = COMPLEMENT_CATS.map(() => '?').join(',');
+  const rows = (await db.execute({
+    sql: `SELECT p.name, p.price, p.category,
+                 (p.price - COALESCE(
+                    (SELECT SUM(pr.qty_per_unit * i.cost_unit)
+                       FROM product_recipes pr JOIN ingredients i ON i.id = pr.ingredient_id
+                      WHERE pr.product_id = p.id),
+                    p.cost, 0)) AS margin
+          FROM products p
+          WHERE p.is_active = 1 AND p.in_catalog = 1 AND p.category IN (${ph})
+          ORDER BY margin DESC, p.price ASC
+          LIMIT ?`,
+    args: [...COMPLEMENT_CATS, limit],
+  })).rows;
+  return rows.map((r) => ({ name: r.name, price: Number(r.price), category: r.category }));
+}
 
 /** GET /api/public/catalog/:slug */
 export async function getPublicCatalog(req, res) {
@@ -43,6 +64,8 @@ export async function getPublicCatalog(req, res) {
     .sort((a, b) => order(a[0]) - order(b[0]) || a[0].localeCompare(b[0]))
     .map(([name, items]) => ({ name, items }));
 
+  const upsell = await highMarginComplements(db, 2);
+
   return res.json({
     business: {
       name: bs.name,
@@ -58,6 +81,7 @@ export async function getPublicCatalog(req, res) {
       delivery: bs.delivery_enabled == null ? true : !!bs.delivery_enabled,
     },
     categories,
+    upsell,
     count: prods.length,
   });
 }

@@ -31,6 +31,7 @@ import { listUsers, createUser, updateUser, resetPassword } from './controllers/
 import { listDispatch, updateDispatchStatus } from './controllers/dispatch.js';
 import { getPublicCatalog } from './controllers/publicCatalog.js';
 import { getPublicWallet } from './controllers/publicLoyalty.js';
+import { getPublicTracking } from './controllers/publicTracking.js';
 import { getReviews } from './controllers/reviews.js';
 import { chat } from './controllers/chat.js';
 import { deliveryQuote } from './controllers/delivery.js';
@@ -61,6 +62,8 @@ app.post('/api/auth/login', rateLimit({ windowMs: 5 * 60_000, max: 30 }), login)
 app.get('/api/public/catalog/:slug', getPublicCatalog);
 // Billetera de fidelización del cliente (consulta por teléfono). Rate-limit anti-enumeración.
 app.get('/api/public/clients/:phone/wallet', rateLimit({ windowMs: 60_000, max: 20 }), getPublicWallet);
+// Seguimiento del pedido del día por número de orden (sin PII).
+app.get('/api/public/tracking/:order_number', rateLimit({ windowMs: 60_000, max: 60 }), getPublicTracking);
 app.get('/api/public/reviews', getReviews);
 app.post('/api/public/chat', chat); // chatbot de ventas (público)
 app.get('/api/public/delivery-quote', deliveryQuote); // cotización de despacho
