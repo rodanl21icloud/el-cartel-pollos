@@ -5,6 +5,7 @@ import { CAT_ORDER } from './posShared.js';
 import ProductSearch from './ProductSearch.jsx';
 import ProductGrid from './ProductGrid.jsx';
 import Cart from './Cart.jsx';
+import PosCartSheet from './PosCartSheet.jsx';
 import ModifierModal from './ModifierModal.jsx';
 import PaymentPanel from './PaymentPanel.jsx';
 
@@ -85,13 +86,21 @@ export default function ProductSale({ onSold, preload }) {
   }
 
   return (
-    <div className="grid md:grid-cols-3 gap-4">
-      <div className="md:col-span-2">
+    <div className="flex flex-col lg:flex-row lg:gap-4">
+      {/* Productos: 100% en móvil, 70% en desktop. pb-28 deja aire para el peek bar. */}
+      <section className="w-full lg:w-[70%] pb-28 lg:pb-0">
         <ProductSearch search={search} onSearch={setSearch} cat={cat} onCat={setCat} tabs={tabs} />
         <ProductGrid products={products} visible={visible} qtyInCart={qtyInCart} onTap={tapProduct} />
-      </div>
+      </section>
 
-      <Cart lines={lines} total={total} totalUnidades={totalUnidades}
+      {/* Carrito desktop: 30% fijo, sticky. Oculto en móvil. */}
+      <aside className="hidden lg:flex lg:w-[30%] lg:shrink-0">
+        <Cart lines={lines} total={total} totalUnidades={totalUnidades}
+          onInc={incLine} onDec={decLine} onNote={setLineNote} onCheckout={() => setConfirming(true)} />
+      </aside>
+
+      {/* Carrito móvil: bottom sheet. Oculto en lg+. */}
+      <PosCartSheet lines={lines} total={total} totalUnidades={totalUnidades}
         onInc={incLine} onDec={decLine} onNote={setLineNote} onCheckout={() => setConfirming(true)} />
 
       {modalProduct && (

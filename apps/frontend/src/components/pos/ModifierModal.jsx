@@ -44,7 +44,7 @@ export default function ModifierModal({ product, onCancel, onConfirm }) {
   const extra = groups ? groups.flatMap((g) => [...(sel[g.id] || [])].map((oid) => g.options.find((o) => o.id === oid)?.price_delta || 0)).reduce((s, n) => s + n, 0) : 0;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-30" onClick={onCancel}>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={onCancel}>
       <div className="bg-white rounded-2xl p-5 w-full max-w-md max-h-[85vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
         <h3 className="font-black text-lg mb-1">{product.name}</h3>
         <p className="text-sm text-zinc-500 mb-3">{money(product.price)}{extra > 0 ? ` + ${money(extra)}` : ''}</p>

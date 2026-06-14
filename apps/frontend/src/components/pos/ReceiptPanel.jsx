@@ -5,7 +5,7 @@ import { money } from './posShared.js';
 // Panel post-venta: número de orden + acciones de comprobante.
 export default function ReceiptPanel({ data, settings, onClose }) {
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-30" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={onClose}>
       <div className="bg-white rounded-3xl p-6 w-full max-w-sm text-center" onClick={(e) => e.stopPropagation()}>
         <div className="text-sm text-zinc-500">Venta registrada</div>
         <div className="text-6xl font-black text-cartel my-1">{data.offline ? '⏳' : `N° ${data.order_number}`}</div>

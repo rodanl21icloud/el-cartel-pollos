@@ -3,7 +3,7 @@ import { money } from './posShared.js';
 // Panel del pedido (carrito): líneas con nota, +/- cantidad, total y botón Cobrar.
 export default function Cart({ lines, total, totalUnidades, onInc, onDec, onNote, onCheckout }) {
   return (
-    <div className="bg-white rounded-2xl p-4 shadow flex flex-col lg:sticky lg:top-4 lg:max-h-[calc(100vh-7rem)]">
+    <div className="bg-white rounded-2xl p-4 shadow flex flex-col w-full lg:sticky lg:top-4 lg:max-h-[calc(100vh-7rem)]">
       <h2 className="font-black text-lg mb-2">Pedido {totalUnidades > 0 && <span className="text-sm text-zinc-400">({totalUnidades})</span>}</h2>
       <div className="flex-1 space-y-2 overflow-auto">
         {lines.map((l) => (
