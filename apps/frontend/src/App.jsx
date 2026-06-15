@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { getToken } from './lib/api.js';
+import { api, getToken } from './lib/api.js';
 import { useSession } from './store/session.js';
 import { NAV, itemByKey } from './config/nav.js';
 import { Icon } from './config/icons.jsx';
@@ -57,6 +57,7 @@ export default function App() {
   const { user, perms, booting, sessionMsg, setSessionMsg, restore, login, logout } = useSession();
   const [online, setOnline] = useState(navigator.onLine);
   const [drawer, setDrawer] = useState(false);
+  const [alerts, setAlerts] = useState([]); // alertas operativas del día (centro de mando)
   const idleTimer = useRef(null);
 
   useEffect(() => {
@@ -68,6 +69,16 @@ export default function App() {
 
   // Restaurar la sesión al recargar (la URL actual se conserva: deep-link / refresh).
   useEffect(() => { restore(); }, [restore]);
+
+  // Alertas operativas para badges de navegación (solo quien ve el centro de mando).
+  useEffect(() => {
+    if (!user || !perms['reports.view']) { setAlerts([]); return; }
+    let alive = true;
+    const load = () => api('/today').then((d) => alive && setAlerts(d.alerts || [])).catch(() => {});
+    load();
+    const t = setInterval(load, 90000);
+    return () => { alive = false; clearInterval(t); };
+  }, [user, perms]);
 
   async function handleLogin(username, password) {
     const path = await login(username, password);
@@ -122,6 +133,22 @@ export default function App() {
     return it && !perms[it.perm] ? <Forbidden module={it.label.toLowerCase()} /> : el;
   };
 
+  // Badges de alerta en la navegación: nivel por ítem (rojo>ámbar). Las alertas
+  // de rutas hijas también marcan su estación contenedora.
+  const HUB_BY_ROUTE = {
+    pos: 'ventashub', ventas: 'ventashub', operaciones: 'ventashub', retroactiva: 'ventashub', clientes: 'ventashub',
+    kds: 'cocinahub', despacho: 'cocinahub', prediccion: 'cocinahub', merma: 'cocinahub',
+    cash: 'finanzashub', cuadre: 'finanzashub', finanzas: 'finanzashub', movimientos: 'finanzashub',
+  };
+  const navBadges = {};
+  for (const a of alerts) {
+    const lvl = a.level === 'red' ? 'red' : 'amber';
+    const set = (k) => { if (k) navBadges[k] = navBadges[k] === 'red' ? 'red' : lvl; };
+    set(a.route); set(HUB_BY_ROUTE[a.route]);
+  }
+  const totalAlerts = alerts.length;
+  const topLevel = alerts.some((a) => a.level === 'red') ? 'red' : (alerts.length ? 'amber' : null);
+
   return (
     <div className="h-screen flex overflow-hidden" style={{ background: '#f3efe7' }}>
       {/* Sidebar — desktop / tablet */}
@@ -134,7 +161,7 @@ export default function App() {
           style={{ background: 'radial-gradient(ellipse 100% 60% at 50% 112%, rgba(255,90,31,0.16) 0%, transparent 70%)' }}
         />
         <Brand />
-        <NavList groups={groups} screen={screen} onGo={go} />
+        <NavList groups={groups} screen={screen} onGo={go} badges={navBadges} totalAlerts={totalAlerts} topLevel={topLevel} />
         <UserFooter user={user} online={online} onLogout={logout} />
       </aside>
 
@@ -147,7 +174,7 @@ export default function App() {
             style={{ background: '#16110c' }}
           >
             <Brand onClose={() => setDrawer(false)} />
-            <NavList groups={groups} screen={screen} onGo={go} />
+            <NavList groups={groups} screen={screen} onGo={go} badges={navBadges} totalAlerts={totalAlerts} topLevel={topLevel} />
             <UserFooter user={user} online={online} onLogout={logout} />
           </aside>
         </div>
@@ -276,7 +303,7 @@ function Brand({ onClose }) {
   );
 }
 
-function NavList({ groups, screen, onGo }) {
+function NavList({ groups, screen, onGo, badges = {}, totalAlerts = 0, topLevel }) {
   return (
     <nav className="flex-1 overflow-y-auto py-3 px-2.5 space-y-4">
       {/* Inicio */}
@@ -285,6 +312,8 @@ function NavList({ groups, screen, onGo }) {
         label="Hoy"
         active={screen === 'home'}
         onClick={() => onGo('home')}
+        badge={topLevel}
+        count={totalAlerts}
       />
 
       {groups.map((g) => (
@@ -305,6 +334,7 @@ function NavList({ groups, screen, onGo }) {
                 label={i.label}
                 active={screen === i.key}
                 onClick={() => onGo(i.key)}
+                badge={badges[i.key]}
               />
             ))}
           </div>
@@ -314,7 +344,9 @@ function NavList({ groups, screen, onGo }) {
   );
 }
 
-function NavButton({ icon, label, active, onClick }) {
+function NavButton({ icon, label, active, onClick, badge, count }) {
+  const showCount = count != null && count > 0;
+  const dot = badge === 'red' ? 'bg-red-500' : 'bg-amber-400';
   return (
     <button
       onClick={onClick}
@@ -335,6 +367,12 @@ function NavButton({ icon, label, active, onClick }) {
       <span className={`text-[13px] font-condensed font-semibold tracking-wide truncate transition-colors ${active ? 'text-white' : 'group-hover:text-slate-200'}`}>
         {label}
       </span>
+      {/* Badge de alerta: contador (Hoy) o punto de color (ítems) */}
+      {showCount ? (
+        <span className={`ml-auto shrink-0 min-w-[18px] h-[18px] px-1 grid place-items-center rounded-full text-[10px] font-black text-white ${badge === 'red' ? 'bg-red-500' : 'bg-amber-400'}`}>{count}</span>
+      ) : badge ? (
+        <span className={`ml-auto shrink-0 w-2 h-2 rounded-full ${dot}`} />
+      ) : null}
     </button>
   );
 }
