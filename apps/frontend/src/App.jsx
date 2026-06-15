@@ -26,6 +26,9 @@ const Finanzas = lazy(() => import('./screens/Finanzas.jsx'));
 const CentroOperaciones = lazy(() => import('./screens/CentroOperaciones.jsx'));
 const Comercial = lazy(() => import('./screens/Comercial.jsx'));
 const Winback = lazy(() => import('./screens/Winback.jsx'));
+const VentasHub = lazy(() => import('./screens/stations/VentasHub.jsx'));
+const CocinaHub = lazy(() => import('./screens/stations/CocinaHub.jsx'));
+const FinanzasHub = lazy(() => import('./screens/stations/FinanzasHub.jsx'));
 const Banco = lazy(() => import('./screens/Banco.jsx'));
 const Ventas = lazy(() => import('./screens/Ventas.jsx'));
 const VentaRetroactiva = lazy(() => import('./screens/VentaRetroactiva.jsx'));
@@ -205,6 +208,9 @@ export default function App() {
           <Suspense fallback={<Spinner />}>
           <Routes>
             <Route path="/" element={<Home role={user.role} onGo={go} userName={user.name} />} />
+            <Route path="/ventashub" element={guard('ventashub', <VentasHub onGo={go} user={user} perms={perms} />)} />
+            <Route path="/cocinahub" element={guard('cocinahub', <CocinaHub perms={perms} />)} />
+            <Route path="/finanzashub" element={guard('finanzashub', <FinanzasHub onGo={go} user={user} role={user.role} perms={perms} />)} />
             <Route path="/operaciones" element={guard('operaciones', <CentroOperaciones />)} />
             <Route path="/pos" element={guard('pos', <Pos onNavigate={go} />)} />
             <Route path="/ventas" element={guard('ventas', <Ventas canVoid={!!perms['sales.void']} />)} />

@@ -9,6 +9,7 @@
 export const NAV = [
   {
     section: 'Ventas', kind: 'OPERACION', items: [
+      { key: 'ventashub', label: '▶ Estación de ventas', icon: 'cart', perm: 'pos.sell' },
       { key: 'operaciones', label: 'Centro de Operaciones', icon: 'clipboard', perm: 'cash.operate' },
       { key: 'pos', label: 'Punto de venta', icon: 'cart', perm: 'pos.sell' },
       { key: 'ventas', label: 'Pedidos', icon: 'receipt', perm: 'pos.sell' },
@@ -18,6 +19,7 @@ export const NAV = [
   },
   {
     section: 'Cocina y producción', kind: 'OPERACION', items: [
+      { key: 'cocinahub', label: '▶ Estación de cocina', icon: 'chef', perm: 'dispatch.manage' },
       { key: 'kds', label: 'Tablero de cocina', icon: 'chef', perm: 'dispatch.manage' },
       { key: 'despacho', label: 'Despacho', icon: 'moto', perm: 'dispatch.manage' },
       { key: 'prediccion', label: 'Plan de horno', icon: 'flame', perm: 'forecast.view' },
@@ -35,6 +37,7 @@ export const NAV = [
   },
   {
     section: 'Finanzas', kind: 'OPERACION', items: [
+      { key: 'finanzashub', label: '▶ Estación de finanzas', icon: 'cash', perm: 'cash.operate' },
       { key: 'cash', label: 'Caja', icon: 'cash', perm: 'cash.operate' },
       { key: 'cuadre', label: 'Cuadre de turno', icon: 'clock', perm: 'reports.view' },
       { key: 'finanzas', label: 'Finanzas', icon: 'pie', perm: 'reports.view' },
