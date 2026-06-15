@@ -74,7 +74,9 @@ describe('Upselling BOM en el catálogo público', () => {
     await request(app).post('/api/products').set('Authorization', bearer(gtoken))
       .send({ name: 'Papas Premium ' + randomUUID().slice(0, 6), price: 99999, category: 'PAPAS', cost: 1 });
 
-    const c = await request(app).get('/api/public/catalog/cualquier-slug');
+    // Usa el slug configurado (otra suite puede haber fijado catalog_slug).
+    const slug = (await request(app).get('/api/settings').set('Authorization', bearer(gtoken))).body.catalog_slug || 'x';
+    const c = await request(app).get(`/api/public/catalog/${slug}`);
     expect(c.status).toBe(200);
     expect(Array.isArray(c.body.upsell)).toBe(true);
     expect(c.body.upsell.length).toBeLessThanOrEqual(2);

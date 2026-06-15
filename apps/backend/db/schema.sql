@@ -331,6 +331,25 @@ CREATE TABLE IF NOT EXISTS cash_movements (
 );
 
 -- ----------------------------------------------------------------
+-- OVEN_BATCH — producción de pollo del turno. kind HORNO = enviado al horno hoy.
+-- PRECOCIDO = adelantado para mañana. qty en pollos enteros. Base para conciliar
+-- horno vs vendido vs precocido vs merma en "Hoy".
+-- ----------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS oven_batch (
+  id           TEXT PRIMARY KEY,
+  session_id   TEXT,                                              -- sesión de caja del turno (nullable)
+  user_id      TEXT NOT NULL,
+  business_day TEXT NOT NULL,                                     -- 'YYYY-MM-DD' (zona America/Santiago)
+  kind         TEXT NOT NULL CHECK (kind IN ('HORNO','PRECOCIDO')),
+  qty          INTEGER NOT NULL CHECK (qty > 0),                  -- pollos enteros
+  note         TEXT,
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (session_id) REFERENCES cash_sessions(id) ON DELETE SET NULL,
+  FOREIGN KEY (user_id)    REFERENCES users(id)         ON DELETE RESTRICT
+);
+CREATE INDEX IF NOT EXISTS idx_oven_day ON oven_batch(business_day, kind);
+
+-- ----------------------------------------------------------------
 -- EXPENSE_CATEGORIES — categorías de gasto. kind RETIRO = no operativo.
 -- ----------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS expense_categories (

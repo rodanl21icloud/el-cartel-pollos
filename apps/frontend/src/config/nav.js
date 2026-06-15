@@ -1,29 +1,28 @@
 // ============================================================
 // Arquitectura de información (fuente ÚNICA) — 7 áreas operativas.
-// Hoy (centro de mando, botón Inicio) + 6 secciones agrupadas por flujo real:
-// Ventas · Cocina y producción · Inventario y costos · Finanzas ·
-// Clientes y campañas · Administración. `icon` -> set de íconos (config/icons.jsx);
-// `perm` habilita el ítem; `kind` separa operación de administración.
-// Las claves (key) NO cambian -> ruteo y deep-links intactos.
+// Hoy (centro de mando) + 6 secciones por flujo real. `perm` habilita el ítem;
+// `kind` separa operación de administración. `hidden:true` = deprecado del menú
+// (cubierto por una Estación) pero su ruta y guard siguen vivos (compatibilidad
+// + deep-links). Las claves (key) NO cambian.
 // ============================================================
 export const NAV = [
   {
     section: 'Ventas', kind: 'OPERACION', items: [
       { key: 'ventashub', label: '▶ Estación de ventas', icon: 'cart', perm: 'pos.sell' },
-      { key: 'operaciones', label: 'Centro de Operaciones', icon: 'clipboard', perm: 'cash.operate' },
-      { key: 'pos', label: 'Punto de venta', icon: 'cart', perm: 'pos.sell' },
-      { key: 'ventas', label: 'Pedidos', icon: 'receipt', perm: 'pos.sell' },
-      { key: 'retroactiva', label: 'Venta pasada', icon: 'clock', perm: 'sales.backdate' },
-      { key: 'clientes', label: 'Clientes', icon: 'users', perm: 'pos.sell' },
+      { key: 'operaciones', label: 'Centro de Operaciones', icon: 'clipboard', perm: 'cash.operate', hidden: true },
+      { key: 'pos', label: 'Punto de venta', icon: 'cart', perm: 'pos.sell', hidden: true },
+      { key: 'ventas', label: 'Pedidos', icon: 'receipt', perm: 'pos.sell', hidden: true },
+      { key: 'retroactiva', label: 'Venta pasada', icon: 'clock', perm: 'sales.backdate', hidden: true },
+      { key: 'clientes', label: 'Clientes', icon: 'users', perm: 'pos.sell', hidden: true },
     ],
   },
   {
     section: 'Cocina y producción', kind: 'OPERACION', items: [
       { key: 'cocinahub', label: '▶ Estación de cocina', icon: 'chef', perm: 'dispatch.manage' },
-      { key: 'kds', label: 'Tablero de cocina', icon: 'chef', perm: 'dispatch.manage' },
-      { key: 'despacho', label: 'Despacho', icon: 'moto', perm: 'dispatch.manage' },
-      { key: 'prediccion', label: 'Plan de horno', icon: 'flame', perm: 'forecast.view' },
-      { key: 'merma', label: 'Mermas', icon: 'trash', perm: 'inventory.merma' },
+      { key: 'kds', label: 'Tablero de cocina', icon: 'chef', perm: 'dispatch.manage', hidden: true },
+      { key: 'despacho', label: 'Despacho', icon: 'moto', perm: 'dispatch.manage', hidden: true },
+      { key: 'prediccion', label: 'Plan de horno', icon: 'flame', perm: 'forecast.view', hidden: true },
+      { key: 'merma', label: 'Mermas', icon: 'trash', perm: 'inventory.merma', hidden: true },
     ],
   },
   {
@@ -38,10 +37,10 @@ export const NAV = [
   {
     section: 'Finanzas', kind: 'OPERACION', items: [
       { key: 'finanzashub', label: '▶ Estación de finanzas', icon: 'cash', perm: 'cash.operate' },
-      { key: 'cash', label: 'Caja', icon: 'cash', perm: 'cash.operate' },
-      { key: 'cuadre', label: 'Cuadre de turno', icon: 'clock', perm: 'reports.view' },
-      { key: 'finanzas', label: 'Finanzas', icon: 'pie', perm: 'reports.view' },
-      { key: 'movimientos', label: 'Movimientos', icon: 'receipt', perm: 'reports.view' },
+      { key: 'cash', label: 'Caja', icon: 'cash', perm: 'cash.operate', hidden: true },
+      { key: 'cuadre', label: 'Cuadre de turno', icon: 'clock', perm: 'reports.view', hidden: true },
+      { key: 'finanzas', label: 'Finanzas', icon: 'pie', perm: 'reports.view', hidden: true },
+      { key: 'movimientos', label: 'Movimientos', icon: 'receipt', perm: 'reports.view', hidden: true },
     ],
   },
   {
@@ -64,7 +63,6 @@ export const ALL_ITEMS = NAV.flatMap((g) => g.items);
 export const itemByKey = (key) => ALL_ITEMS.find((i) => i.key === key);
 
 // Landing por rol: a qué área entra cada perfil al iniciar sesión.
-// Gerencia/Admin -> Hoy ('/'); Cajero/Supervisor -> Ventas; Cocina/Despacho -> Cocina.
 export const ROLE_LANDING = {
   GERENCIA: '/', ADMIN: '/',
   CAJERO: '/pos', SUPERVISOR: '/pos',

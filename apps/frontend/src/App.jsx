@@ -124,7 +124,7 @@ export default function App() {
 
   const current = itemByKey(screen);
   const currentSection = NAV.find((g) => g.items.some((i) => i.key === screen))?.section;
-  const groups = NAV.map((g) => ({ ...g, items: g.items.filter((i) => perms[i.perm]) })).filter((g) => g.items.length);
+  const groups = NAV.map((g) => ({ ...g, items: g.items.filter((i) => perms[i.perm] && !i.hidden) })).filter((g) => g.items.length);
 
   // Guard de permiso por ruta (defensa además del filtro de menú). Las pantallas
   // que no son ítems de menú (sin entrada en NAV) las refuerza el backend.

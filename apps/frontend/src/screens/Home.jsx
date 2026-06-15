@@ -94,11 +94,18 @@ function CommandCenter({ onGo, userName }) {
           <button onClick={() => onGo('prediccion')} className="text-sm font-bold text-cartel">Plan de horno →</button>
         </div>
         <div className="grid grid-cols-3 gap-3 text-center">
-          <div><div className="text-2xl font-black">{t.horno.enviados}</div><div className="text-xs text-ink-mute">enviados al horno</div></div>
-          <div><div className="text-2xl font-black">{t.horno.porciones_vendidas}</div><div className="text-xs text-ink-mute">porciones vendidas</div></div>
-          <div><div className="text-2xl font-black">{t.horno.sacos_papas_ini}</div><div className="text-xs text-ink-mute">sacos papas (inicio)</div></div>
+          <div><div className="text-2xl font-black">{t.horno.enviados}</div><div className="text-xs text-ink-mute">al horno</div></div>
+          <div><div className="text-2xl font-black">{t.horno.precocidos}</div><div className="text-xs text-ink-mute">precocidos</div></div>
+          <div><div className={`text-2xl font-black ${t.horno.conciliacion === 'no_explicada' ? 'text-red-600' : ''}`}>{t.horno.disponible_estimado}</div><div className="text-xs text-ink-mute">disponible est.</div></div>
         </div>
-        <p className="text-[11px] text-ink-mute mt-2">Conciliación fina (precocidos/merma vs horno) se afina en el cierre de turno.</p>
+        <p className="text-[11px] text-ink-mute mt-2">
+          Vendidos ≈ {t.horno.vendidos_equiv} enteros ({t.horno.porciones_vendidas} porciones) · merma {t.horno.merma} ·{' '}
+          {t.horno.conciliacion === 'no_explicada'
+            ? <b className="text-red-600">descalce: revisa conteo/merma</b>
+            : t.horno.conciliacion === 'explicada'
+              ? <b className="text-green-600">conciliado ✓</b>
+              : 'sin lotes de horno hoy'}
+        </p>
       </div>
 
       {/* Top productos */}

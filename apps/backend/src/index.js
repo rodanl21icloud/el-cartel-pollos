@@ -33,6 +33,7 @@ import { getPublicCatalog } from './controllers/publicCatalog.js';
 import { getPublicWallet } from './controllers/publicLoyalty.js';
 import { getPublicTracking } from './controllers/publicTracking.js';
 import { today } from './controllers/today.js';
+import { registerOvenBatch, ovenToday } from './controllers/oven.js';
 import { getReviews } from './controllers/reviews.js';
 import { chat } from './controllers/chat.js';
 import { deliveryQuote } from './controllers/delivery.js';
@@ -84,6 +85,10 @@ app.get('/api/permissions/me', myPermissions);
 
 // "Hoy" — centro de mando operativo (KPIs + semáforos del día).
 app.get('/api/today', requirePermission('reports.view'), today);
+
+// Producción de pollo del turno (horno / precocido).
+app.post('/api/oven', requirePermission('dispatch.manage'), registerOvenBatch);
+app.get('/api/oven/today', requirePermission('dispatch.manage'), ovenToday);
 
 // Catálogo POS (cualquier autenticado lo lee; vender requiere permiso).
 app.get('/api/products', listProducts);

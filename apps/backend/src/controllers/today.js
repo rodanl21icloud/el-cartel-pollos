@@ -11,6 +11,7 @@ import { chileBusinessDay } from '../services/sales.js';
 const FOOD_COST_AMBER = Number(process.env.FOOD_COST_AMBER_PCT || 30);
 const FOOD_COST_RED = Number(process.env.FOOD_COST_RED_PCT || 35);
 const VOID_AMBER = Number(process.env.VOID_ALERT_COUNT || 3);
+const PORCIONES_POR_ENTERO = Number(process.env.POLLO_PORCIONES_POR_ENTERO || 4); // p/ conciliación horno
 const num = (v) => Number(v || 0);
 
 export async function today(_req, res) {
@@ -24,7 +25,7 @@ export async function today(_req, res) {
     return { n: num(r.n), total: num(r.t), ticket: num(r.n) ? Math.round(num(r.t) / num(r.n)) : 0 };
   };
 
-  const [hoy, semanaPasada, pagos, activosRow, voidsRow, cogsRow, top, sesion, critRows, critCount, incid, cierre, polloRow] = await Promise.all([
+  const [hoy, semanaPasada, pagos, activosRow, voidsRow, cogsRow, top, sesion, critRows, critCount, incid, cierre, polloRow, ovenRows, mermaRow] = await Promise.all([
     ventasDe(day),
     ventasDe(prevWeek),
     q(`SELECT payment_method m, COALESCE(SUM(total),0) t, COUNT(*) n FROM sales WHERE business_day=? AND status='CONFIRMADA' GROUP BY payment_method`, [day]),
@@ -42,6 +43,9 @@ export async function today(_req, res) {
     q(`SELECT period_end, diff_total, has_descuadre, created_at FROM cash_register_closures ORDER BY created_at DESC LIMIT 1`),
     q(`SELECT COALESCE(SUM(si.qty),0) u FROM sale_items si JOIN sales s ON s.id=si.sale_id AND s.business_day=? AND s.status='CONFIRMADA'
         JOIN products p ON p.id=si.product_id WHERE p.category='POLLO'`, [day]),
+    q(`SELECT kind, COALESCE(SUM(qty),0) q FROM oven_batch WHERE business_day=? GROUP BY kind`, [day]),
+    q(`SELECT COALESCE(SUM(ABS(ia.qty_delta)),0) q FROM inventory_adjustments ia JOIN ingredients i ON i.id=ia.ingredient_id
+        WHERE ia.type='MERMA' AND lower(i.name) LIKE '%pollo%' AND substr(ia.created_at,1,10)=?`, [day]),
   ]);
 
   const cogs = num(cogsRow[0]?.cogs);
@@ -49,6 +53,24 @@ export async function today(_req, res) {
   const cajaAbierta = !!sesion[0];
   const stockCriticos = num(critCount[0]?.n);
   const anulaciones = num(voidsRow[0]?.n);
+
+  // Conciliación de pollo del día (horno vs vendido vs precocido vs merma).
+  const hornoEnv = ovenRows.find((r) => r.kind === 'HORNO');
+  const hornoPre = ovenRows.find((r) => r.kind === 'PRECOCIDO');
+  const horno = (() => {
+    const enviados = hornoEnv ? num(hornoEnv.q) : 0;
+    const precocidos = hornoPre ? num(hornoPre.q) : 0;
+    const porciones = num(polloRow[0]?.u);
+    const mermaPollo = num(mermaRow[0]?.q);
+    const vendidosEquiv = Math.round(porciones / PORCIONES_POR_ENTERO);
+    const disponible = enviados - vendidosEquiv - mermaPollo;
+    return {
+      enviados, precocidos, porciones_vendidas: porciones,
+      vendidos_equiv: vendidosEquiv, merma: mermaPollo, disponible_estimado: disponible,
+      porciones_por_entero: PORCIONES_POR_ENTERO,
+      conciliacion: enviados === 0 ? 'sin_datos' : (disponible >= 0 ? 'explicada' : 'no_explicada'),
+    };
+  })();
 
   // --- Alertas / semáforos accionables ---
   const alerts = [];
@@ -59,6 +81,7 @@ export async function today(_req, res) {
   if (anulaciones > VOID_AMBER) alerts.push({ level: 'amber', area: 'Ventas', msg: `${anulaciones} anulaciones hoy`, action: 'Revísalas con el equipo', route: 'auditoria' });
   if (incid.length > 0) alerts.push({ level: 'amber', area: 'Auditoría', msg: `${incid.length} incidencia(s) sensible(s) hoy`, action: 'Revisa la auditoría del turno', route: 'auditoria' });
   if (cierre[0]?.has_descuadre) alerts.push({ level: 'amber', area: 'Caja', msg: 'El cierre anterior tuvo descuadre', action: 'Compara el arqueo del turno', route: 'cuadre' });
+  if (horno.conciliacion === 'no_explicada') alerts.push({ level: 'amber', area: 'Producción', msg: `Descalce de pollo (${horno.disponible_estimado})`, action: 'Vendiste/perdiste más de lo horneado: revisa conteo o merma', route: 'prediccion' });
 
   const deltaVentas = semanaPasada.total > 0 ? Math.round(((hoy.total - semanaPasada.total) / semanaPasada.total) * 100) : null;
 
@@ -72,13 +95,7 @@ export async function today(_req, res) {
     caja: cajaAbierta
       ? { open: true, opening_float: num(sesion[0].opening_float), opened_at: sesion[0].opened_at }
       : { open: false },
-    horno: {
-      enviados: num(sesion[0]?.pollos_horno),
-      porciones_vendidas: num(polloRow[0]?.u),
-      sacos_papas_ini: num(sesion[0]?.sacos_papas_ini),
-      // Conciliación fina (precocidos/merma vs horno) requiere oven_batch (pendiente F-E).
-      conciliacion: 'parcial',
-    },
+    horno,
     top: top.map((r) => ({ name: r.name, unidades: num(r.u), monto: num(r.t) })),
     stock_critico: { count: stockCriticos, items: critRows.map((r) => ({ name: r.name, unit: r.unit, stock: num(r.stock_qty), min: num(r.min_stock_qty) })) },
     incidencias: incid.map((r) => ({ action: r.action, severity: r.severity, at: r.created_at })),
