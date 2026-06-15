@@ -7,7 +7,7 @@
 import { create } from 'zustand';
 import { api, setToken, clearToken, getToken } from '../lib/api.js';
 import { setSessionKey } from '../lib/crypto.js';
-import { ALL_ITEMS } from '../config/nav.js';
+import { ALL_ITEMS, ROLE_LANDING } from '../config/nav.js';
 
 function clearLocalSession() {
   clearToken();
@@ -50,6 +50,10 @@ export const useSession = create((set) => ({
     localStorage.setItem('session', JSON.stringify(data.session));
     const me = await api('/permissions/me');
     set({ perms: me.permissions, user: data.user, sessionMsg: '' });
+    // Landing por rol; si el rol no tiene mapeo o permiso, cae al primer ítem permitido.
+    const landing = ROLE_LANDING[data.user.role];
+    const item = landing && ALL_ITEMS.find((n) => `/${n.key}` === landing);
+    if (landing === '/' || (item && me.permissions[item.perm])) return landing;
     const first = ALL_ITEMS.find((n) => me.permissions[n.perm]);
     return first ? `/${first.key}` : '/';
   },

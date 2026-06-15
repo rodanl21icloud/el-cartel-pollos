@@ -178,7 +178,7 @@ export default function App() {
                 </div>
               )}
               <h1 className="text-base font-bold tracking-tight truncate leading-tight text-slate-900">
-                {current?.label || 'Inicio'}
+                {current?.label || 'Hoy'}
               </h1>
             </div>
           </div>
@@ -276,7 +276,7 @@ function NavList({ groups, screen, onGo }) {
       {/* Inicio */}
       <NavButton
         icon="home"
-        label="Inicio"
+        label="Hoy"
         active={screen === 'home'}
         onClick={() => onGo('home')}
       />
